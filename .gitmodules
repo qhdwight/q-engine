@@ -1,0 +1,9 @@
+[submodule "glfw"]
+	path = glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "glm"]
+	path = glm
+	url = https://github.com/g-truc/glm.git
+[submodule "physx"]
+	path = physx
+	url = https://github.com/NVIDIAGameWorks/PhysX.git
