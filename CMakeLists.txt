@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 project(game_engine)
 set(CMAKE_CXX_STANDARD 17)
 
-#if (MSVC)
-#    add_compile_options(/Wv:18)
-#endif ()
+if (MSVC)
+    add_compile_options(/Wv:18)
+endif ()
 
 # Vulkan
 set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.2.198.1")
@@ -12,7 +12,6 @@ find_package(Vulkan REQUIRED)
 include_directories(${Vulkan_INCLUDE_DIRS})
 # GLFW
 add_subdirectory(glfw)
-#target_compile_definitions(glfw PUBLIC _GLFW_VULKAN_STATIC)
 # GLM
 add_subdirectory(glm)
 include_directories(glm)

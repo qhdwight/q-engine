@@ -2,8 +2,6 @@
 #include "shaders.hpp"
 #include "utils.hpp"
 
-#include <GLFW/glfw3.h>
-
 #include <PxConfig.h>
 #include <PxPhysicsAPI.h>
 #include <vulkan/vulkan.hpp>
@@ -19,6 +17,22 @@
 template<typename T>
 struct px_ptr : public std::shared_ptr<T> {
     explicit px_ptr(T *ptr) : std::shared_ptr<T>(ptr, [](T *ptr) { ptr->release(); }) {}
+};
+
+struct Vulkan {
+    vk::Instance inst;
+    std::optional<vk::PhysicalDevice> physDev;
+    std::optional<vk::Device> device;
+    std::optional<vk::su::SurfaceData> surfData;
+    std::optional<vk::CommandBuffer> cmdBuf;
+    std::optional<vk::Queue> graphicsQueue, presentQueue;
+    std::optional<vk::su::SwapChainData> swapChainData;
+    std::optional<vk::PipelineLayout> pipelineLayout;
+    std::optional<vk::RenderPass> renderPass;
+    std::vector<vk::Framebuffer> framebufs;
+    std::optional<vk::su::BufferData> vertBufData;
+    std::optional<vk::DescriptorSet> descSet;
+    std::optional<vk::Pipeline> pipeline;
 };
 
 void initPhysics() {
@@ -67,169 +81,172 @@ glm::mat4x4 calcMVPCMat(vk::Extent2D const &extent) {
     return clip * projection * view * model;
 }
 
-int main() {
-    try {
-        std::string const appName = "Game Engine", engineName = "QEngine";
+Vulkan getVulkanInstance() {
+    std::string const appName = "Game Engine", engineName = "QEngine";
+    return {vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions())};
+}
 
-        initPhysics();
-
-        vk::Instance inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
-
+void initVulkan(Vulkan &vk) {
 #ifndef NDEBUG
-        inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+    vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
 #endif
 
-        vk::PhysicalDevice physDev = inst.enumeratePhysicalDevices().front();
+    std::vector<vk::PhysicalDevice> const &physDevs = vk.inst.enumeratePhysicalDevices();
+    if (physDevs.empty()) {
+        throw std::runtime_error("No physical devices found");
+    }
+    vk.physDev = physDevs.front();
 
-//        vk::su::WindowData window = vk::su::createWindow(appName, vk::Extent2D(500, 500));
-//        vk::Win32SurfaceCreateInfoKHR{.hInstance = GetModuleHandle(NULL), .hwnd = window.handle->win32.handle};
-//        inst.createWin32SurfaceKHR()
-        vk::su::SurfaceData surfData(inst, appName, vk::Extent2D(500, 500));
+    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(500, 500));
 
-        std::pair<uint32_t, uint32_t> graphicsAndPresentQueueFamilyIndex =
-                vk::su::findGraphicsAndPresentQueueFamilyIndex(physDev, surfData.surface);
-        vk::Device device = vk::su::createDevice(physDev,
-                                                 graphicsAndPresentQueueFamilyIndex.first,
-                                                 vk::su::getDeviceExtensions());
+    std::pair<uint32_t, uint32_t> qFamilyIdx =
+            vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    vk.device = vk::su::createDevice(*vk.physDev,
+                                     qFamilyIdx.first,
+                                     vk::su::getDeviceExtensions());
 
-        vk::CommandPool cmdPool = vk::su::createCommandPool(device, graphicsAndPresentQueueFamilyIndex.first);
-        vk::CommandBuffer cmdBuf = device.allocateCommandBuffers(
-                        vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
-                .front();
+    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, qFamilyIdx.first);
+    vk.cmdBuf = vk.device->allocateCommandBuffers(
+                    vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
+            .front();
 
-        vk::Queue graphicsQueue = device.getQueue(graphicsAndPresentQueueFamilyIndex.first, 0);
-        vk::Queue presentQueue = device.getQueue(graphicsAndPresentQueueFamilyIndex.second, 0);
+    vk.graphicsQueue = vk.device->getQueue(qFamilyIdx.first, 0);
+    vk.presentQueue = vk.device->getQueue(qFamilyIdx.second, 0);
 
-        vk::su::SwapChainData swapChainData(physDev,
-                                            device,
-                                            surfData.surface,
-                                            surfData.extent,
-                                            vk::ImageUsageFlagBits::eColorAttachment |
-                                            vk::ImageUsageFlagBits::eTransferSrc,
-                                            {},
-                                            graphicsAndPresentQueueFamilyIndex.first,
-                                            graphicsAndPresentQueueFamilyIndex.second);
+    vk.swapChainData = vk::su::SwapChainData(*vk.physDev,
+                                             *vk.device,
+                                             vk.surfData->surface,
+                                             vk.surfData->extent,
+                                             vk::ImageUsageFlagBits::eColorAttachment |
+                                             vk::ImageUsageFlagBits::eTransferSrc,
+                                             {},
+                                             qFamilyIdx.first,
+                                             qFamilyIdx.second);
 
-        vk::su::DepthBufferData depthBufData(physDev, device, vk::Format::eD16Unorm, surfData.extent);
+    vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
 
-        vk::su::BufferData uniformBufData(physDev, device, sizeof(glm::mat4x4),
-                                          vk::BufferUsageFlagBits::eUniformBuffer);
-        glm::mat4x4 mvpcMat = calcMVPCMat(surfData.extent);
-        vk::su::copyToDevice(device, uniformBufData.deviceMemory, mvpcMat);
+    vk::su::BufferData uniformBufData(*vk.physDev, *vk.device, sizeof(glm::mat4x4),
+                                      vk::BufferUsageFlagBits::eUniformBuffer);
+    glm::mat4x4 mvpcMat = calcMVPCMat(vk.surfData->extent);
+    vk::su::copyToDevice(*vk.device, uniformBufData.deviceMemory, mvpcMat);
 
-        vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
-                device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}});
-        vk::PipelineLayout pipelineLayout = device.createPipelineLayout(
-                vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), descSetLayout));
+    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
+            *vk.device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}});
+    vk.pipelineLayout = vk.device->createPipelineLayout(
+            vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), descSetLayout));
 
-        vk::RenderPass renderPass = vk::su::createRenderPass(
-                device,
-                vk::su::pickSurfaceFormat(physDev.getSurfaceFormatsKHR(surfData.surface)).format,
-                depthBufData.format);
+    vk.renderPass = vk::su::createRenderPass(
+            *vk.device,
+            vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(vk.surfData->surface)).format,
+            depthBufData.format);
 
-        glslang::InitializeProcess();
-        vk::ShaderModule vertexShaderModule =
-                vk::su::createShaderModule(device, vk::ShaderStageFlagBits::eVertex, vertexShaderText_PC_C);
-        vk::ShaderModule fragmentShaderModule =
-                vk::su::createShaderModule(device, vk::ShaderStageFlagBits::eFragment, fragmentShaderText_C_C);
-        glslang::FinalizeProcess();
+    glslang::InitializeProcess();
+    vk::ShaderModule vertexShaderModule =
+            vk::su::createShaderModule(*vk.device, vk::ShaderStageFlagBits::eVertex, vertexShaderText_PC_C);
+    vk::ShaderModule fragmentShaderModule =
+            vk::su::createShaderModule(*vk.device, vk::ShaderStageFlagBits::eFragment, fragmentShaderText_C_C);
+    glslang::FinalizeProcess();
 
-        std::vector<vk::Framebuffer> framebufs = vk::su::createFramebuffers(
-                device, renderPass, swapChainData.imageViews, depthBufData.imageView, surfData.extent);
+    vk.framebufs = vk::su::createFramebuffers(
+            *vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
 
-        vk::su::BufferData vertBufData(
-                physDev, device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
-        vk::su::copyToDevice(device,
-                             vertBufData.deviceMemory,
-                             coloredCubeData,
-                             sizeof(coloredCubeData) / sizeof(coloredCubeData[0]));
+    vk.vertBufData.emplace(*vk.physDev, *vk.device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
+    vk::su::copyToDevice(*vk.device,
+                         vk.vertBufData->deviceMemory,
+                         coloredCubeData,
+                         sizeof(coloredCubeData) / sizeof(coloredCubeData[0]));
 
-        vk::DescriptorPool descPool =
-                vk::su::createDescriptorPool(device, {{vk::DescriptorType::eUniformBuffer, 1}});
-        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(descPool, descSetLayout);
-        vk::DescriptorSet descSet = device.allocateDescriptorSets(descriptorSetAllocateInfo).front();
+    vk::DescriptorPool descPool =
+            vk::su::createDescriptorPool(*vk.device, {{vk::DescriptorType::eUniformBuffer, 1}});
+    vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(descPool, descSetLayout);
+    vk.descSet = vk.device->allocateDescriptorSets(descriptorSetAllocateInfo).front();
 
-        vk::su::updateDescriptorSets(
-                device, descSet, {{vk::DescriptorType::eUniformBuffer, uniformBufData.buffer, {}}}, {});
+    vk::su::updateDescriptorSets(
+            *vk.device, *vk.descSet, {{vk::DescriptorType::eUniformBuffer, uniformBufData.buffer, {}}}, {});
 
-        vk::PipelineCache pipelineCache = device.createPipelineCache(vk::PipelineCacheCreateInfo());
-        vk::Pipeline graphicsPipeline = vk::su::createGraphicsPipeline(
-                device,
-                pipelineCache,
-                std::make_pair(vertexShaderModule, nullptr),
-                std::make_pair(fragmentShaderModule, nullptr),
-                sizeof(coloredCubeData[0]),
-                {{vk::Format::eR32G32B32A32Sfloat, 0},
-                 {vk::Format::eR32G32B32A32Sfloat, 16}},
-                vk::FrontFace::eClockwise,
-                true,
-                pipelineLayout,
-                renderPass);
+    vk::PipelineCache pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
+    vk.pipeline = vk::su::createGraphicsPipeline(
+            *vk.device,
+            pipelineCache,
+            std::make_pair(vertexShaderModule, nullptr),
+            std::make_pair(fragmentShaderModule, nullptr),
+            sizeof(coloredCubeData[0]),
+            {{vk::Format::eR32G32B32A32Sfloat, 0},
+             {vk::Format::eR32G32B32A32Sfloat, 16}},
+            vk::FrontFace::eClockwise,
+            true,
+            *vk.pipelineLayout,
+            *vk.renderPass);
+}
 
-        /* VULKAN_KEY_START */
+void render(Vulkan &vk) {
+    vk::Semaphore imageAcquiredSemaphore = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
+    vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout,
+                                                                      imageAcquiredSemaphore, nullptr);
+    assert(curBuf.result == vk::Result::eSuccess);
+    assert(curBuf.value < vk.framebufs.size());
 
-        // Get the index of the next available swapchain image:
-        vk::Semaphore imageAcquiredSemaphore = device.createSemaphore(vk::SemaphoreCreateInfo());
-        vk::ResultValue<uint32_t> curBuf =
-                device.acquireNextImageKHR(swapChainData.swapChain, vk::su::FenceTimeout, imageAcquiredSemaphore,
-                                           nullptr);
-        assert(curBuf.result == vk::Result::eSuccess);
-        assert(curBuf.value < framebufs.size());
+    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
 
-        cmdBuf.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
+    std::array<vk::ClearValue, 2> clearVals;
+    clearVals[0].color = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
+    clearVals[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+    vk::RenderPassBeginInfo renderPassBeginInfo(*vk.renderPass,
+                                                vk.framebufs[curBuf.value],
+                                                vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent),
+                                                clearVals);
+    vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
+    vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *vk.pipelineLayout, 0, *vk.descSet, nullptr);
 
-        std::array<vk::ClearValue, 2> clearVals;
-        clearVals[0].color = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
-        clearVals[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-        vk::RenderPassBeginInfo renderPassBeginInfo(renderPass,
-                                                    framebufs[curBuf.value],
-                                                    vk::Rect2D(vk::Offset2D(0, 0), surfData.extent),
-                                                    clearVals);
-        cmdBuf.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-        cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
-        cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descSet, nullptr);
-
-        cmdBuf.bindVertexBuffers(0, vertBufData.buffer, {0});
-        cmdBuf.setViewport(0,
+    vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
+    vk.cmdBuf->setViewport(0,
                            vk::Viewport(0.0f,
                                         0.0f,
-                                        static_cast<float>(surfData.extent.width),
-                                        static_cast<float>(surfData.extent.height),
+                                        static_cast<float>(vk.surfData->extent.width),
+                                        static_cast<float>(vk.surfData->extent.height),
                                         0.0f,
                                         1.0f));
-        cmdBuf.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), surfData.extent));
+    vk.cmdBuf->setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent));
 
-        cmdBuf.draw(12 * 3, 1, 0, 0);
-        cmdBuf.endRenderPass();
-        cmdBuf.end();
+    vk.cmdBuf->draw(12 * 3, 1, 0, 0);
+    vk.cmdBuf->endRenderPass();
+    vk.cmdBuf->end();
 
-        vk::Fence drawFence = device.createFence(vk::FenceCreateInfo());
+    vk::Fence drawFence = vk.device->createFence(vk::FenceCreateInfo());
 
-        vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-        vk::SubmitInfo submitInfo(imageAcquiredSemaphore, waitDestStageMask, cmdBuf);
-        graphicsQueue.submit(submitInfo, drawFence);
+    vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    vk::SubmitInfo submitInfo(imageAcquiredSemaphore, waitDestStageMask, *vk.cmdBuf);
+    vk.graphicsQueue->submit(submitInfo, drawFence);
 
-        while (vk::Result::eTimeout == device.waitForFences(drawFence, VK_TRUE, vk::su::FenceTimeout));
+    while (vk::Result::eTimeout == vk.device->waitForFences(drawFence, VK_TRUE, vk::su::FenceTimeout));
 
-        vk::Result result =
-                presentQueue.presentKHR(vk::PresentInfoKHR({}, swapChainData.swapChain, curBuf.value));
-        switch (result) {
-            case vk::Result::eSuccess:
-                break;
-            case vk::Result::eSuboptimalKHR:
-                std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
-                break;
-            default:
-                assert(false);  // an unexpected result is returned !
+    vk::Result result =
+            vk.presentQueue->presentKHR(vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));
+    switch (result) {
+        case vk::Result::eSuccess:
+            break;
+        case vk::Result::eSuboptimalKHR:
+            std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
+            break;
+        default:
+            assert(false);  // an unexpected result is returned !
+    }
+}
+
+int main() {
+    try {
+        initPhysics();
+
+        Vulkan vk = getVulkanInstance();
+        initVulkan(vk);
+
+        while (!glfwWindowShouldClose(vk.surfData->window.handle)) {
+            render(vk);
+            glfwPollEvents();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-        device.waitIdle();
-
-//        while (!glfwWindowShouldClose(window.get())) {
-//            glfwPollEvents();
-//        }
-//        glfwTerminate();
+        vk.device->waitIdle();
     }
     catch (vk::SystemError &err) {
         std::cout << "vk::SystemError: " << err.what() << std::endl;
