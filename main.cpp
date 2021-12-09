@@ -65,15 +65,12 @@ void initPhysics() {
 
 glm::mat4x4 calcMVPCMat(vk::Extent2D const &extent) {
     float fov = glm::radians(45.0f);
-    if (extent.width > extent.height) {
-        fov *= static_cast<float>(extent.height) / static_cast<float>(extent.width);
-    }
-
     glm::mat4x4 model = glm::mat4x4(1.0f);
     glm::mat4x4 view = glm::lookAt(glm::vec3(-5.0f, 3.0f, -10.0f),
                                    glm::vec3(0.0f, 0.0f, 0.0f),
                                    glm::vec3(0.0f, -1.0f, 0.0f));
-    glm::mat4x4 projection = glm::perspective(fov, 1.0f, 0.1f, 100.0f);
+    float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+    glm::mat4x4 projection = glm::perspective(fov, aspect, 0.1f, 100.0f);
     glm::mat4x4 clip = glm::mat4x4(1.0f, 0.0f, 0.0f, 0.0f,
                                    0.0f, -1.0f, 0.0f, 0.0f,
                                    0.0f, 0.0f, 0.5f, 0.0f,
@@ -86,42 +83,18 @@ Vulkan getVulkanInstance() {
     return {vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions())};
 }
 
-void initVulkan(Vulkan &vk) {
-#ifndef NDEBUG
-    vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
-#endif
-
-    std::vector<vk::PhysicalDevice> const &physDevs = vk.inst.enumeratePhysicalDevices();
-    if (physDevs.empty()) {
-        throw std::runtime_error("No physical devices found");
-    }
-    vk.physDev = physDevs.front();
-
-    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(500, 500));
-
-    std::pair<uint32_t, uint32_t> qFamilyIdx =
+void createPipeline(Vulkan &vk) {
+    std::pair<uint32_t, uint32_t> familyIdx =
             vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
-    vk.device = vk::su::createDevice(*vk.physDev,
-                                     qFamilyIdx.first,
-                                     vk::su::getDeviceExtensions());
-
-    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, qFamilyIdx.first);
-    vk.cmdBuf = vk.device->allocateCommandBuffers(
-                    vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
-            .front();
-
-    vk.graphicsQueue = vk.device->getQueue(qFamilyIdx.first, 0);
-    vk.presentQueue = vk.device->getQueue(qFamilyIdx.second, 0);
-
-    vk.swapChainData = vk::su::SwapChainData(*vk.physDev,
-                                             *vk.device,
-                                             vk.surfData->surface,
-                                             vk.surfData->extent,
-                                             vk::ImageUsageFlagBits::eColorAttachment |
-                                             vk::ImageUsageFlagBits::eTransferSrc,
-                                             {},
-                                             qFamilyIdx.first,
-                                             qFamilyIdx.second);
+    vk.swapChainData = vk::su::SwapChainData(
+            *vk.physDev,
+            *vk.device,
+            vk.surfData->surface,
+            vk.surfData->extent,
+            vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+            {},
+            familyIdx.first,
+            familyIdx.second);
 
     vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
 
@@ -164,10 +137,9 @@ void initVulkan(Vulkan &vk) {
     vk::su::updateDescriptorSets(
             *vk.device, *vk.descSet, {{vk::DescriptorType::eUniformBuffer, uniformBufData.buffer, {}}}, {});
 
-    vk::PipelineCache pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
     vk.pipeline = vk::su::createGraphicsPipeline(
             *vk.device,
-            pipelineCache,
+            vk.device->createPipelineCache(vk::PipelineCacheCreateInfo()),
             std::make_pair(vertexShaderModule, nullptr),
             std::make_pair(fragmentShaderModule, nullptr),
             sizeof(coloredCubeData[0]),
@@ -177,6 +149,46 @@ void initVulkan(Vulkan &vk) {
             true,
             *vk.pipelineLayout,
             *vk.renderPass);
+}
+
+void recreatePipeline(Vulkan &vk) {
+    vk.device->waitIdle();
+    int width, height;
+    glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
+    vk.surfData->extent = vk::Extent2D(width, height);
+    vk.swapChainData->clear(*vk.device);
+    vk.vertBufData->clear(*vk.device);
+    createPipeline(vk);
+}
+
+void initVulkan(Vulkan &vk) {
+#ifndef NDEBUG
+    vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+#endif
+
+    std::vector<vk::PhysicalDevice> const &physDevs = vk.inst.enumeratePhysicalDevices();
+    if (physDevs.empty()) {
+        throw std::runtime_error("No physical devices found");
+    }
+    vk.physDev = physDevs.front();
+
+    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(500, 500));
+
+    std::pair<uint32_t, uint32_t> familyIdx =
+            vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    vk.device = vk::su::createDevice(*vk.physDev,
+                                     familyIdx.first,
+                                     vk::su::getDeviceExtensions());
+
+    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, familyIdx.first);
+    vk.cmdBuf = vk.device->allocateCommandBuffers(
+                    vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
+            .front();
+
+    vk.graphicsQueue = vk.device->getQueue(familyIdx.first, 0);
+    vk.presentQueue = vk.device->getQueue(familyIdx.second, 0);
+
+    createPipeline(vk);
 }
 
 void render(Vulkan &vk) {
@@ -221,16 +233,20 @@ void render(Vulkan &vk) {
 
     while (vk::Result::eTimeout == vk.device->waitForFences(drawFence, VK_TRUE, vk::su::FenceTimeout));
 
-    vk::Result result =
-            vk.presentQueue->presentKHR(vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));
-    switch (result) {
-        case vk::Result::eSuccess:
-            break;
-        case vk::Result::eSuboptimalKHR:
-            std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
-            break;
-        default:
-            assert(false);  // an unexpected result is returned !
+    try {
+        vk::Result result = vk.presentQueue->presentKHR(
+                vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));
+        switch (result) {
+            case vk::Result::eSuccess:
+                break;
+            case vk::Result::eSuboptimalKHR:
+                std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
+                break;
+            default:
+                assert(false);  // an unexpected result is returned !
+        }
+    } catch (vk::OutOfDateKHRError const &outOfDateError) {
+        recreatePipeline(vk);
     }
 }
 
