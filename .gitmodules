@@ -7,3 +7,6 @@
 [submodule "physx"]
 	path = physx
 	url = https://github.com/NVIDIAGameWorks/PhysX.git
+[submodule "glslang"]
+	path = glslang
+	url = https://github.com/KhronosGroup/glslang.git

@@ -1,29 +1,37 @@
 cmake_minimum_required(VERSION 3.16)
 project(game_engine)
+set(CMAKE_CXX_STANDARD 17)
 
+#if (MSVC)
+#    add_compile_options(/Wv:18)
+#endif ()
+
+# Vulkan
+set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.2.198.1")
+find_package(Vulkan REQUIRED)
+include_directories(${Vulkan_INCLUDE_DIRS})
+# GLFW
 add_subdirectory(glfw)
+#target_compile_definitions(glfw PUBLIC _GLFW_VULKAN_STATIC)
+# GLM
 add_subdirectory(glm)
+include_directories(glm)
+# GLSLANG
+add_subdirectory(glslang)
+include_directories(glslang)
+# PhysX
 set(PHYSX_PATH ${PROJECT_SOURCE_DIR}/physx)
 set(PHYSX_ROOT_DIR ${PHYSX_PATH}/physx)
-set(PHYSX_INCLUDE_DIRS ${PHYSX_PATH}/physx/include/ ${PHYSX_PATH}/pxshared/include/)
-set(PHYSX_LIBRARIES
-        PhysXExtensions
-        PhysX
-        PhysXPvdSDK
-        PhysXVehicle
-        PhysXCharacterKinematic
-        PhysXCooking
-        PhysXCommon
-        PhysXFoundation
-        )
+set(PHYSX_INCLUDE_DIRS ${PHYSX_PATH}/physx/include ${PHYSX_PATH}/pxshared/include)
+set(PHYSX_LIBRARIES PhysXExtensions PhysX PhysXPvdSDK PhysXVehicle PhysXCharacterKinematic PhysXCooking PhysXCommon PhysXFoundation)
 if (WIN32)
     set(TARGET_BUILD_PLATFORM "windows")
+    set(NV_USE_STATIC_WINCRT ON CACHE BOOL "Use the statically linked windows CRT")
+    set(NV_USE_DEBUG_WINCRT ON CACHE BOOL "Use the debug version of the CRT")
 endif ()
 set(PX_BUILDSNIPPETS OFF CACHE BOOL "Generate the snippets")
 set(PX_BUILDPUBLICSAMPLES OFF CACHE BOOL "Generate the samples projects")
 set(PX_GENERATE_STATIC_LIBRARIES ON CACHE BOOL "Generate static libraries")
-set(NV_USE_STATIC_WINCRT ON CACHE BOOL "Use the statically linked windows CRT")
-set(NV_USE_DEBUG_WINCRT ON CACHE BOOL "Use the debug version of the CRT")
 set(PXSHARED_PATH ${PHYSX_PATH}/pxshared)
 set(PXSHARED_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 set(CMAKEMODULES_PATH ${PHYSX_PATH}/externals/cmakemodules)
@@ -31,7 +39,9 @@ set(PX_OUTPUT_LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/externals/physx)
 set(PX_OUTPUT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/externals/physx)
 add_subdirectory(${PHYSX_PATH}/physx/compiler/public ${PHYSX_PATH}/externals/physx)
 
-set(CMAKE_CXX_STANDARD 20)
-
-add_executable(game_engine main.cpp)
-target_link_libraries(game_engine glfw ${PHYSX_LIBRARIES})
+add_executable(game_engine main.cpp utils.cpp shaders.cpp)
+target_link_libraries(game_engine glfw glm glslang glslang-default-resource-limits SPIRV ${PHYSX_LIBRARIES})
+target_compile_definitions(game_engine PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+if (WIN32)
+    target_compile_definitions(game_engine PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
+endif ()
