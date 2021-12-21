@@ -1,23 +1,16 @@
 #include "geometries.hpp"
 #include "shaders.hpp"
+#include "physics.hpp"
 #include "utils.hpp"
+#include "state.hpp"
 
-#include <PxConfig.h>
-#include <PxPhysicsAPI.h>
 #include <vulkan/vulkan.hpp>
 #include <SPIRV/GlslangToSpv.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <memory>
-#include <thread>
 #include <optional>
 #include <iostream>
-
-template<typename T>
-struct px_ptr : public std::shared_ptr<T> {
-    explicit px_ptr(T *ptr) : std::shared_ptr<T>(ptr, [](T *ptr) { ptr->release(); }) {}
-};
 
 struct Vulkan {
     vk::Instance inst;
@@ -35,35 +28,7 @@ struct Vulkan {
     std::optional<vk::Pipeline> pipeline;
 };
 
-void initPhysics() {
-    physx::PxDefaultErrorCallback errorCallback;
-    physx::PxDefaultAllocator allocCallback;
-    px_ptr<physx::PxFoundation> foundation{
-            PxCreateFoundation(PX_PHYSICS_VERSION, allocCallback, errorCallback)};
-    if (!foundation) {
-        throw std::runtime_error("Failed to create PhysX foundation");
-    }
-    px_ptr<physx::PxPhysics> physics{
-            PxCreatePhysics(PX_PHYSICS_VERSION, *foundation, physx::PxTolerancesScale(), true)};
-    physx::PxSceneDesc sceneDesc(physics->getTolerancesScale());
-    if (!sceneDesc.cpuDispatcher) {
-        physx::PxDefaultCpuDispatcher *cpuDispatcher = physx::PxDefaultCpuDispatcherCreate(1);
-        sceneDesc.cpuDispatcher = cpuDispatcher;
-    }
-    if (!sceneDesc.filterShader) {
-        sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
-    }
-    physx::PxScene *scene = physics->createScene(sceneDesc);
-    if (!scene) {
-        throw std::runtime_error("Failed to create PhysX scene");
-    }
-    scene->setGravity({0.0f, -9.8f, 0.0f});
-    if (!physics) {
-        throw std::runtime_error("Failed to create PhysX physics");
-    }
-}
-
-glm::mat4x4 calcMVPCMat(vk::Extent2D const &extent) {
+glm::mat4x4 calcMVPCMat(vk::Extent2D const& extent) {
     float fov = glm::radians(45.0f);
     glm::mat4x4 model = glm::mat4x4(1.0f);
     glm::mat4x4 view = glm::lookAt(glm::vec3(-5.0f, 3.0f, -10.0f),
@@ -83,9 +48,8 @@ Vulkan getVulkanInstance() {
     return {vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions())};
 }
 
-void createPipeline(Vulkan &vk) {
-    std::pair<uint32_t, uint32_t> familyIdx =
-            vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+void createPipeline(Vulkan& vk) {
+    auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
             *vk.physDev,
             *vk.device,
@@ -93,8 +57,8 @@ void createPipeline(Vulkan &vk) {
             vk.surfData->extent,
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             {},
-            familyIdx.first,
-            familyIdx.second);
+            graphicsFamilyIdx,
+            presentFamilyIdx);
 
     vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
 
@@ -151,7 +115,7 @@ void createPipeline(Vulkan &vk) {
             *vk.renderPass);
 }
 
-void recreatePipeline(Vulkan &vk) {
+void recreatePipeline(Vulkan& vk) {
     vk.device->waitIdle();
     int width, height;
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
@@ -161,12 +125,12 @@ void recreatePipeline(Vulkan &vk) {
     createPipeline(vk);
 }
 
-void initVulkan(Vulkan &vk) {
+void initVulkan(Vulkan& vk) {
 #ifndef NDEBUG
     vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
 #endif
 
-    std::vector<vk::PhysicalDevice> const &physDevs = vk.inst.enumeratePhysicalDevices();
+    std::vector<vk::PhysicalDevice> const& physDevs = vk.inst.enumeratePhysicalDevices();
     if (physDevs.empty()) {
         throw std::runtime_error("No physical devices found");
     }
@@ -174,35 +138,40 @@ void initVulkan(Vulkan &vk) {
 
     vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(500, 500));
 
-    std::pair<uint32_t, uint32_t> familyIdx =
-            vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.device = vk::su::createDevice(*vk.physDev,
-                                     familyIdx.first,
+                                     graphicsFamilyIdx,
                                      vk::su::getDeviceExtensions());
 
-    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, familyIdx.first);
+    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, graphicsFamilyIdx);
     vk.cmdBuf = vk.device->allocateCommandBuffers(
                     vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
             .front();
 
-    vk.graphicsQueue = vk.device->getQueue(familyIdx.first, 0);
-    vk.presentQueue = vk.device->getQueue(familyIdx.second, 0);
+    vk.graphicsQueue = vk.device->getQueue(graphicsFamilyIdx, 0);
+    vk.presentQueue = vk.device->getQueue(presentFamilyIdx, 0);
 
     createPipeline(vk);
 }
 
-void render(Vulkan &vk) {
+void render(Vulkan& vk) {
     vk::Semaphore imageAcquiredSemaphore = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
     vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout,
                                                                       imageAcquiredSemaphore, nullptr);
+
+    if (curBuf.result == vk::Result::eSuboptimalKHR) {
+        recreatePipeline(vk);
+        return;
+    }
+
     assert(curBuf.result == vk::Result::eSuccess);
     assert(curBuf.value < vk.framebufs.size());
 
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
 
-    std::array<vk::ClearValue, 2> clearVals;
-    clearVals[0].color = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
-    clearVals[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
+    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
+    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
     vk::RenderPassBeginInfo renderPassBeginInfo(*vk.renderPass,
                                                 vk.framebufs[curBuf.value],
                                                 vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent),
@@ -245,15 +214,13 @@ void render(Vulkan &vk) {
             default:
                 assert(false);  // an unexpected result is returned !
         }
-    } catch (vk::OutOfDateKHRError const &outOfDateError) {
+    } catch (vk::OutOfDateKHRError const& outOfDateError) {
         recreatePipeline(vk);
     }
 }
 
 int main() {
     try {
-        initPhysics();
-
         Vulkan vk = getVulkanInstance();
         initVulkan(vk);
 
@@ -264,11 +231,11 @@ int main() {
 
         vk.device->waitIdle();
     }
-    catch (vk::SystemError &err) {
+    catch (vk::SystemError& err) {
         std::cout << "vk::SystemError: " << err.what() << std::endl;
         return EXIT_FAILURE;
     }
-    catch (std::exception &err) {
+    catch (std::exception& err) {
         std::cerr << "std::exception: " << err.what() << std::endl;
         return EXIT_FAILURE;
     }

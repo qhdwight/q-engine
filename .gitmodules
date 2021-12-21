@@ -10,3 +10,6 @@
 [submodule "glslang"]
 	path = glslang
 	url = https://github.com/KhronosGroup/glslang.git
+[submodule "vcpkg"]
+	path = vcpkg
+	url = git@github.com:Microsoft/vcpkg.git
