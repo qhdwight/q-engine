@@ -20,6 +20,9 @@ include_directories(glm)
 # GLSLANG
 add_subdirectory(glslang)
 include_directories(glslang)
+# ENTT
+add_subdirectory(entt)
+include_directories(entt/src)
 
 file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp")
 add_executable(game_engine ${SOURCE_FILES})

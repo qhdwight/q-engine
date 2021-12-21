@@ -13,3 +13,6 @@
 [submodule "vcpkg"]
 	path = vcpkg
 	url = git@github.com:Microsoft/vcpkg.git
+[submodule "entt"]
+	path = entt
+	url = git@github.com:skypjack/entt.git
