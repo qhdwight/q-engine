@@ -8,10 +8,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-glm::mat4x4 calcVPCMat(vk::Extent2D const& extent, position eye, quaternion look) {
+glm::mat4x4 calcVPCMat(vk::Extent2D const& extent, position const& eye, rotation const& look) {
     glm::mat4x4 view = glm::lookAt(
-            {eye.x, eye.y, eye.z},
-            glm::quat(look.x, look.y, look.z, look.w) * glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(eye),
+            glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
             {0.0f, -1.0f, 0.0f}
     );
     float fov = glm::radians(45.0f);
@@ -26,10 +26,9 @@ glm::mat4x4 calcVPCMat(vk::Extent2D const& extent, position eye, quaternion look
     return clip * projection * view;
 }
 
-glm::mat4x4 calcModelMat(position pos) {
+glm::mat4x4 calcModelMat(position const& pos) {
     glm::mat4x4 model(1.0f);
-    glm::translate(model, {pos.x, pos.y, pos.z});
-    return model;
+    return glm::translate(model, glm::vec3(pos));
 }
 
 void VulkanRender::createPipeline() {
@@ -47,13 +46,14 @@ void VulkanRender::createPipeline() {
 
     vk::su::DepthBufferData depthBufData(*physDev, *device, vk::Format::eD16Unorm, surfData->extent);
 
-    uniformBufData.emplace(*physDev, *device, sizeof(glm::mat4x4), vk::BufferUsageFlagBits::eUniformBuffer);
+    uniformBufData.emplace(*physDev, *device, sizeof(glm::mat4x4) * 2, vk::BufferUsageFlagBits::eUniformBuffer);
 
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
-            *device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}});
-    pipelineLayout = device->createPipelineLayout(
-            vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), descSetLayout)
+            *device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}}
     );
+    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4x4));
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout);
+    pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
 
     renderPass = vk::su::createRenderPass(
             *device,
@@ -170,37 +170,38 @@ void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
             clearVals
     );
 
-    auto view = world.reg.view<const position, const quaternion>();
     auto ts = world.reg.get<timestamp>(world.worldEnt);
-    double add = std::cos(ts.ns / 1e9);
-    position eye{-5.0f + add, 3.0f + add, -10.0f + add};
+    double add = std::cos(static_cast<double>(ts.ns) / 1e9);
+    position eye{-5.0, 3.0, -10.0};
     glm::mat4x4 vpcMat = calcVPCMat(surfData->extent, eye, {1.0, 0.0, 0.0, 0.0});
-    for (auto[ent, pos, rot]: view.each()) {
-        glm::mat4x4 mvpcMat = vpcMat * calcModelMat(pos);
-        vk::su::copyToDevice(*device, uniformBufData->deviceMemory, mvpcMat);
 
-        cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-        cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+    cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+    cmdBuf->bindVertexBuffers(0, vertBufData->buffer, {0});
+    cmdBuf->setViewport(
+            0,
+            vk::Viewport(
+                    0.0f,
+                    0.0f,
+                    static_cast<float>(surfData->extent.width),
+                    static_cast<float>(surfData->extent.height),
+                    0.0f,
+                    1.
+            )
+    );
+    cmdBuf->setScissor(0, vk::Rect2D({}, surfData->extent));
+
+    std::array<glm::mat4, 2> mats{};
+    uint32_t i = 0;
+    for (auto[ent, pos, rot]: world.reg.view<const position, const rotation>().each()) {
+        mats[i] = vpcMat * calcModelMat(pos + glm::dvec3{0.0, add, 0.0});
+        vk::su::copyToDevice(*device, uniformBufData->deviceMemory, mats[i]);
         cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, nullptr);
-
-        cmdBuf->bindVertexBuffers(0, vertBufData->buffer, {0});
-        cmdBuf->setViewport(
-                0,
-                vk::Viewport(
-                        0.0f,
-                        0.0f,
-                        static_cast<float>(surfData->extent.width),
-                        static_cast<float>(surfData->extent.height),
-                        0.0f,
-                        1.
-                )
-        );
-        cmdBuf->setScissor(0, vk::Rect2D({}, surfData->extent));
-
         cmdBuf->draw(12 * 3, 1, 0, 0);
-        cmdBuf->endRenderPass();
+        ++i;
     }
 
+    cmdBuf->endRenderPass();
     cmdBuf->end();
 }
 

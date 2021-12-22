@@ -1,14 +1,13 @@
 #pragma once
 
 #include <entt/entt.hpp>
+#include <glm/glm.hpp>
+#include <glm/detail/type_quat.hpp>
+#include <glm/detail/type_vec3.hpp>
 
-struct quaternion {
-    double x, y, z, w;
-};
+typedef glm::dvec3 position;
 
-struct position {
-    double x, y, z;
-};
+typedef glm::dquat rotation;
 
 struct timestamp {
     long long ns;

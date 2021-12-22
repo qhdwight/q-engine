@@ -11,13 +11,15 @@
 int main() {
     try {
         entt::registry reg;
-        auto cubeEnt = reg.create();
-        auto start = std::chrono::steady_clock::now();
-        reg.emplace_or_replace<position>(cubeEnt, 0.0, 0.0, 0.0);
-        reg.emplace_or_replace<quaternion>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
+        for (int i = 0; i < 2; ++i) {
+            auto cubeEnt = reg.create();
+            reg.emplace_or_replace<position>(cubeEnt, i * 3.0, 0.0, 0.0);
+            reg.emplace_or_replace<rotation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
+        }
         auto gameEnt = reg.create();
         world world{std::move(reg), gameEnt};
 
+        auto start = std::chrono::steady_clock::now();
         std::unique_ptr<Render> renderEngine = getRenderEngine();
         while (renderEngine->isActive()) {
             auto now = std::chrono::steady_clock::now();
