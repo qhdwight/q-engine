@@ -6,25 +6,29 @@
 
 #include <optional>
 #include <iostream>
+#include <chrono>
 
 int main() {
     try {
         entt::registry reg;
-        auto ent = reg.create();
-        reg.emplace_or_replace<position>(ent, 0.0, 0.0, 0.0);
+        auto cubeEnt = reg.create();
+        auto start = std::chrono::steady_clock::now();
+        reg.emplace_or_replace<position>(cubeEnt, 0.0, 0.0, 0.0);
+        reg.emplace_or_replace<quaternion>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
+        auto gameEnt = reg.create();
+        world world{std::move(reg), gameEnt};
 
         std::unique_ptr<Render> renderEngine = getRenderEngine();
         while (renderEngine->isActive()) {
-            renderEngine->render(reg);
+            auto now = std::chrono::steady_clock::now();
+            long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
+            world.reg.emplace_or_replace<timestamp>(gameEnt, ns);
+            renderEngine->render(world);
             glfwPollEvents();
         }
     }
-    catch (vk::SystemError& err) {
-        std::cout << "vk::SystemError: " << err.what() << std::endl;
-        return EXIT_FAILURE;
-    }
-    catch (std::exception& err) {
-        std::cerr << "std::exception: " << err.what() << std::endl;
+    catch (std::exception const& err) {
+        std::cerr << "exception: " << err.what() << std::endl;
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

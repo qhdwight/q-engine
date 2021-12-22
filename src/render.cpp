@@ -6,20 +6,30 @@
 #include <SPIRV/GlslangToSpv.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
-glm::mat4x4 calcMVPCMat(vk::Extent2D const& extent) {
+glm::mat4x4 calcVPCMat(vk::Extent2D const& extent, position eye, quaternion look) {
+    glm::mat4x4 view = glm::lookAt(
+            {eye.x, eye.y, eye.z},
+            glm::quat(look.x, look.y, look.z, look.w) * glm::vec3(0.0f, 0.0f, 1.0f),
+            {0.0f, -1.0f, 0.0f}
+    );
     float fov = glm::radians(45.0f);
-    glm::mat4x4 model = glm::mat4x4(1.0f);
-    glm::mat4x4 view = glm::lookAt(glm::vec3(-5.0f, 3.0f, -10.0f),
-                                   glm::vec3(0.0f, 0.0f, 0.0f),
-                                   glm::vec3(0.0f, -1.0f, 0.0f));
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
     glm::mat4x4 projection = glm::perspective(fov, aspect, 0.1f, 100.0f);
-    glm::mat4x4 clip = glm::mat4x4(1.0f, 0.0f, 0.0f, 0.0f,
-                                   0.0f, -1.0f, 0.0f, 0.0f,
-                                   0.0f, 0.0f, 0.5f, 0.0f,
-                                   0.0f, 0.0f, 0.5f, 1.0f);  // vulkan clip space has inverted y and half z !
-    return clip * projection * view * model;
+    glm::mat4x4 clip = glm::mat4x4(
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, -1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 0.5f, 0.0f,
+            0.0f, 0.0f, 0.5f, 1.0f
+    );  // vulkan clip space has inverted y and half z!
+    return clip * projection * view;
+}
+
+glm::mat4x4 calcModelMat(position pos) {
+    glm::mat4x4 model(1.0f);
+    glm::translate(model, {pos.x, pos.y, pos.z});
+    return model;
 }
 
 void VulkanRender::createPipeline() {
@@ -32,24 +42,24 @@ void VulkanRender::createPipeline() {
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             {},
             graphicsFamilyIdx,
-            presentFamilyIdx);
+            presentFamilyIdx
+    );
 
     vk::su::DepthBufferData depthBufData(*physDev, *device, vk::Format::eD16Unorm, surfData->extent);
 
-    vk::su::BufferData uniformBufData(*physDev, *device, sizeof(glm::mat4x4),
-                                      vk::BufferUsageFlagBits::eUniformBuffer);
-    glm::mat4x4 mvpcMat = calcMVPCMat(surfData->extent);
-    vk::su::copyToDevice(*device, uniformBufData.deviceMemory, mvpcMat);
+    uniformBufData.emplace(*physDev, *device, sizeof(glm::mat4x4), vk::BufferUsageFlagBits::eUniformBuffer);
 
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
             *device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}});
     pipelineLayout = device->createPipelineLayout(
-            vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), descSetLayout));
+            vk::PipelineLayoutCreateInfo(vk::PipelineLayoutCreateFlags(), descSetLayout)
+    );
 
     renderPass = vk::su::createRenderPass(
             *device,
             vk::su::pickSurfaceFormat(physDev->getSurfaceFormatsKHR(surfData->surface)).format,
-            depthBufData.format);
+            depthBufData.format
+    );
 
     glslang::InitializeProcess();
     vk::ShaderModule vertexShaderModule =
@@ -59,7 +69,8 @@ void VulkanRender::createPipeline() {
     glslang::FinalizeProcess();
 
     framebufs = vk::su::createFramebuffers(
-            *device, *renderPass, swapChainData->imageViews, depthBufData.imageView, surfData->extent);
+            *device, *renderPass, swapChainData->imageViews, depthBufData.imageView, surfData->extent
+    );
 
     vertBufData.emplace(*physDev, *device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
     vk::su::copyToDevice(*device,
@@ -73,7 +84,9 @@ void VulkanRender::createPipeline() {
     descSet = device->allocateDescriptorSets(descriptorSetAllocateInfo).front();
 
     vk::su::updateDescriptorSets(
-            *device, *descSet, {{vk::DescriptorType::eUniformBuffer, uniformBufData.buffer, {}}}, {});
+            *device, *descSet,
+            {{vk::DescriptorType::eUniformBuffer, uniformBufData->buffer, {}}}, {}
+    );
 
     pipeline = vk::su::createGraphicsPipeline(
             *device,
@@ -86,7 +99,8 @@ void VulkanRender::createPipeline() {
             vk::FrontFace::eClockwise,
             true,
             *pipelineLayout,
-            *renderPass);
+            *renderPass
+    );
 }
 
 void VulkanRender::recreatePipeline() {
@@ -99,14 +113,11 @@ void VulkanRender::recreatePipeline() {
     createPipeline();
 }
 
-void VulkanRender::render(entt::registry& reg) {
-    auto view = reg.view<const position>();
-    for (auto[ent, pos]: view.each()) {
-
-    }
+void VulkanRender::render(world& world) {
     vk::Semaphore imageAcquiredSemaphore = device->createSemaphore(vk::SemaphoreCreateInfo());
-    vk::ResultValue<uint32_t> curBuf = device->acquireNextImageKHR(swapChainData->swapChain, vk::su::FenceTimeout,
-                                                                   imageAcquiredSemaphore, nullptr);
+    vk::ResultValue<uint32_t> curBuf = device->acquireNextImageKHR(
+            swapChainData->swapChain, vk::su::FenceTimeout, imageAcquiredSemaphore, nullptr
+    );
 
     if (curBuf.result == vk::Result::eSuboptimalKHR) {
         recreatePipeline();
@@ -119,32 +130,7 @@ void VulkanRender::render(entt::registry& reg) {
         throw std::runtime_error("Invalid framebuffer size");
     }
 
-    cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
-
-    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
-    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
-    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
-    vk::RenderPassBeginInfo renderPassBeginInfo(*renderPass,
-                                                framebufs[curBuf.value],
-                                                vk::Rect2D(vk::Offset2D(0, 0), surfData->extent),
-                                                clearVals);
-    cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-    cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, nullptr);
-
-    cmdBuf->bindVertexBuffers(0, vertBufData->buffer, {0});
-    cmdBuf->setViewport(0,
-                        vk::Viewport(0.0f,
-                                     0.0f,
-                                     static_cast<float>(surfData->extent.width),
-                                     static_cast<float>(surfData->extent.height),
-                                     0.0f,
-                                     1.0f));
-    cmdBuf->setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), surfData->extent));
-
-    cmdBuf->draw(12 * 3, 1, 0, 0);
-    cmdBuf->endRenderPass();
-    cmdBuf->end();
+    commandBuffer(world, curBuf.value);
 
     vk::Fence drawFence = device->createFence(vk::FenceCreateInfo());
 
@@ -171,6 +157,53 @@ void VulkanRender::render(entt::registry& reg) {
     }
 }
 
+void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
+    cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
+
+    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
+    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
+    vk::RenderPassBeginInfo renderPassBeginInfo(
+            *renderPass,
+            framebufs[curBufIdx],
+            vk::Rect2D(vk::Offset2D(0, 0), surfData->extent),
+            clearVals
+    );
+
+    auto view = world.reg.view<const position, const quaternion>();
+    auto ts = world.reg.get<timestamp>(world.worldEnt);
+    double add = std::cos(ts.ns / 1e9);
+    position eye{-5.0f + add, 3.0f + add, -10.0f + add};
+    glm::mat4x4 vpcMat = calcVPCMat(surfData->extent, eye, {1.0, 0.0, 0.0, 0.0});
+    for (auto[ent, pos, rot]: view.each()) {
+        glm::mat4x4 mvpcMat = vpcMat * calcModelMat(pos);
+        vk::su::copyToDevice(*device, uniformBufData->deviceMemory, mvpcMat);
+
+        cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+        cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, nullptr);
+
+        cmdBuf->bindVertexBuffers(0, vertBufData->buffer, {0});
+        cmdBuf->setViewport(
+                0,
+                vk::Viewport(
+                        0.0f,
+                        0.0f,
+                        static_cast<float>(surfData->extent.width),
+                        static_cast<float>(surfData->extent.height),
+                        0.0f,
+                        1.
+                )
+        );
+        cmdBuf->setScissor(0, vk::Rect2D({}, surfData->extent));
+
+        cmdBuf->draw(12 * 3, 1, 0, 0);
+        cmdBuf->endRenderPass();
+    }
+
+    cmdBuf->end();
+}
+
 bool VulkanRender::isActive() {
     return !glfwWindowShouldClose(surfData->window.handle);
 }
@@ -193,14 +226,14 @@ VulkanRender::VulkanRender(vk::Instance inInst) : inst(inInst) {
     surfData.emplace(inst, "Game Engine", vk::Extent2D(500, 500));
 
     auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*physDev, surfData->surface);
-    device = vk::su::createDevice(*physDev,
-                                  graphicsFamilyIdx,
-                                  vk::su::getDeviceExtensions());
+    device = vk::su::createDevice(
+            *physDev, graphicsFamilyIdx, vk::su::getDeviceExtensions()
+    );
 
     vk::CommandPool cmdPool = vk::su::createCommandPool(*device, graphicsFamilyIdx);
     cmdBuf = device->allocateCommandBuffers(
-                    vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1))
-            .front();
+            vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1)
+    ).front();
 
     graphicsQueue = device->getQueue(graphicsFamilyIdx, 0);
     presentQueue = device->getQueue(presentFamilyIdx, 0);

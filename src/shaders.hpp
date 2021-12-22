@@ -44,7 +44,7 @@ layout (std140, binding = 0) uniform buffer
   mat4 mvp;
 } uniformBuffer;
 
-layout (location = 0) in vec4 pos;
+layout (location = 0) in vec4 position;
 layout (location = 1) in vec4 inColor;
 
 layout (location = 0) out vec4 outColor;
@@ -52,7 +52,7 @@ layout (location = 0) out vec4 outColor;
 void main()
 {
   outColor = inColor;
-  gl_Position = uniformBuffer.mvp * pos;
+  gl_Position = uniformBuffer.mvp * position;
 }
 )";
 
@@ -68,7 +68,7 @@ layout (std140, binding = 0) uniform buffer
   mat4 mvp;
 } uniformBuffer;
 
-layout (location = 0) in vec4 pos;
+layout (location = 0) in vec4 position;
 layout (location = 1) in vec2 inTexCoord;
 
 layout (location = 0) out vec2 outTexCoord;
@@ -76,7 +76,7 @@ layout (location = 0) out vec2 outTexCoord;
 void main()
 {
   outTexCoord = inTexCoord;
-  gl_Position = uniformBuffer.mvp * pos;
+  gl_Position = uniformBuffer.mvp * position;
 }
 )";
 

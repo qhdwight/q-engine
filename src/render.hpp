@@ -2,6 +2,7 @@
 
 #include "shaders.hpp"
 #include "utils.hpp"
+#include "state.hpp"
 
 #include <vulkan/vulkan.hpp>
 #include <entt/entt.hpp>
@@ -11,7 +12,7 @@
 struct Render {
     virtual bool isActive() = 0;
 
-    virtual void render(entt::registry& reg) = 0;
+    virtual void render(world& world) = 0;
 };
 
 struct VulkanRender : Render {
@@ -25,21 +26,23 @@ struct VulkanRender : Render {
     std::optional<vk::PipelineLayout> pipelineLayout;
     std::optional<vk::RenderPass> renderPass;
     std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::su::BufferData> vertBufData;
+    std::optional<vk::su::BufferData> uniformBufData, vertBufData;
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::Pipeline> pipeline;
 
-    VulkanRender(vk::Instance inInst);
+    explicit VulkanRender(vk::Instance inInst);
 
     ~VulkanRender();
 
-    void render(entt::registry& reg);
+    void render(world& world) override;
 
-    bool isActive();
+    bool isActive() override;
 
     void createPipeline();
 
     void recreatePipeline();
+
+    void commandBuffer(world& world, uint32_t curBufIdx);
 };
 
 std::unique_ptr<Render> getRenderEngine();
