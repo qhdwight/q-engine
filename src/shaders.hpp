@@ -59,8 +59,8 @@ layout (location = 0) out vec4 outColor;
 void main()
 {
   outColor = inColor;
-  mat4 mvp = sharedUbo.view * sharedUbo.proj * sharedUbo.clip;
-  gl_Position = mvp * dynamicUbo.model * position;
+  mat4 vpc = sharedUbo.clip * sharedUbo.proj * sharedUbo.view;
+  gl_Position = vpc * dynamicUbo.model * position;
 }
 )";
 

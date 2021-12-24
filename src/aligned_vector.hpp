@@ -22,7 +22,7 @@ template<typename T>
 class aligned_vector {
 private:
     void* mPtr = nullptr;
-    size_t mAlignment{}, mSize{};
+    size_t mAlignment{}, mSize{}, mBlockSize{};
 
     void free() {
         if (!mPtr) return;
@@ -35,8 +35,12 @@ public:
     void resize(size_t alignment, size_t size) {
         free();
         mAlignment = alignment;
+        mBlockSize = sizeof(T);
+        if (alignment > 0) {
+            mBlockSize = (mBlockSize + alignment - 1) & ~(alignment - 1);
+        }
         mSize = size;
-        mPtr = alignedAlloc(size, alignment);
+        mPtr = alignedAlloc(mem_size(), mBlockSize);
         if (!mPtr) {
             throw std::runtime_error("Failed to allocate aligned memory");
         }
@@ -54,13 +58,17 @@ public:
         return mAlignment;
     }
 
+    size_t block_size() {
+        return mBlockSize;
+    }
+
     T& operator[](size_t i) {
         auto bytePtr = reinterpret_cast<std::byte*>(mPtr);
-        return *reinterpret_cast<T*>(bytePtr + i * mAlignment);
+        return *reinterpret_cast<T*>(bytePtr + i * mBlockSize);
     }
 
     size_t mem_size() {
-        return mAlignment * mSize;
+        return mBlockSize * mSize;
     }
 
     void* data() {

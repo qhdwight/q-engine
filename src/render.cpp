@@ -3,9 +3,9 @@
 #include "state.hpp"
 #include "geometries.hpp"
 
-#include <SPIRV/GlslangToSpv.h>
+#include <glm/gtx/string_cast.hpp>
 
-#include <ranges>
+#include <SPIRV/GlslangToSpv.h>
 
 glm::mat4x4 calcView(position const& eye, rotation const& look) {
     return glm::lookAt(
@@ -135,7 +135,6 @@ void VulkanRender::recreatePipeline() {
     glfwGetFramebufferSize(surfData->window.handle, &width, &height);
     surfData->extent = vk::Extent2D(width, height);
     swapChainData->clear(*device);
-    vertBufData->clear(*device);
     createPipeline();
 }
 
@@ -224,13 +223,14 @@ void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
     for (auto[ent, pos, rot]: world.reg.view<const position, const rotation>().each()) {
         glm::mat4x4 model = calcModel(pos + glm::dvec3{0.0, add, 0.0});
         dynUboData[drawIdx++] = {model};
+//        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
     void* devUboPtr = device->mapMemory(dynUboBuf->deviceMemory, 0, dynUboData.mem_size());
     memcpy(devUboPtr, dynUboData.data(), dynUboData.mem_size());
     device->unmapMemory(dynUboBuf->deviceMemory);
 
     for (drawIdx = 0; drawIdx < dynUboData.size(); ++drawIdx) {
-        uint32_t off = drawIdx * dynUboData.alignment();
+        uint32_t off = drawIdx * dynUboData.block_size();
         cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, off);
         cmdBuf->draw(12 * 3, 1, 0, 0);
     }
@@ -258,7 +258,11 @@ VulkanRender::VulkanRender(vk::Instance inInst) : inst(inInst) {
     }
     physDev = physDevs.front();
 
-    surfData.emplace(inst, "Game Engine", vk::Extent2D(500, 500));
+    surfData.emplace(inst, "Game Engine", vk::Extent2D(512, 512));
+    float xScale, yScale;
+    glfwGetWindowContentScale(surfData->window.handle, &xScale, &yScale);
+    surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(surfData->extent.width) * xScale),
+                                    static_cast<uint32_t>(static_cast<float>(surfData->extent.height) * yScale));
 
     auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*physDev, surfData->surface);
 

@@ -547,7 +547,12 @@ namespace vk
 
     std::vector<std::string> getDeviceExtensions()
     {
-      return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+        return {
+#if defined( VK_USE_PLATFORM_MACOS_MVK )
+          "VK_KHR_portability_subset",
+#endif
+          VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        };
     }
 
     std::vector<std::string> getInstanceExtensions()
@@ -559,7 +564,8 @@ namespace vk
 #elif defined( VK_USE_PLATFORM_IOS_MVK )
       extensions.push_back( VK_MVK_IOS_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_MACOS_MVK )
-      extensions.push_back( VK_MVK_MACOS_SURFACE_EXTENSION_NAME );
+      extensions.push_back( "VK_EXT_metal_surface" );
+      extensions.push_back( "VK_KHR_get_physical_device_properties2" );
 #elif defined( VK_USE_PLATFORM_MIR_KHR )
       extensions.push_back( VK_KHR_MIR_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_VI_NN )
