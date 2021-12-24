@@ -39,10 +39,17 @@ const std::string vertexShaderText_PC_C = R"(
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (std140, binding = 0) uniform buffer
+layout (binding = 0) uniform u1
 {
-  mat4 mvp;
-} uniformBuffer;
+  mat4 view;
+  mat4 proj;
+  mat4 clip;
+} sharedUbo;
+
+layout (binding = 1) uniform u2
+{
+  mat4 model;
+} dynamicUbo;
 
 layout (location = 0) in vec4 position;
 layout (location = 1) in vec4 inColor;
@@ -52,7 +59,8 @@ layout (location = 0) out vec4 outColor;
 void main()
 {
   outColor = inColor;
-  gl_Position = uniformBuffer.mvp * position;
+  mat4 mvp = sharedUbo.view * sharedUbo.proj * sharedUbo.clip;
+  gl_Position = mvp * dynamicUbo.model * position;
 }
 )";
 

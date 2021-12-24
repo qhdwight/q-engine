@@ -3,9 +3,13 @@
 #include "shaders.hpp"
 #include "utils.hpp"
 #include "state.hpp"
+#include "aligned_vector.hpp"
 
 #include <vulkan/vulkan.hpp>
 #include <entt/entt.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <optional>
 
@@ -13,6 +17,14 @@ struct Render {
     virtual bool isActive() = 0;
 
     virtual void render(world& world) = 0;
+};
+
+struct SharedUboData {
+    glm::mat4x4 view, proj, clip;
+};
+
+struct DynamicUboData {
+    glm::mat4x4 model;
 };
 
 struct VulkanRender : Render {
@@ -26,9 +38,11 @@ struct VulkanRender : Render {
     std::optional<vk::PipelineLayout> pipelineLayout;
     std::optional<vk::RenderPass> renderPass;
     std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::su::BufferData> uniformBufData, vertBufData;
+    std::optional<vk::su::BufferData> sharedUboBuf, dynUboBuf, vertBufData;
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::Pipeline> pipeline;
+    aligned_vector<DynamicUboData> dynUboData;
+    std::vector<SharedUboData> sharedUboData;
 
     explicit VulkanRender(vk::Instance inInst);
 
@@ -43,6 +57,8 @@ struct VulkanRender : Render {
     void recreatePipeline();
 
     void commandBuffer(world& world, uint32_t curBufIdx);
+
+    void createPipelineLayout();
 };
 
 std::unique_ptr<Render> getRenderEngine();

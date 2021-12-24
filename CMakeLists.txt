@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(game_engine)
-set(CMAKE_CXX_STANDARD 20)
-
-if (MSVC)
-    add_compile_options(/Wv:18)
-endif ()
+set(CMAKE_CXX_STANDARD 23)
 
 # Vulkan
 if (WIN32)
@@ -24,10 +20,11 @@ include_directories(glslang)
 add_subdirectory(entt)
 include_directories(entt/src)
 
-file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp")
-add_executable(game_engine ${SOURCE_FILES})
-target_link_libraries(game_engine glfw glm glslang glslang-default-resource-limits SPIRV ${PHYSX_LIBRARIES})
-target_compile_definitions(game_engine PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+file(GLOB SOURCE_FILES CONFIGURE_DEPEND S "src/*.cpp")
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+message("${CMAKE_CXX_COMPILE_FEATURES}")
+target_link_libraries(${PROJECT_NAME} glfw glm glslang glslang-default-resource-limits SPIRV)
+target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
 if (WIN32)
-    target_compile_definitions(game_engine PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
 endif ()

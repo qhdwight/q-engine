@@ -4,29 +4,33 @@
 #include "geometries.hpp"
 
 #include <SPIRV/GlslangToSpv.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 
-glm::mat4x4 calcVPCMat(vk::Extent2D const& extent, position const& eye, rotation const& look) {
-    glm::mat4x4 view = glm::lookAt(
+#include <ranges>
+
+glm::mat4x4 calcView(position const& eye, rotation const& look) {
+    return glm::lookAt(
             glm::vec3(eye),
             glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
             {0.0f, -1.0f, 0.0f}
     );
+}
+
+glm::mat4x4 calcProj(vk::Extent2D const& extent) {
     float fov = glm::radians(45.0f);
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-    glm::mat4x4 projection = glm::perspective(fov, aspect, 0.1f, 100.0f);
-    glm::mat4x4 clip = glm::mat4x4(
+    return glm::perspective(fov, aspect, 0.1f, 100.0f);
+}
+
+glm::mat4x4 getClip() {
+    return {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 0.5f, 0.0f,
             0.0f, 0.0f, 0.5f, 1.0f
-    );  // vulkan clip space has inverted y and half z!
-    return clip * projection * view;
+    };  // vulkan clip space has inverted y and half z!
 }
 
-glm::mat4x4 calcModelMat(position const& pos) {
+glm::mat4x4 calcModel(position const& pos) {
     glm::mat4x4 model(1.0f);
     return glm::translate(model, glm::vec3(pos));
 }
@@ -44,23 +48,6 @@ void VulkanRender::createPipeline() {
             presentFamilyIdx
     );
 
-    vk::su::DepthBufferData depthBufData(*physDev, *device, vk::Format::eD16Unorm, surfData->extent);
-
-    uniformBufData.emplace(*physDev, *device, sizeof(glm::mat4x4) * 2, vk::BufferUsageFlagBits::eUniformBuffer);
-
-    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
-            *device, {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}}
-    );
-    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4x4));
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout);
-    pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
-
-    renderPass = vk::su::createRenderPass(
-            *device,
-            vk::su::pickSurfaceFormat(physDev->getSurfaceFormatsKHR(surfData->surface)).format,
-            depthBufData.format
-    );
-
     glslang::InitializeProcess();
     vk::ShaderModule vertexShaderModule =
             vk::su::createShaderModule(*device, vk::ShaderStageFlagBits::eVertex, vertexShaderText_PC_C);
@@ -68,31 +55,27 @@ void VulkanRender::createPipeline() {
             vk::su::createShaderModule(*device, vk::ShaderStageFlagBits::eFragment, fragmentShaderText_C_C);
     glslang::FinalizeProcess();
 
+    vk::su::DepthBufferData depthBufData(*physDev, *device, vk::Format::eD16Unorm, surfData->extent);
+
+    renderPass = vk::su::createRenderPass(
+            *device,
+            vk::su::pickSurfaceFormat(physDev->getSurfaceFormatsKHR(surfData->surface)).format,
+            depthBufData.format
+    );
+
     framebufs = vk::su::createFramebuffers(
             *device, *renderPass, swapChainData->imageViews, depthBufData.imageView, surfData->extent
     );
 
-    vertBufData.emplace(*physDev, *device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
-    vk::su::copyToDevice(*device,
-                         vertBufData->deviceMemory,
-                         coloredCubeData,
-                         sizeof(coloredCubeData) / sizeof(coloredCubeData[0]));
-
-    vk::DescriptorPool descPool =
-            vk::su::createDescriptorPool(*device, {{vk::DescriptorType::eUniformBuffer, 1}});
-    vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(descPool, descSetLayout);
-    descSet = device->allocateDescriptorSets(descriptorSetAllocateInfo).front();
-
-    vk::su::updateDescriptorSets(
-            *device, *descSet,
-            {{vk::DescriptorType::eUniformBuffer, uniformBufData->buffer, {}}}, {}
-    );
+    if (!pipelineLayout) {
+        createPipelineLayout();
+    }
 
     pipeline = vk::su::createGraphicsPipeline(
             *device,
             device->createPipelineCache(vk::PipelineCacheCreateInfo()),
-            std::make_pair(vertexShaderModule, nullptr),
-            std::make_pair(fragmentShaderModule, nullptr),
+            {vertexShaderModule, nullptr},
+            {fragmentShaderModule, nullptr},
             sizeof(coloredCubeData[0]),
             {{vk::Format::eR32G32B32A32Sfloat, 0},
              {vk::Format::eR32G32B32A32Sfloat, 16}},
@@ -101,6 +84,49 @@ void VulkanRender::createPipeline() {
             *pipelineLayout,
             *renderPass
     );
+
+}
+
+
+void VulkanRender::createPipelineLayout() {
+    dynUboData.resize(physDev->getProperties().limits.minUniformBufferOffsetAlignment, 2);
+    sharedUboData.resize(2);
+    dynUboBuf.emplace(*physDev, *device, dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
+    size_t sharedSize = sharedUboData.size() * sizeof(decltype(sharedUboData)::value_type);
+    sharedUboBuf.emplace(*physDev, *device, sharedSize, vk::BufferUsageFlagBits::eUniformBuffer);
+
+    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
+            *device, {
+                    {vk::DescriptorType::eUniformBuffer,        1, vk::ShaderStageFlagBits::eVertex},
+                    {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}
+            }
+    );
+    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4x4));
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout, pushConstRange);
+    pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
+
+    vertBufData.emplace(*physDev, *device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
+    vk::su::copyToDevice(
+            *device,
+            vertBufData->deviceMemory,
+            coloredCubeData,
+            sizeof(coloredCubeData) / sizeof(coloredCubeData[0])
+    );
+
+    vk::DescriptorPool descPool = vk::su::createDescriptorPool(
+            *device, {
+                    {vk::DescriptorType::eUniformBuffer,        1},
+                    {vk::DescriptorType::eUniformBufferDynamic, 1}
+            }
+    );
+    vk::DescriptorSetAllocateInfo descSetAllocInfo(descPool, descSetLayout);
+    descSet = device->allocateDescriptorSets(descSetAllocInfo).front();
+
+    vk::DescriptorBufferInfo sharedDescBufInfo{sharedUboBuf->buffer, 0, VK_WHOLE_SIZE};
+    vk::WriteDescriptorSet sharedWriteDescSet{*descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &sharedDescBufInfo};
+    vk::DescriptorBufferInfo dynDescBufInfo{dynUboBuf->buffer, 0, sizeof(DynamicUboData)};
+    vk::WriteDescriptorSet dynWriteDescSet{*descSet, 1, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &dynDescBufInfo};
+    device->updateDescriptorSets({sharedWriteDescSet, dynWriteDescSet}, nullptr);
 }
 
 void VulkanRender::recreatePipeline() {
@@ -145,9 +171,7 @@ void VulkanRender::render(world& world) {
                 vk::PresentInfoKHR({}, swapChainData->swapChain, curBuf.value));
         switch (result) {
             case vk::Result::eSuccess:
-                break;
             case vk::Result::eSuboptimalKHR:
-                std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
                 break;
             default:
                 throw std::runtime_error("Bad present KHR result");
@@ -170,11 +194,6 @@ void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
             clearVals
     );
 
-    auto ts = world.reg.get<timestamp>(world.worldEnt);
-    double add = std::cos(static_cast<double>(ts.ns) / 1e9);
-    position eye{-5.0, 3.0, -10.0};
-    glm::mat4x4 vpcMat = calcVPCMat(surfData->extent, eye, {1.0, 0.0, 0.0, 0.0});
-
     cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
     cmdBuf->bindVertexBuffers(0, vertBufData->buffer, {0});
@@ -186,19 +205,34 @@ void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
                     static_cast<float>(surfData->extent.width),
                     static_cast<float>(surfData->extent.height),
                     0.0f,
-                    1.
+                    1.0f
             )
     );
     cmdBuf->setScissor(0, vk::Rect2D({}, surfData->extent));
 
-    std::array<glm::mat4, 2> mats{};
-    uint32_t i = 0;
+    auto ts = world.reg.get<timestamp>(world.worldEnt);
+    double add = std::cos(static_cast<double>(ts.ns) / 1e9);
+    position eye{-5.0, 3.0, -10.0};
+    SharedUboData sharedUbo{
+            calcView(eye, {1.0, 0.0, 0.0, 0.0}),
+            calcProj(surfData->extent),
+            getClip()
+    };
+    vk::su::copyToDevice(*device, sharedUboBuf->deviceMemory, sharedUbo);
+
+    size_t drawIdx = 0;
     for (auto[ent, pos, rot]: world.reg.view<const position, const rotation>().each()) {
-        mats[i] = vpcMat * calcModelMat(pos + glm::dvec3{0.0, add, 0.0});
-        vk::su::copyToDevice(*device, uniformBufData->deviceMemory, mats[i]);
-        cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, nullptr);
+        glm::mat4x4 model = calcModel(pos + glm::dvec3{0.0, add, 0.0});
+        dynUboData[drawIdx++] = {model};
+    }
+    void* devUboPtr = device->mapMemory(dynUboBuf->deviceMemory, 0, dynUboData.mem_size());
+    memcpy(devUboPtr, dynUboData.data(), dynUboData.mem_size());
+    device->unmapMemory(dynUboBuf->deviceMemory);
+
+    for (drawIdx = 0; drawIdx < dynUboData.size(); ++drawIdx) {
+        uint32_t off = drawIdx * dynUboData.alignment();
+        cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, off);
         cmdBuf->draw(12 * 3, 1, 0, 0);
-        ++i;
     }
 
     cmdBuf->endRenderPass();
@@ -214,7 +248,7 @@ VulkanRender::~VulkanRender() {
 }
 
 VulkanRender::VulkanRender(vk::Instance inInst) : inst(inInst) {
-#ifndef NDEBUG
+#if !defined(NDEBUG)
     inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
 #endif
 
@@ -227,9 +261,12 @@ VulkanRender::VulkanRender(vk::Instance inInst) : inst(inInst) {
     surfData.emplace(inst, "Game Engine", vk::Extent2D(500, 500));
 
     auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*physDev, surfData->surface);
-    device = vk::su::createDevice(
-            *physDev, graphicsFamilyIdx, vk::su::getDeviceExtensions()
-    );
+
+    std::vector<std::string> extensions = vk::su::getDeviceExtensions();
+//#if !defined(NDEBUG)
+//    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+//#endif
+    device = vk::su::createDevice(*physDev, graphicsFamilyIdx, extensions);
 
     vk::CommandPool cmdPool = vk::su::createCommandPool(*device, graphicsFamilyIdx);
     cmdBuf = device->allocateCommandBuffers(
