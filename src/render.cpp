@@ -7,6 +7,9 @@
 
 #include <SPIRV/GlslangToSpv.h>
 
+#include <fstream>
+#include <sstream>
+
 glm::mat4x4 calcView(position const& eye, rotation const& look) {
     return glm::lookAt(
             glm::vec3(eye),
@@ -49,10 +52,8 @@ void VulkanRender::createPipeline() {
     );
 
     glslang::InitializeProcess();
-    vk::ShaderModule vertexShaderModule =
-            vk::su::createShaderModule(*device, vk::ShaderStageFlagBits::eVertex, vertexShaderText_PC_C);
-    vk::ShaderModule fragmentShaderModule =
-            vk::su::createShaderModule(*device, vk::ShaderStageFlagBits::eFragment, fragmentShaderText_C_C);
+    vk::ShaderModule vertexShaderModule = createShaderModule(vk::ShaderStageFlagBits::eVertex, "shaders/vertex.glsl");
+    vk::ShaderModule fragmentShaderModule = createShaderModule(vk::ShaderStageFlagBits::eFragment, "shaders/fragment.glsl");
     glslang::FinalizeProcess();
 
     vk::su::DepthBufferData depthBufData(*physDev, *device, vk::Format::eD16Unorm, surfData->extent);
@@ -281,6 +282,15 @@ VulkanRender::VulkanRender(vk::Instance inInst) : inst(inInst) {
     presentQueue = device->getQueue(presentFamilyIdx, 0);
 
     createPipeline();
+}
+
+vk::ShaderModule VulkanRender::createShaderModule(vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
+    std::ifstream shaderFile;
+    shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    shaderFile.open(path);
+    std::stringstream strStream;
+    strStream << shaderFile.rdbuf();
+    return vk::su::createShaderModule(*device, shaderStage, strStream.str());
 }
 
 std::unique_ptr<Render> getRenderEngine() {

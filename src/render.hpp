@@ -11,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <filesystem>
 #include <optional>
 
 struct Render {
@@ -59,6 +60,8 @@ struct VulkanRender : Render {
     void commandBuffer(world& world, uint32_t curBufIdx);
 
     void createPipelineLayout();
+
+    vk::ShaderModule createShaderModule(vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path);
 };
 
 std::unique_ptr<Render> getRenderEngine();
