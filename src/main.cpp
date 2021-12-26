@@ -11,7 +11,7 @@
 int main() {
     try {
         entt::registry reg;
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 3; ++i) {
             auto cubeEnt = reg.create();
             reg.emplace_or_replace<position>(cubeEnt, i * 3.0, 0.0, 0.0);
             reg.emplace_or_replace<rotation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);

@@ -43,7 +43,7 @@ struct VulkanRender : Render {
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::Pipeline> pipeline;
     aligned_vector<DynamicUboData> dynUboData;
-    std::vector<SharedUboData> sharedUboData;
+    SharedUboData sharedUboData;
 
     explicit VulkanRender(vk::Instance inInst);
 

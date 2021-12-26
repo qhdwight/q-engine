@@ -10,7 +10,7 @@
 #include <fstream>
 #include <sstream>
 
-glm::mat4x4 calcView(position const& eye, rotation const& look) {
+glm::mat4 calcView(position const& eye, rotation const& look) {
     return glm::lookAt(
             glm::vec3(eye),
             glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
@@ -18,13 +18,13 @@ glm::mat4x4 calcView(position const& eye, rotation const& look) {
     );
 }
 
-glm::mat4x4 calcProj(vk::Extent2D const& extent) {
+glm::mat4 calcProj(vk::Extent2D const& extent) {
     float fov = glm::radians(45.0f);
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
     return glm::perspective(fov, aspect, 0.1f, 100.0f);
 }
 
-glm::mat4x4 getClip() {
+glm::mat4 getClip() {
     return {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 0.0f, 0.0f,
@@ -33,8 +33,8 @@ glm::mat4x4 getClip() {
     };  // vulkan clip space has inverted y and half z!
 }
 
-glm::mat4x4 calcModel(position const& pos) {
-    glm::mat4x4 model(1.0f);
+glm::mat4 calcModel(position const& pos) {
+    glm::mat4 model(1.0f);
     return glm::translate(model, glm::vec3(pos));
 }
 
@@ -90,11 +90,10 @@ void VulkanRender::createPipeline() {
 
 
 void VulkanRender::createPipelineLayout() {
-    dynUboData.resize(physDev->getProperties().limits.minUniformBufferOffsetAlignment, 2);
-    sharedUboData.resize(2);
+    size_t uboAlignment = physDev->getProperties().limits.minUniformBufferOffsetAlignment;
+    dynUboData.resize(uboAlignment, 16);
     dynUboBuf.emplace(*physDev, *device, dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
-    size_t sharedSize = sharedUboData.size() * sizeof(decltype(sharedUboData)::value_type);
-    sharedUboBuf.emplace(*physDev, *device, sharedSize, vk::BufferUsageFlagBits::eUniformBuffer);
+    sharedUboBuf.emplace(*physDev, *device, sizeof(sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
 
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
             *device, {
@@ -102,7 +101,7 @@ void VulkanRender::createPipelineLayout() {
                     {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}
             }
     );
-    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4x4));
+    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4));
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout, pushConstRange);
     pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
 
@@ -221,16 +220,19 @@ void VulkanRender::commandBuffer(world& world, uint32_t curBufIdx) {
     vk::su::copyToDevice(*device, sharedUboBuf->deviceMemory, sharedUbo);
 
     size_t drawIdx = 0;
-    for (auto[ent, pos, rot]: world.reg.view<const position, const rotation>().each()) {
-        glm::mat4x4 model = calcModel(pos + glm::dvec3{0.0, add, 0.0});
+    auto entView = world.reg.view<const position, const rotation>();
+    for (auto[ent, pos, rot]: entView.each()) {
+        glm::mat4 model = calcModel(pos + glm::dvec3{0.0, add, 0.0});
         dynUboData[drawIdx++] = {model};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
+    size_t drawCount = drawIdx;
+
     void* devUboPtr = device->mapMemory(dynUboBuf->deviceMemory, 0, dynUboData.mem_size());
     memcpy(devUboPtr, dynUboData.data(), dynUboData.mem_size());
     device->unmapMemory(dynUboBuf->deviceMemory);
 
-    for (drawIdx = 0; drawIdx < dynUboData.size(); ++drawIdx) {
+    for (drawIdx = 0; drawIdx < drawCount; ++drawIdx) {
         uint32_t off = drawIdx * dynUboData.block_size();
         cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, *descSet, off);
         cmdBuf->draw(12 * 3, 1, 0, 0);
