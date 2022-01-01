@@ -46,8 +46,7 @@ private:
     };
 public:
     explicit octree() {
-        std::cout << sizeof(child_block) << std::endl;
-//        std::cout << sizeof(glm::vec << std::endl;
+        static_assert(sizeof(child_block) == BLOCK_SIZE);
     }
 
     void insert(glm::ivec3 const& point) {

@@ -2,6 +2,6 @@
 
 #include "vulkan_render.hpp"
 
-void render(world& world) {
+void render(World& world) {
     tryRenderVulkan(world);
 }

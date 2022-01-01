@@ -8,10 +8,10 @@
 
 #include <fstream>
 
-glm::mat4 calcView(position const& eye, rotation const& look) {
+glm::mat4 calcView(position const& eye, orientation const& look) {
     return glm::lookAt(
             glm::vec3(eye),
-            glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(eye) + glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
             {0.0f, -1.0f, 0.0f}
     );
 }
@@ -146,7 +146,7 @@ void recreatePipeline(VulkanData& vk) {
     createPipeline(vk);
 }
 
-void commandBuffer(VulkanData& vk, world& world, uint32_t curBufIdx) {
+void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
 
     vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
@@ -175,21 +175,20 @@ void commandBuffer(VulkanData& vk, world& world, uint32_t curBufIdx) {
     );
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto ts = world.reg.get<timestamp>(world.worldEnt);
-    double add = std::cos(static_cast<double>(ts.ns) / 1e9);
-    position eye{-5.0, 3.0, -10.0};
-    SharedUboData sharedUbo{
-            calcView(eye, {1.0, 0.0, 0.0, 0.0}),
-            calcProj(vk.surfData->extent),
-            getClip()
-    };
-    vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
+    auto playerView = world.reg.view<const position, const orientation, const Player>();
+    for (auto[ent, pos, orien]: playerView.each()) {
+        SharedUboData sharedUbo{
+                calcView(pos, orien),
+                calcProj(vk.surfData->extent),
+                getClip()
+        };
+        vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
+    }
 
     size_t drawIdx = 0;
-    auto entView = world.reg.view<const position, const rotation>();
-    for (auto[ent, pos, rot]: entView.each()) {
-        glm::mat4 model = calcModel(pos + glm::dvec3{0.0, add, 0.0});
-        vk.dynUboData[drawIdx++] = {model};
+    auto entView = world.reg.view<const position, const orientation, const Cube>();
+    for (auto[ent, pos, orien]: entView.each()) {
+        vk.dynUboData[drawIdx++] = {calcModel(pos)};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
     size_t drawCount = drawIdx;
@@ -245,8 +244,8 @@ void init(VulkanData& vk) {
     createPipeline(vk);
 }
 
-void tryRenderVulkan(world& world) {
-    auto pVk = world.reg.try_get<VulkanData>(world.worldEnt);
+void tryRenderVulkan(World& world) {
+    auto pVk = world.reg.try_get<VulkanData>(world.sharedEnt);
     if (!pVk) return;
 
     VulkanData& vk = *pVk;
@@ -292,7 +291,7 @@ void tryRenderVulkan(world& world) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = world.reg.get<Render>(world.worldEnt).keepOpen;
+    bool& keepOpen = world.reg.get<Render>(world.sharedEnt).keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();

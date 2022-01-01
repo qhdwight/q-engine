@@ -6,4 +6,4 @@ struct Render {
     bool keepOpen;
 };
 
-void render(world& world);
+void render(World& world);

@@ -35,4 +35,4 @@ struct VulkanData {
     SharedUboData sharedUboData;
 };
 
-void tryRenderVulkan(world& world);
+void tryRenderVulkan(World& world);
