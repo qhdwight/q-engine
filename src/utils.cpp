@@ -1112,7 +1112,14 @@ namespace vk
       std::swap( extent, other.extent );
     }
 
-    WindowData::~WindowData() noexcept
+    WindowData& WindowData::operator=( WindowData && other )
+    {
+        std::swap( handle, other.handle );
+        std::swap( name, other.name );
+        std::swap( extent, other.extent );
+    }
+
+      WindowData::~WindowData() noexcept
     {
       glfwDestroyWindow( handle );
     }

@@ -5,30 +5,59 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <variant>
+#include <bitset>
+#include <iostream>
+
+static constexpr size_t BLOCK_SIZE = 1 << 10 << 3; // 8 KiB
+
+struct small_ivec3 {
+    int8_t x: 2, y: 2, z: 2;
+};
 
 template<typename T>
 class octree {
 private:
-    using children_t = std::array<std::shared_ptr<octree<T>>, 8>;
-    struct node {
-        glm::ivec3 mPoint;
-        T val;
-        std::weak_ptr<node> parent;
-        children_t children;
+    struct child {
+        uint16_t childOff: 15;
+        bool isFar: 1;
+        std::byte validMask, leafMask;
+
+        uint32_t ctrOff: 24;
+        std::byte ctrMask;
     };
-    glm::ivec3 mPosExt, mNegExt;
-    children_t children;
+
+
+    struct contour {
+        small_ivec3 pos;
+
+    };
+
+    using children_t = std::array<child, 8>;
+
+    struct alignas(sizeof(children_t)) child_block {
+        uint32_t nextOff;
+        static constexpr size_t CHILD_ARRAY_COUNT = (BLOCK_SIZE - sizeof(nextOff)) / sizeof(children_t);
+        std::array<children_t, CHILD_ARRAY_COUNT> children;
+    };
+
+    struct alignas(sizeof(contour)) ctr_block {
+        std::array<contour, BLOCK_SIZE / sizeof(contour)> contours;
+    };
 public:
+    explicit octree() {
+        std::cout << sizeof(child_block) << std::endl;
+//        std::cout << sizeof(glm::vec << std::endl;
+    }
+
     void insert(glm::ivec3 const& point) {
         if (find(point)) {
 
         }
-        int32_t pos = -1;
-
     }
 
     bool find(glm::ivec3 const& point) {
-        glm::ivec3 mid = (mPosExt + mNegExt) / 2;
+//        glm::ivec3 mid = (mPosExt + mNegExt) / 2;
 
     }
 };

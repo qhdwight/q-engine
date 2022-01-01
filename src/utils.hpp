@@ -98,6 +98,7 @@ namespace vk
     {
       WindowData( GLFWwindow * wnd, std::string const & name, vk::Extent2D const & extent );
       WindowData( const WindowData & ) = delete;
+      WindowData& operator=( WindowData && other );
       WindowData( WindowData && other );
       ~WindowData() noexcept;
 
