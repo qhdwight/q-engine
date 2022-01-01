@@ -8,8 +8,15 @@
 #include <string>
 #include <unordered_map>
 
-typedef glm::dvec3 position;
-typedef glm::dquat orientation;
+struct position {
+    glm::dvec3 vec;
+};
+struct orientation {
+    glm::dquat quat;
+};
+struct look {
+    glm::dvec3 vec;
+};
 
 struct timestamp {
     long long ns;
@@ -24,8 +31,8 @@ struct Cube {
 };
 
 struct Input {
-    glm::dvec2 mouse;
-    std::unordered_map<std::string, bool> buttons;
+    glm::dvec2 cursor;
+    glm::dvec3 move;
 };
 
 struct InputConfig {

@@ -8,12 +8,10 @@
 
 #include <fstream>
 
-glm::mat4 calcView(position const& eye, orientation const& look) {
-    return glm::lookAt(
-            glm::vec3(eye),
-            glm::vec3(eye) + glm::quat(look) * glm::vec3(0.0f, 0.0f, 1.0f),
-            {0.0f, -1.0f, 0.0f}
-    );
+glm::mat4 calcView(position const& eye, look const& look) {
+    glm::dvec3 dir = glm::dquat(look.vec) * glm::dvec3{0.0f, 0.0f, 1.0f};
+    glm::dvec3 center = eye.vec + dir;
+    return glm::lookAt(glm::vec3(eye.vec), glm::vec3(center), {0.0f, -1.0f, 0.0f});
 }
 
 glm::mat4 calcProj(vk::Extent2D const& extent) {
@@ -33,7 +31,7 @@ glm::mat4 getClip() {
 
 glm::mat4 calcModel(position const& pos) {
     glm::mat4 model(1.0f);
-    return glm::translate(model, glm::vec3(pos));
+    return glm::translate(model, glm::vec3(pos.vec));
 }
 
 vk::ShaderModule createShaderModule(VulkanData& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
@@ -175,10 +173,10 @@ void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
     );
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto playerView = world.reg.view<const position, const orientation, const Player>();
-    for (auto[ent, pos, orien]: playerView.each()) {
+    auto playerView = world.reg.view<const position, const look, const Player>();
+    for (auto[ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
-                calcView(pos, orien),
+                calcView(pos, look),
                 calcProj(vk.surfData->extent),
                 getClip()
         };
@@ -291,7 +289,7 @@ void tryRenderVulkan(World& world) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = world.reg.get<Render>(world.sharedEnt).keepOpen;
+    bool& keepOpen = world.reg.get<Window>(world.sharedEnt).keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();

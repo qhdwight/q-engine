@@ -21,26 +21,26 @@ int main() {
             auto cubeEnt = reg.create();
             reg.emplace<Cube>(cubeEnt);
             reg.emplace<position>(cubeEnt);
-            reg.emplace<orientation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
+            reg.emplace<orientation>(cubeEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
         }
         auto playerEnt = reg.create();
         reg.emplace<Player>(playerEnt);
-        reg.emplace<position>(playerEnt, -5.0, 3.0, -10.0);
-        reg.emplace<orientation>(playerEnt, 1.0, 0.0, 0.0, 0.0);
+        reg.emplace<position>(playerEnt, glm::dvec3{-5.0, 3.0, -10.0});
+        reg.emplace<look>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
         reg.emplace<Input>(playerEnt);
 
         auto worldEnt = reg.create();
         reg.emplace<VulkanData>(worldEnt);
-        reg.emplace<Render>(worldEnt, true);
+        reg.emplace<Window>(worldEnt, true);
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();
-        while (world.reg.get<Render>(worldEnt).keepOpen) {
+        while (world.reg.get<Window>(worldEnt).keepOpen) {
             auto now = std::chrono::steady_clock::now();
             long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
             for (auto ent: world.reg.view<position, orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
-                world.reg.emplace_or_replace<position>(ent, (int) ent * 3.0, add, 0.0);
+                world.reg.emplace_or_replace<position>(ent, glm::dvec3{(int) ent * 3.0, add, 0.0});
             }
             world.reg.emplace_or_replace<timestamp>(worldEnt, ns);
             input(world);

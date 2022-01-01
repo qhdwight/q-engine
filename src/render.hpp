@@ -2,8 +2,8 @@
 
 #include "state.hpp"
 
-struct Render {
-    bool keepOpen;
+struct Window {
+    bool keepOpen, isFocused;
 };
 
 void render(World& world);
