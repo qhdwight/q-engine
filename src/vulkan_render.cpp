@@ -5,13 +5,18 @@
 #include "geometries.hpp"
 
 #include <SPIRV/GlslangToSpv.h>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_access.hpp>
 
 #include <fstream>
 
 glm::mat4 calcView(position const& eye, look const& look) {
-    glm::dvec3 dir = glm::dquat(look.vec) * glm::dvec3{0.0f, 0.0f, 1.0f};
-    glm::dvec3 center = eye.vec + dir;
-    return glm::lookAt(glm::vec3(eye.vec), glm::vec3(center), {0.0f, -1.0f, 0.0f});
+    glm::dvec3 right{1.0, 0.0, 0.0};
+    glm::dvec3 forward{0.0, 1.0, 0.0};
+    glm::dvec3 up{0.0, 0.0, 1.0};
+    glm::dvec3 rotatedForward = glm::angleAxis(look.vec.z, up) * glm::angleAxis(-look.vec.x, right) * forward;
+//    glm::dvec3 rotatedForward = glm::dquat{look.vec} * glm::dvec3{0.0, 1.0, 0.0};
+    return glm::lookAtRH(glm::vec3{eye.vec}, glm::vec3{eye.vec + rotatedForward}, glm::vec3{up});
 }
 
 glm::mat4 calcProj(vk::Extent2D const& extent) {
@@ -21,12 +26,12 @@ glm::mat4 calcProj(vk::Extent2D const& extent) {
 }
 
 glm::mat4 getClip() {
-    return {
+    return { // vulkan clip space has inverted y and half z!
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, -1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 0.5f, 0.0f,
             0.0f, 0.0f, 0.5f, 1.0f
-    };  // vulkan clip space has inverted y and half z!
+    };
 }
 
 glm::mat4 calcModel(position const& pos) {

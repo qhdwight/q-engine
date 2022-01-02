@@ -4,9 +4,6 @@
 #include "vulkan_render.hpp"
 
 #include <GLFW/glfw3.h>
-#include <glm/gtc/quaternion.hpp>
-
-#include <algorithm>
 
 void input(World& world) {
     auto vkPtr = world.reg.try_get<VulkanData>(world.sharedEnt);
@@ -33,8 +30,8 @@ void input(World& world) {
 
         input.move = {
                 (glfwGetKey(glfwWindow, GLFW_KEY_D) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_A) ? -1.0 : 0.0),
-                (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0),
                 (glfwGetKey(glfwWindow, GLFW_KEY_W) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_S) ? -1.0 : 0.0),
+                (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0)
         };
     }
 }

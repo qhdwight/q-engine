@@ -26,7 +26,7 @@ int main() {
         }
         auto playerEnt = reg.create();
         reg.emplace<Player>(playerEnt);
-        reg.emplace<position>(playerEnt, glm::dvec3{-5.0, 3.0, -10.0});
+        reg.emplace<position>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
         reg.emplace<look>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
         reg.emplace<Input>(playerEnt);
 
@@ -44,7 +44,8 @@ int main() {
             world.reg.emplace_or_replace<timestamp>(worldEnt, ns, ns - prevNs);
             for (auto ent: world.reg.view<position, orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
-                world.reg.emplace_or_replace<position>(ent, glm::dvec3{(int) ent * 3.0, add, 0.0});
+                double x_pos = ((int) ent - 0) * 3.0;
+                world.reg.emplace_or_replace<position>(ent, glm::dvec3{x_pos, 10.0, add});
             }
             input(world);
             modify(world);
