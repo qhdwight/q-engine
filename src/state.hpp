@@ -19,7 +19,7 @@ struct look {
 };
 
 struct timestamp {
-    long long ns;
+    long long ns, nsDelta;
 };
 
 struct Player {
@@ -31,7 +31,7 @@ struct Cube {
 };
 
 struct Input {
-    glm::dvec2 cursor;
+    glm::dvec2 cursor, cursorDelta;
     glm::dvec3 move;
 };
 

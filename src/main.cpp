@@ -2,6 +2,7 @@
 #include "state.hpp"
 #include "input.hpp"
 #include "render.hpp"
+#include "player.hpp"
 #include "vulkan_render.hpp"
 #include "octree.hpp"
 
@@ -35,15 +36,18 @@ int main() {
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();
+        world.reg.emplace<timestamp>(world.sharedEnt, 0, 0);
         while (world.reg.get<Window>(worldEnt).keepOpen) {
             auto now = std::chrono::steady_clock::now();
+            long long prevNs = world.reg.get<timestamp>(world.sharedEnt).ns;
             long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
+            world.reg.emplace_or_replace<timestamp>(worldEnt, ns, ns - prevNs);
             for (auto ent: world.reg.view<position, orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
                 world.reg.emplace_or_replace<position>(ent, glm::dvec3{(int) ent * 3.0, add, 0.0});
             }
-            world.reg.emplace_or_replace<timestamp>(worldEnt, ns);
             input(world);
+            modify(world);
             render(world);
         }
     }

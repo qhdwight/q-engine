@@ -1,4 +1,5 @@
 #include "input.hpp"
+#include "state.hpp"
 #include "render.hpp"
 #include "vulkan_render.hpp"
 
@@ -23,17 +24,17 @@ void input(World& world) {
     for (auto[ent, input]: world.reg.view<Input>().each()) {
         glm::dvec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
-        if (window.isFocused == isFocused) { // prevent snapping when tabbing back in
-            glm::dvec2 delta = input.cursor - prevMouse;
-            auto lookPtr = world.reg.try_get<look>(ent);
-            if (lookPtr) {
-                look& look = *lookPtr;
-                delta *= 0.005;
-                look.vec += glm::dvec3{-delta.y, delta.x, 0.0};
-                look.vec.x = std::clamp(look.vec.x, glm::radians(-90.0), glm::radians(90.0));
-            }
-        } else {
-            window.isFocused = isFocused;
+        if (window.isFocused == isFocused) {
+            input.cursorDelta = (input.cursor - prevMouse) * 0.005;
+        } else { // prevent snapping when tabbing back in
+            input.cursorDelta = {};
         }
+        window.isFocused = isFocused;
+
+        input.move = {
+                (glfwGetKey(glfwWindow, GLFW_KEY_D) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_A) ? -1.0 : 0.0),
+                (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0),
+                (glfwGetKey(glfwWindow, GLFW_KEY_W) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_S) ? -1.0 : 0.0),
+        };
     }
 }
