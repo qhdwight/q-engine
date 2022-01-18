@@ -1,5 +1,6 @@
 #include "vulkan_render.hpp"
 
+#include "math.hpp"
 #include "render.hpp"
 #include "shaders.hpp"
 #include "geometries.hpp"
@@ -10,33 +11,31 @@
 
 #include <fstream>
 
-glm::mat4 calcView(position const& eye, look const& look) {
-    glm::dvec3 right{1.0, 0.0, 0.0};
-    glm::dvec3 forward{0.0, 1.0, 0.0};
-    glm::dvec3 up{0.0, 0.0, 1.0};
-    glm::dvec3 rotatedForward = glm::angleAxis(look.vec.z, up) * glm::angleAxis(-look.vec.x, right) * forward;
-//    glm::dvec3 rotatedForward = glm::dquat{look.vec} * glm::dvec3{0.0, 1.0, 0.0};
-    return glm::lookAtRH(glm::vec3{eye.vec}, glm::vec3{eye.vec + rotatedForward}, glm::vec3{up});
+glm::dmat4 calcView(position const& eye, look const& look) {
+    glm::dvec3 right{1.0, 0.0, 0.0}, fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
+    return glm::lookAtRH(eye.vec, eye.vec + fromEuler(look.vec) * fwd, fromEuler(look.vec) * up);
 }
 
-glm::mat4 calcProj(vk::Extent2D const& extent) {
-    float fov = glm::radians(45.0f);
-    float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-    return glm::perspective(fov, aspect, 0.1f, 100.0f);
+glm::dmat4 calcProj(vk::Extent2D const& extent) {
+    return glm::perspectiveFovRH_ZO(
+            glm::radians(45.0),
+            static_cast<double>(extent.width), static_cast<double>(extent.height),
+            0.1, 100.0
+    );
 }
 
-glm::mat4 getClip() {
+glm::dmat4 getClip() {
     return { // vulkan clip space has inverted y and half z!
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, -1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 0.5f, 0.0f,
-            0.0f, 0.0f, 0.5f, 1.0f
+            1.0, 0.0, 0.0, 0.0,
+            0.0, -1.0, 0.0, 0.0,
+            0.0, 0.0, 0.5, 0.0,
+            0.0, 0.0, 0.5, 1.0
     };
 }
 
-glm::mat4 calcModel(position const& pos) {
-    glm::mat4 model(1.0f);
-    return glm::translate(model, glm::vec3(pos.vec));
+glm::dmat4 calcModel(position const& pos) {
+    glm::dmat4 model(1.0);
+    return glm::translate(model, pos.vec);
 }
 
 vk::ShaderModule createShaderModule(VulkanData& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {

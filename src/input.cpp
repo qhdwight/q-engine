@@ -33,5 +33,6 @@ void input(World& world) {
                 (glfwGetKey(glfwWindow, GLFW_KEY_W) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_S) ? -1.0 : 0.0),
                 (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0)
         };
+        input.lean = (glfwGetKey(glfwWindow, GLFW_KEY_E) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_Q) ? -1.0 : 0.0);
     }
 }

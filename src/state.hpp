@@ -14,6 +14,7 @@ struct position {
 struct orientation {
     glm::dquat quat;
 };
+
 struct look {
     glm::dvec3 vec;
 };
@@ -33,6 +34,7 @@ struct Cube {
 struct Input {
     glm::dvec2 cursor, cursorDelta;
     glm::dvec3 move;
+    double lean;
 };
 
 struct InputConfig {

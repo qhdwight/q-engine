@@ -10,13 +10,12 @@
 
 #include <glm/gtc/quaternion.hpp>
 
+#include <chrono>
 #include <optional>
 #include <iostream>
-#include <chrono>
 
 int main() {
     try {
-        octree<int> oct;
         entt::registry reg;
         for (int i = 0; i < 3; ++i) {
             auto cubeEnt = reg.create();
@@ -45,7 +44,7 @@ int main() {
             for (auto ent: world.reg.view<position, orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
                 double x_pos = ((int) ent - 0) * 3.0;
-                world.reg.emplace_or_replace<position>(ent, glm::dvec3{x_pos, 10.0, add});
+                world.reg.emplace_or_replace<position>(ent, glm::dvec3{x_pos, 10.0, add - 1});
             }
             input(world);
             modify(world);
