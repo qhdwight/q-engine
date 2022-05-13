@@ -37,5 +37,12 @@
       "glslang-default-resource-limits",
       "SPIRV"
     ]
+  },
+  "imgui": {
+    "uri": "git@github.com:ocornut/imgui.git",
+    "reference": "v1.87",
+    "includes": [
+      ""
+    ]
   }
 }

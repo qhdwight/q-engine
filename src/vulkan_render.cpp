@@ -6,6 +6,9 @@
 #include <SPIRV/GlslangToSpv.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_access.hpp>
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
 
 #include "math.hpp"
 #include "render.hpp"
@@ -39,7 +42,7 @@ glm::dmat4 calcModel(position const& pos) {
     return glm::translate(model, pos.vec);
 }
 
-vk::ShaderModule createShaderModule(VulkanData& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
+vk::ShaderModule createShaderModule(VulkanResource& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     shaderFile.open(path);
@@ -48,7 +51,7 @@ vk::ShaderModule createShaderModule(VulkanData& vk, vk::ShaderStageFlagBits shad
     return vk::su::createShaderModule(*vk.device, shaderStage, strStream.str());
 }
 
-void createPipelineLayout(VulkanData& vk) {
+void createPipelineLayout(VulkanResource& vk) {
     size_t uboAlignment = vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment;
     vk.dynUboData.resize(uboAlignment, 16);
     vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
@@ -72,14 +75,23 @@ void createPipelineLayout(VulkanData& vk) {
             coloredCubeData,
             sizeof(coloredCubeData) / sizeof(coloredCubeData[0])
     );
-
-    vk::DescriptorPool descPool = vk::su::createDescriptorPool(
+    vk.descriptorPool = vk::su::createDescriptorPool(
             *vk.device, {
-                    {vk::DescriptorType::eUniformBuffer,        1},
-                    {vk::DescriptorType::eUniformBufferDynamic, 1}
+                    {vk::DescriptorType::eSampler,              64},
+                    {vk::DescriptorType::eCombinedImageSampler, 64},
+                    {vk::DescriptorType::eSampledImage,         64},
+                    {vk::DescriptorType::eStorageImage,         64},
+                    {vk::DescriptorType::eUniformTexelBuffer,   64},
+                    {vk::DescriptorType::eStorageTexelBuffer,   64},
+                    {vk::DescriptorType::eUniformBuffer,        64},
+                    {vk::DescriptorType::eStorageBuffer,        64},
+                    {vk::DescriptorType::eUniformBufferDynamic, 64},
+                    {vk::DescriptorType::eStorageBufferDynamic, 64},
+                    {vk::DescriptorType::eInputAttachment,      64},
             }
     );
-    vk::DescriptorSetAllocateInfo descSetAllocInfo(descPool, descSetLayout);
+
+    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
     vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
 
     vk::DescriptorBufferInfo sharedDescBufInfo{vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE};
@@ -90,7 +102,7 @@ void createPipelineLayout(VulkanData& vk) {
 }
 
 
-void createPipeline(VulkanData& vk) {
+void createPipeline(VulkanResource& vk) {
     auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
             *vk.physDev,
@@ -126,7 +138,7 @@ void createPipeline(VulkanData& vk) {
 
     vk.pipeline = vk::su::createGraphicsPipeline(
             *vk.device,
-            vk.device->createPipelineCache(vk::PipelineCacheCreateInfo()),
+            *vk.pipelineCache,
             {vertexShaderModule, nullptr},
             {fragmentShaderModule, nullptr},
             sizeof(coloredCubeData[0]),
@@ -137,10 +149,9 @@ void createPipeline(VulkanData& vk) {
             *vk.pipelineLayout,
             *vk.renderPass
     );
-
 }
 
-void recreatePipeline(VulkanData& vk) {
+void recreatePipeline(VulkanResource& vk) {
     vk.device->waitIdle();
     int width, height;
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
@@ -149,31 +160,92 @@ void recreatePipeline(VulkanData& vk) {
     createPipeline(vk);
 }
 
-void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
-    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
 
-    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
-    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
-    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
-    vk::RenderPassBeginInfo renderPassBeginInfo(
-            *vk.renderPass,
-            vk.framebufs[curBufIdx],
-            vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent),
-            clearVals
-    );
+void setupImgui(VulkanResource& vk) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void) io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForVulkan(vk.surfData->window.handle, true);
+    ImGui_ImplVulkan_InitInfo init_info{
+            .Instance = vk.inst,
+            .PhysicalDevice = *vk.physDev,
+            .Device = *vk.device,
+            .QueueFamily = vk.graphicsFamilyIdx,
+            .Queue = *vk.graphicsQueue,
+            .PipelineCache = *vk.pipelineCache,
+            .DescriptorPool = *vk.descriptorPool,
+            .Subpass = 0,
+            .MinImageCount = 2,
+            .ImageCount = 2,
+            .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+    };
+    ImGui_ImplVulkan_Init(&init_info, *vk.renderPass);
 
-    vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    ImGui_ImplVulkan_CreateFontsTexture(*vk.cmdBuf);
+    vk.cmdBuf->end();
+    vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+    vk.device->waitIdle();
+
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
+void init(VulkanResource& vk) {
+    std::string const appName = "Game Engine", engineName = "QEngine";
+    vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
+
+#if !defined(NDEBUG)
+    auto result = vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+    if (!result) {
+        throw std::runtime_error("Failed to create debug messenger!");
+    }
+#endif
+
+    std::vector<vk::PhysicalDevice> const& physDevs = vk.inst.enumeratePhysicalDevices();
+    if (physDevs.empty()) {
+        throw std::runtime_error("No physical vk.devices found");
+    }
+    vk.physDev = physDevs.front();
+
+    // Creates window as well
+    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(512, 512));
+    float xScale, yScale;
+    glfwGetWindowContentScale(vk.surfData->window.handle, &xScale, &yScale);
+    vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
+                                       static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.height) * yScale));
+
+    std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+
+    std::vector<std::string> extensions = vk::su::getDeviceExtensions();
+//#if !defined(NDEBUG)
+//    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+//#endif
+    vk.device = vk::su::createDevice(*vk.physDev, vk.graphicsFamilyIdx, extensions);
+
+    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, vk.graphicsFamilyIdx);
+    auto cmdBufs = vk.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 16));
+    vk.cmdBuf = cmdBufs[0];
+
+    vk.graphicsQueue = vk.device->getQueue(vk.graphicsFamilyIdx, 0);
+    vk.presentQueue = vk.device->getQueue(vk.presentFamilyIdx, 0);
+
+    vk.pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
+    createPipeline(vk);
+
+    setupImgui(vk);
+}
+
+void renderOpaque(VulkanResource& vk, World& world) {
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
     vk.cmdBuf->setViewport(
             0,
             vk::Viewport(
-                    0.0f,
-                    0.0f,
-                    static_cast<float>(vk.surfData->extent.width),
-                    static_cast<float>(vk.surfData->extent.height),
-                    0.0f,
-                    1.0f
+                    0.0f, 0.0f,
+                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
+                    0.0f, 1.0f
             )
     );
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
@@ -205,56 +277,22 @@ void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
         vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *vk.pipelineLayout, 0, *vk.descSet, off);
         vk.cmdBuf->draw(12 * 3, 1, 0, 0);
     }
-
-    vk.cmdBuf->endRenderPass();
-    vk.cmdBuf->end();
 }
 
-void init(VulkanData& vk) {
-    std::string const appName = "Game Engine", engineName = "QEngine";
-    vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
-
-#if !defined(NDEBUG)
-    auto result = vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
-    if (!result) {
-        throw std::runtime_error("Failed to create debug messenger!");
-    }
-#endif
-
-    std::vector<vk::PhysicalDevice> const& physDevs = vk.inst.enumeratePhysicalDevices();
-    if (physDevs.empty()) {
-        throw std::runtime_error("No physical vk.devices found");
-    }
-    vk.physDev = physDevs.front();
-
-    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(512, 512));
-    float xScale, yScale;
-    glfwGetWindowContentScale(vk.surfData->window.handle, &xScale, &yScale);
-    vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
-                                       static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.height) * yScale));
-
-    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
-
-    std::vector<std::string> extensions = vk::su::getDeviceExtensions();
-//#if !defined(NDEBUG)
-//    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-//#endif
-    vk.device = vk::su::createDevice(*vk.physDev, graphicsFamilyIdx, extensions);
-
-    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, graphicsFamilyIdx);
-    vk.cmdBuf = vk.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 1)).front();
-
-    vk.graphicsQueue = vk.device->getQueue(graphicsFamilyIdx, 0);
-    vk.presentQueue = vk.device->getQueue(presentFamilyIdx, 0);
-
-    createPipeline(vk);
+void renderImGui(VulkanResource& vk, uint32_t curBufIdx) {
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    ImGui::ShowDemoWindow();
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *vk.cmdBuf);
 }
 
 void tryRenderVulkan(World& world) {
-    auto pVk = world.reg.try_get<VulkanData>(world.sharedEnt);
+    auto pVk = world.reg.try_get<VulkanResource>(world.sharedEnt);
     if (!pVk) return;
 
-    VulkanData& vk = *pVk;
+    VulkanResource& vk = *pVk;
     if (!vk.inst) {
         init(vk);
     }
@@ -273,13 +311,26 @@ void tryRenderVulkan(World& world) {
         throw std::runtime_error("Invalid framebuffer size");
     }
 
-    commandBuffer(vk, world, curBuf.value);
+    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
+    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
+    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
+    vk::RenderPassBeginInfo renderPassBeginInfo(
+            *vk.renderPass,
+            vk.framebufs[curBuf.value],
+            vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent),
+            clearVals
+    );
+    vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    renderOpaque(vk, world);
+    renderImGui(vk, curBuf.value);
+    vk.cmdBuf->endRenderPass();
+    vk.cmdBuf->end();
 
     vk::Fence drawFence = vk.device->createFence(vk::FenceCreateInfo());
 
     vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    vk::SubmitInfo submitInfo(imgAcqSem, waitDestStageMask, *vk.cmdBuf);
-    vk.graphicsQueue->submit(submitInfo, drawFence);
+    vk.graphicsQueue->submit(vk::SubmitInfo(imgAcqSem, waitDestStageMask, *vk.cmdBuf), drawFence);
 
     while (vk::Result::eTimeout == vk.device->waitForFences(drawFence, VK_TRUE, vk::su::FenceTimeout));
 
@@ -297,7 +348,7 @@ void tryRenderVulkan(World& world) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = world.reg.get<Window>(world.sharedEnt).keepOpen;
+    bool& keepOpen = world.reg.get<WindowResource>(world.sharedEnt).keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();

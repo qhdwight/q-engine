@@ -2,8 +2,9 @@
 
 #include <optional>
 
-#include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.hpp>
+#include <backends/imgui_impl_vulkan.h>
 
 #include "utils.hpp"
 #include "state.hpp"
@@ -17,7 +18,7 @@ struct DynamicUboData {
     glm::mat4 model;
 };
 
-struct VulkanData {
+struct VulkanResource {
     vk::Instance inst;
     std::optional<vk::PhysicalDevice> physDev;
     std::optional<vk::Device> device;
@@ -31,8 +32,12 @@ struct VulkanData {
     std::optional<vk::su::BufferData> sharedUboBuf, dynUboBuf, vertBufData;
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::Pipeline> pipeline;
+    std::optional<vk::PipelineCache> pipelineCache;
+    std::optional<vk::DescriptorPool> descriptorPool;
     aligned_vector<DynamicUboData> dynUboData;
     SharedUboData sharedUboData;
+    uint32_t graphicsFamilyIdx, presentFamilyIdx;
+    ImGui_ImplVulkanH_Window imGuiWindow;
 };
 
 void tryRenderVulkan(World& world);

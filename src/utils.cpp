@@ -13,8 +13,6 @@
 // limitations under the License.
 //
 
-#define VK_USE_PLATFORM_XCB_KHR
-
 #if defined( _MSC_VER )
 // no need to ignore any warnings with MSVC
 #elif defined( __clang__ )
@@ -65,9 +63,8 @@ namespace vk {
 
         vk::DescriptorPool createDescriptorPool(vk::Device const& device, std::vector<vk::DescriptorPoolSize> const& poolSizes) {
             assert(!poolSizes.empty());
-            uint32_t maxSets =
-                    std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
-                                    [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
+            uint32_t maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
+                                               [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
             assert(0 < maxSets);
 
             vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes);
@@ -406,11 +403,11 @@ namespace vk {
         }
 
         uint32_t findGraphicsQueueFamilyIndex(std::vector<vk::QueueFamilyProperties> const& queueFamilyProperties) {
-            // get the first index into queueFamiliyProperties which supports graphics
-            std::vector<vk::QueueFamilyProperties>::const_iterator graphicsQueueFamilyProperty =
-                    std::find_if(queueFamilyProperties.begin(),
-                                 queueFamilyProperties.end(),
-                                 [](vk::QueueFamilyProperties const& qfp) { return qfp.queueFlags & vk::QueueFlagBits::eGraphics; });
+            // get the first index into queueFamilyProperties which supports graphics
+            auto graphicsQueueFamilyProperty = std::find_if(queueFamilyProperties.begin(), queueFamilyProperties.end(),
+                                                            [](vk::QueueFamilyProperties const& qfp) {
+                                                                return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
+                                                            });
             assert(graphicsQueueFamilyProperty != queueFamilyProperties.end());
             return static_cast<uint32_t>( std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty));
         }
@@ -447,7 +444,7 @@ namespace vk {
 
         uint32_t
         findMemoryType(vk::PhysicalDeviceMemoryProperties const& memoryProperties, uint32_t typeBits, vk::MemoryPropertyFlags requirementsMask) {
-            uint32_t typeIndex = uint32_t(~0);
+            auto typeIndex = uint32_t(~0);
             for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
                 if ((typeBits & 1) && ((memoryProperties.memoryTypes[i].propertyFlags & requirementsMask) == requirementsMask)) {
                     typeIndex = i;
@@ -481,7 +478,7 @@ namespace vk {
 #elif defined( VK_USE_PLATFORM_WIN32_KHR )
             extensions.push_back( VK_KHR_WIN32_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_XCB_KHR )
-            extensions.push_back( VK_KHR_XCB_SURFACE_EXTENSION_NAME );
+            extensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 #elif defined( VK_USE_PLATFORM_XLIB_KHR )
             extensions.push_back( VK_KHR_XLIB_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_XLIB_XRANDR_EXT )

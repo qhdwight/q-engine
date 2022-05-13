@@ -6,13 +6,13 @@
 #include <GLFW/glfw3.h>
 
 void input(World& world) {
-    auto vkPtr = world.reg.try_get<VulkanData>(world.sharedEnt);
+    auto vkPtr = world.reg.try_get<VulkanResource>(world.sharedEnt);
     if (!vkPtr) return;
 
-    VulkanData& vk = *vkPtr;
+    VulkanResource& vk = *vkPtr;
     if (!vk.surfData) return;
 
-    auto& window = world.reg.get<Window>(world.sharedEnt);
+    auto& window = world.reg.get<WindowResource>(world.sharedEnt);
 
     GLFWwindow* glfwWindow = vk.surfData->window.handle;
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);

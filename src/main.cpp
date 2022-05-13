@@ -1,16 +1,15 @@
+#include <chrono>
+#include <optional>
+#include <iostream>
+
+#include <entt/entt.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include "state.hpp"
 #include "input.hpp"
 #include "render.hpp"
 #include "player.hpp"
 #include "vulkan_render.hpp"
-
-#include <entt/entt.hpp>
-
-#include <glm/gtc/quaternion.hpp>
-
-#include <chrono>
-#include <optional>
-#include <iostream>
 
 int main() {
     try {
@@ -28,13 +27,13 @@ int main() {
         reg.emplace<Input>(playerEnt);
 
         auto worldEnt = reg.create();
-        reg.emplace<VulkanData>(worldEnt);
-        reg.emplace<Window>(worldEnt, true);
+        reg.emplace<VulkanResource>(worldEnt);
+        reg.emplace<WindowResource>(worldEnt, true);
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();
         world.reg.emplace<timestamp>(world.sharedEnt, 0, 0);
-        while (world.reg.get<Window>(worldEnt).keepOpen) {
+        while (world.reg.get<WindowResource>(worldEnt).keepOpen) {
             auto now = std::chrono::steady_clock::now();
             long long prevNs = world.reg.get<timestamp>(world.sharedEnt).ns;
             long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();

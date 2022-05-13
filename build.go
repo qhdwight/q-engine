@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-git/go-git/v5"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/go-git/go-git/v5"
 )
 
 type Package struct {
@@ -68,7 +69,9 @@ set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 `))
 
 	for pkgName, pkg := range packages {
-		_, _ = cmakeFile.Write([]byte(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../../build/%[1]s)\n", pkgName)))
+		if _, err := os.Stat(filepath.Join("pkg", pkgName, "CMakeLists.txt")); err == nil {
+			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../../build/%[1]s)\n", pkgName)))
+		}
 		for _, include := range pkg.Includes {
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("include_directories(../pkg/%s/%s)\n", pkgName, include)))
 		}
@@ -86,7 +89,7 @@ if (WIN32)
     target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
 elseif (APPLE)
     target_compile_definitions(${PROJECT_NAME} PUBLIC VK_USE_PLATFORM_MACOS_MVK)
-elseif (LINUX)
+elseif (UNIX)
 	target_compile_definitions(${PROJECT_NAME} PUBLIC VK_USE_PLATFORM_XCB_KHR)
 endif ()
 `))

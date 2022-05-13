@@ -2,7 +2,7 @@
 
 #include "state.hpp"
 
-struct Window {
+struct WindowResource {
     bool keepOpen, isFocused;
 };
 
