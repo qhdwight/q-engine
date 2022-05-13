@@ -15,6 +15,7 @@ type Package struct {
 	Reference string   `json:"reference"`
 	Includes  []string `json:"includes"`
 	Libraries []string `json:"libraries"`
+	Source    []string `json:"source"`
 }
 
 func main() {
@@ -66,6 +67,8 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 
+find_package(Vulkan REQUIRED)
+
 `))
 
 	for pkgName, pkg := range packages {
@@ -76,15 +79,20 @@ set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("include_directories(../pkg/%s/%s)\n", pkgName, include)))
 		}
 	}
-	_, _ = cmakeFile.Write([]byte(`file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "*.cpp")
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-`))
+	_, _ = cmakeFile.Write([]byte("file(GLOB SOURCE_FILES CONFIGURE_DEPENDS \"*.cpp\")\n"))
+	for pkgName, pkg := range packages {
+		for _, source := range pkg.Source {
+			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("list(APPEND SOURCE_FILES ../pkg/%s/%s)\n", pkgName, source)))
+		}
+	}
+	_, _ = cmakeFile.Write([]byte("add_executable(${PROJECT_NAME} ${SOURCE_FILES})\n\n"))
 	for _, pkg := range packages {
 		for _, library := range pkg.Libraries {
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("target_link_libraries(${PROJECT_NAME} %s)\n", library)))
 		}
 	}
-	_, _ = cmakeFile.Write([]byte(`target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+	_, _ = cmakeFile.Write([]byte(`target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
 if (WIN32)
     target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
 elseif (APPLE)

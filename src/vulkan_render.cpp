@@ -128,9 +128,7 @@ void createPipeline(VulkanResource& vk) {
             depthBufData.format
     );
 
-    vk.framebufs = vk::su::createFramebuffers(
-            *vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent
-    );
+    vk.framebufs = vk::su::createFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
 
     if (!vk.pipelineLayout) {
         createPipelineLayout(vk);
@@ -210,7 +208,7 @@ void init(VulkanResource& vk) {
     vk.physDev = physDevs.front();
 
     // Creates window as well
-    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(512, 512));
+    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(640, 480));
     float xScale, yScale;
     glfwGetWindowContentScale(vk.surfData->window.handle, &xScale, &yScale);
     vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
@@ -240,17 +238,12 @@ void init(VulkanResource& vk) {
 void renderOpaque(VulkanResource& vk, World& world) {
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
-    vk.cmdBuf->setViewport(
-            0,
-            vk::Viewport(
-                    0.0f, 0.0f,
-                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
-                    0.0f, 1.0f
-            )
-    );
+    vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
+                                           static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
+                                           0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto playerView = world.reg.view<const position, const look, const Player>();
+    auto playerView = world->view<const position, const look, const Player>();
     for (auto [ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
                 calcView(pos, look),
@@ -261,7 +254,7 @@ void renderOpaque(VulkanResource& vk, World& world) {
     }
 
     size_t drawIdx = 0;
-    auto entView = world.reg.view<const position, const orientation, const Cube>();
+    auto entView = world->view<const position, const orientation, const Cube>();
     for (auto [ent, pos, orien]: entView.each()) {
         vk.dynUboData[drawIdx++] = {calcModel(pos)};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
@@ -279,7 +272,7 @@ void renderOpaque(VulkanResource& vk, World& world) {
     }
 }
 
-void renderImGui(VulkanResource& vk, uint32_t curBufIdx) {
+void renderImGui(VulkanResource& vk) {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -289,7 +282,7 @@ void renderImGui(VulkanResource& vk, uint32_t curBufIdx) {
 }
 
 void tryRenderVulkan(World& world) {
-    auto pVk = world.reg.try_get<VulkanResource>(world.sharedEnt);
+    auto pVk = world->try_get<VulkanResource>(world.sharedEnt);
     if (!pVk) return;
 
     VulkanResource& vk = *pVk;
@@ -318,12 +311,14 @@ void tryRenderVulkan(World& world) {
     vk::RenderPassBeginInfo renderPassBeginInfo(
             *vk.renderPass,
             vk.framebufs[curBuf.value],
-            vk::Rect2D(vk::Offset2D(0, 0), vk.surfData->extent),
+            vk::Rect2D({}, vk.surfData->extent),
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     renderOpaque(vk, world);
-    renderImGui(vk, curBuf.value);
+    if (auto it = world->view<UI>().each(); std::any_of(it.begin(), it.end(),
+                                                        [](std::tuple<entt::entity, UI>&& t) { return std::get<1>(t).visible; }))
+        renderImGui(vk);
     vk.cmdBuf->endRenderPass();
     vk.cmdBuf->end();
 
@@ -348,7 +343,7 @@ void tryRenderVulkan(World& world) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = world.reg.get<WindowResource>(world.sharedEnt).keepOpen;
+    bool& keepOpen = world->get<WindowResource>(world.sharedEnt).keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();

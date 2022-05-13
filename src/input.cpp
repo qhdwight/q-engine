@@ -1,3 +1,4 @@
+#include "math.hpp"
 #include "input.hpp"
 #include "state.hpp"
 #include "render.hpp"
@@ -6,22 +7,25 @@
 #include <GLFW/glfw3.h>
 
 void input(World& world) {
-    auto vkPtr = world.reg.try_get<VulkanResource>(world.sharedEnt);
+    auto vkPtr = world->try_get<VulkanResource>(world.sharedEnt);
     if (!vkPtr) return;
 
     VulkanResource& vk = *vkPtr;
     if (!vk.surfData) return;
 
-    auto& window = world.reg.get<WindowResource>(world.sharedEnt);
+    auto& window = world->get<WindowResource>(world.sharedEnt);
 
     GLFWwindow* glfwWindow = vk.surfData->window.handle;
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-    glfwSetInputMode(glfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    auto it = world->view<UI>().each();
+    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI>&& t) { return std::get<1>(t).visible; });
+    glfwSetInputMode(glfwWindow, GLFW_CURSOR, uiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
-    for (auto [ent, input]: world.reg.view<Input>().each()) {
+    for (auto [ent, input, ui]: world->view<Input, UI>().each()) {
         glm::dvec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
-        if (window.isFocused == isFocused) {
+        if (window.isFocused == isFocused && !uiVisible) {
             input.cursorDelta = (input.cursor - prevMouse) * 0.005;
         } else { // prevent snapping when tabbing back in
             input.cursorDelta = {};
@@ -34,5 +38,10 @@ void input(World& world) {
                 (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0)
         };
         input.lean = (glfwGetKey(glfwWindow, GLFW_KEY_E) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_Q) ? -1.0 : 0.0);
+        input.menu.previous = input.menu.current;
+        input.menu.current = glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE);
+        if (input.menu.current != input.menu.previous && input.menu.current) {
+            ui.visible = !ui.visible;
+        }
     }
 }

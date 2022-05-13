@@ -31,17 +31,27 @@ struct Cube {
 
 };
 
+struct Key {
+    bool previous: 1;
+    bool current: 1;
+};
+
 struct Input {
     glm::dvec2 cursor, cursorDelta;
     glm::dvec3 move;
     double lean;
+    Key menu;
 };
 
-struct InputConfig {
-
+struct UI {
+    bool visible;
 };
 
 struct World {
     entt::registry reg;
     entt::registry::entity_type sharedEnt;
+
+    entt::registry* operator->() noexcept {
+        return &reg;
+    }
 };
