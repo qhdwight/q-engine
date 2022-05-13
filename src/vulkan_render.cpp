@@ -1,15 +1,16 @@
 #include "vulkan_render.hpp"
 
-#include "math.hpp"
-#include "render.hpp"
-#include "shaders.hpp"
-#include "geometries.hpp"
+#include <fstream>
+#include <filesystem>
 
 #include <SPIRV/GlslangToSpv.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_access.hpp>
 
-#include <fstream>
+#include "math.hpp"
+#include "render.hpp"
+#include "shaders.hpp"
+#include "geometries.hpp"
 
 glm::dmat4 calcView(position const& eye, look const& look) {
     glm::dvec3 right{1.0, 0.0, 0.0}, fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
@@ -90,7 +91,7 @@ void createPipelineLayout(VulkanData& vk) {
 
 
 void createPipeline(VulkanData& vk) {
-    auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
             *vk.physDev,
             *vk.device,
@@ -178,7 +179,7 @@ void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
     auto playerView = world.reg.view<const position, const look, const Player>();
-    for (auto[ent, pos, look]: playerView.each()) {
+    for (auto [ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
                 calcView(pos, look),
                 calcProj(vk.surfData->extent),
@@ -189,7 +190,7 @@ void commandBuffer(VulkanData& vk, World& world, uint32_t curBufIdx) {
 
     size_t drawIdx = 0;
     auto entView = world.reg.view<const position, const orientation, const Cube>();
-    for (auto[ent, pos, orien]: entView.each()) {
+    for (auto [ent, pos, orien]: entView.each()) {
         vk.dynUboData[drawIdx++] = {calcModel(pos)};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
@@ -214,7 +215,10 @@ void init(VulkanData& vk) {
     vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
 
 #if !defined(NDEBUG)
-    vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+    auto result = vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+    if (!result) {
+        throw std::runtime_error("Failed to create debug messenger!");
+    }
 #endif
 
     std::vector<vk::PhysicalDevice> const& physDevs = vk.inst.enumeratePhysicalDevices();
@@ -229,7 +233,7 @@ void init(VulkanData& vk) {
     vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
                                        static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.height) * yScale));
 
-    auto[graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
 
     std::vector<std::string> extensions = vk::su::getDeviceExtensions();
 //#if !defined(NDEBUG)

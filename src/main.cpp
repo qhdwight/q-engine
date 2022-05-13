@@ -1,10 +1,8 @@
-#include "physics.hpp"
 #include "state.hpp"
 #include "input.hpp"
 #include "render.hpp"
 #include "player.hpp"
 #include "vulkan_render.hpp"
-#include "octree.hpp"
 
 #include <entt/entt.hpp>
 

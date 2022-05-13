@@ -18,7 +18,7 @@ void input(World& world) {
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     glfwSetInputMode(glfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
-    for (auto[ent, input]: world.reg.view<Input>().each()) {
+    for (auto [ent, input]: world.reg.view<Input>().each()) {
         glm::dvec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
         if (window.isFocused == isFocused) {

@@ -18,18 +18,12 @@
 #include <string>
 #include <vector>
 
-namespace vk
-{
-  namespace su
-  {
-    vk::ShaderModule createShaderModule( vk::Device const &      device,
-                                         vk::ShaderStageFlagBits shaderStage,
-                                         std::string const &     shaderText );
+namespace vk {
+    namespace su {
+        vk::ShaderModule createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText);
 
-    bool GLSLtoSPV( const vk::ShaderStageFlagBits shaderType,
-                    std::string const &           glslShader,
-                    std::vector<unsigned int> &   spvShader );
-  }  // namespace su
+        bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, std::string const& glslShader, std::vector<unsigned int>& spvShader);
+    }  // namespace su
 }  // namespace vk
 
 // vertex shader with (P)osition and (C)olor in and (C)olor out
@@ -39,19 +33,12 @@ const std::string vertexShaderText_PC_C = R"(
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (binding = 0) uniform u1
+layout (std140, binding = 0) uniform buffer
 {
-  mat4 view;
-  mat4 proj;
-  mat4 clip;
-} sharedUbo;
+  mat4 mvp;
+} uniformBuffer;
 
-layout (binding = 1) uniform u2
-{
-  mat4 model;
-} dynamicUbo;
-
-layout (location = 0) in vec4 position;
+layout (location = 0) in vec4 pos;
 layout (location = 1) in vec4 inColor;
 
 layout (location = 0) out vec4 outColor;
@@ -59,8 +46,7 @@ layout (location = 0) out vec4 outColor;
 void main()
 {
   outColor = inColor;
-  mat4 vpc = sharedUbo.clip * sharedUbo.proj * sharedUbo.view;
-  gl_Position = vpc * dynamicUbo.model * position;
+  gl_Position = uniformBuffer.mvp * pos;
 }
 )";
 
@@ -76,7 +62,7 @@ layout (std140, binding = 0) uniform buffer
   mat4 mvp;
 } uniformBuffer;
 
-layout (location = 0) in vec4 position;
+layout (location = 0) in vec4 pos;
 layout (location = 1) in vec2 inTexCoord;
 
 layout (location = 0) out vec2 outTexCoord;
@@ -84,7 +70,7 @@ layout (location = 0) out vec2 outTexCoord;
 void main()
 {
   outTexCoord = inTexCoord;
-  gl_Position = uniformBuffer.mvp * position;
+  gl_Position = uniformBuffer.mvp * pos;
 }
 )";
 
