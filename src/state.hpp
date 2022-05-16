@@ -10,18 +10,31 @@
 #include <glm/detail/type_quat.hpp>
 #include <glm/detail/type_vec3.hpp>
 
-struct position {
+struct Position {
     glm::dvec3 vec;
+
+    glm::dvec3* operator->() noexcept { return &vec; }
 };
-struct orientation {
+
+struct LinearVelocity {
+    glm::dvec3 vec;
+
+    glm::dvec3* operator->() noexcept { return &vec; }
+};
+
+struct Orientation {
     glm::dquat quat;
+
+    glm::dquat* operator->() noexcept { return &quat; }
 };
 
-struct look {
+struct Look {
     glm::dvec3 vec;
+
+    glm::dvec3* operator->() noexcept { return &vec; }
 };
 
-struct timestamp {
+struct Timestamp {
     long long ns, deltaNs;
 };
 

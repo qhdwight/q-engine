@@ -10,7 +10,6 @@
 #include "render.hpp"
 #include "player.hpp"
 #include "physics.hpp"
-#include "vulkan_render.hpp"
 
 int main() {
     try {
@@ -18,37 +17,44 @@ int main() {
         for (int i = 0; i < 3; ++i) {
             auto cubeEnt = reg.create();
             reg.emplace<Cube>(cubeEnt);
-            reg.emplace<position>(cubeEnt);
-            reg.emplace<orientation>(cubeEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
+            reg.emplace<Position>(cubeEnt);
+            reg.emplace<Orientation>(cubeEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
         }
         auto playerEnt = reg.create();
         reg.emplace<Player>(playerEnt);
-        reg.emplace<position>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
-        reg.emplace<look>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
+        reg.emplace<Position>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
+        reg.emplace<Look>(playerEnt);
         reg.emplace<Input>(playerEnt);
         reg.emplace<UI>(playerEnt);
+        reg.emplace<LinearVelocity>(playerEnt);
+
+        auto groundEnt = reg.create();
+        reg.emplace<btBoxShape>(groundEnt, btVector3{0.5f, 0.5f, 0.5f});
+        reg.emplace<btBroadphaseProxy>(groundEnt);
+        reg.emplace<Position>(groundEnt);
+        reg.emplace<Orientation>(groundEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
 
         auto worldEnt = reg.create();
-        reg.emplace<VulkanResource>(worldEnt);
-        reg.emplace<WindowResource>(worldEnt, true, false);
-        reg.emplace<BulletResource>(worldEnt);
+        reg.emplace<GraphicsResource>(worldEnt);
+        reg.emplace<WindowResource>(worldEnt, false, true, false);
+        reg.emplace<PhysicsResource>(worldEnt);
         reg.emplace<DiagnosticResource>(worldEnt);
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();
-        world->emplace<timestamp>(world.sharedEnt, 0, 0);
+        world->emplace<Timestamp>(world.sharedEnt, 0, 0);
         while (world->get<WindowResource>(worldEnt).keepOpen) {
             auto now = std::chrono::steady_clock::now();
-            long long prevNs = world->get<timestamp>(world.sharedEnt).ns;
+            long long prevNs = world->get<Timestamp>(world.sharedEnt).ns;
             long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
             long long deltaNs = ns - prevNs;
-            world->emplace_or_replace<timestamp>(worldEnt, ns, deltaNs);
+            world->emplace_or_replace<Timestamp>(worldEnt, ns, deltaNs);
             auto& diagnostics = world->get<DiagnosticResource>(worldEnt);
             diagnostics.addFrameTime(deltaNs);
-            for (auto ent: world->view<position, orientation, Cube>()) {
+            for (auto ent: world->view<Position, Orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
                 double x_pos = ((int) ent - 0) * 3.0;
-                world->emplace_or_replace<position>(ent, glm::dvec3{x_pos, 10.0, add - 1});
+                world->emplace_or_replace<Position>(ent, glm::dvec3{x_pos, 10.0, add - 1});
             }
             input(world);
             modify(world);

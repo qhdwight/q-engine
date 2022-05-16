@@ -4,9 +4,9 @@
 
 #include "state.hpp"
 #include "render.hpp"
-#include "vulkan_render.hpp"
 
 void input(World& world) {
+    // TODO:arch restructure so it is graphics API agnostic
     auto vkPtr = world->try_get<VulkanResource>(world.sharedEnt);
     if (!vkPtr) return;
 

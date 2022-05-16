@@ -14,7 +14,7 @@
 #include "shaders.hpp"
 #include "geometries.hpp"
 
-glm::dmat4 calcView(position const& eye, look const& look) {
+glm::dmat4 calcView(Position const& eye, Look const& look) {
     glm::dvec3 right{1.0, 0.0, 0.0}, fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
     return glm::lookAtRH(eye.vec, eye.vec + fromEuler(look.vec) * fwd, fromEuler(look.vec) * up);
 }
@@ -36,7 +36,7 @@ glm::dmat4 getClip() {
     };
 }
 
-glm::dmat4 calcModel(position const& pos) {
+glm::dmat4 calcModel(Position const& pos) {
     glm::dmat4 model(1.0);
     return glm::translate(model, pos.vec);
 }
@@ -259,7 +259,7 @@ void renderOpaque(World& world) {
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto playerView = world->view<const position, const look, const Player>();
+    auto playerView = world->view<const Position, const Look, const Player>();
     for (auto [ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
                 calcView(pos, look),
@@ -270,7 +270,7 @@ void renderOpaque(World& world) {
     }
 
     size_t drawIdx = 0;
-    auto entView = world->view<const position, const orientation, const Cube>();
+    auto entView = world->view<const Position, const Orientation, const Cube>();
     for (auto [ent, pos, orien]: entView.each()) {
         vk.dynUboData[drawIdx++] = {calcModel(pos)};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
@@ -346,6 +346,7 @@ void tryRenderVulkan(World& world) {
         init(vk);
     }
 
+    // Acquire next image and signal the semaphore
     vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout, *vk.imgAcqSem, nullptr);
 
     if (curBuf.result == vk::Result::eSuboptimalKHR) {
@@ -376,12 +377,16 @@ void tryRenderVulkan(World& world) {
     vk.cmdBuf->end();
 
     vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    // Fences need to be manually reset
     vk.device->resetFences(*vk.drawFence);
+    // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
     vk.graphicsQueue->submit(vk::SubmitInfo(*vk.imgAcqSem, waitDestStageMask, *vk.cmdBuf), *vk.drawFence);
 
+    // Wait for the draw fence to be signaled
     while (vk::Result::eTimeout == vk.device->waitForFences(*vk.drawFence, VK_TRUE, vk::su::FenceTimeout));
 
     try {
+        // Present frame to display
         vk::Result result = vk.presentQueue->presentKHR(vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));
         switch (result) {
             case vk::Result::eSuccess:

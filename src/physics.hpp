@@ -4,4 +4,6 @@
 
 #include "state.hpp"
 
+using PhysicsResource = BulletResource;
+
 void physics(World& world);

@@ -3,28 +3,39 @@
 #include "bullet_physics.hpp"
 
 void init(BulletResource& bullet) {
-    bullet.collisionConfig = std::make_shared<btDefaultCollisionConfiguration>();
-    // Use the default collision dispatcher. For parallel processing you can use a different dispatcher (see Extras/BulletMultiThreaded)
-    bullet.dispatcher = std::make_shared<btCollisionDispatcher>(bullet.collisionConfig.get());
-    // btDbvtBroadphase is a good general purpose broad-phase. You can also try out btAxis3Sweep.
     bullet.broadphase = std::make_shared<btDbvtBroadphase>();
-    // The default constraint solver. For parallel processing you can use a different solver (see Extras/BulletMultiThreaded)
     bullet.solver = std::make_shared<btSequentialImpulseConstraintSolver>();
-    bullet.dynamicsWorld = std::make_shared<btDiscreteDynamicsWorld>(bullet.dispatcher.get(), bullet.broadphase.get(),
-                                                                     bullet.solver.get(), bullet.collisionConfig.get());
-    bullet.dynamicsWorld->setGravity(btVector3{0, -9.8, 0});
-
     std::cout << "[Bullet] " << btGetVersion() << " initialized" << std::endl;
 }
+
+btVector3 toBt(LinearVelocity& p) { return {p->x, p->y, p->z}; }
+
+btVector3 toBt(Position& p) { return {p->x, p->y, p->z}; }
+
+btQuaternion toBt(Orientation& o) { return {o->x, o->y, o->z, o->w}; }
+
+btTransform toBt(Position& p, Orientation& o) { return btTransform{toBt(o), toBt(p)}; }
 
 void bulletPhysics(World& world) {
     auto pBullet = world->try_get<BulletResource>(world.sharedEnt);
     if (!pBullet) return;
 
     BulletResource& bullet = *pBullet;
-    if (!bullet.dynamicsWorld) {
+    if (!bullet.broadphase || !bullet.solver) {
         init(bullet);
     }
 
-
+    for (auto [ent, pos, orien, linVel]: world->view<Position, Orientation, LinearVelocity>().each()) {
+        btTransform btTf = toBt(pos, orien);
+        btTransform btTfPred;
+        btTransformUtil::integrateTransform(btTf, toBt(linVel), {}, 1.0f, btTfPred);
+    }
+    for (auto [ent, pos, orien, box, proxy]: world->view<Position, Orientation, btBoxShape, btBroadphaseProxy>().each()) {
+        btTransform btTf = toBt(pos, orien);
+        bullet.broadphase->createProxy()
+        proxy.m_uniqueId = static_cast<int>(ent);
+        box.getAabb(btTf, proxy.m_aabbMin, proxy.m_aabbMax);
+        bullet.broadphase->setAabb(&proxy, proxy.m_aabbMin, proxy.m_aabbMax, nullptr);
+    }
+    bullet.broadphase->calculateOverlappingPairs(nullptr);
 }
