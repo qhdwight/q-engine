@@ -52,7 +52,7 @@ vk::ShaderModule createShaderModule(VulkanResource& vk, vk::ShaderStageFlagBits 
 }
 
 void createPipelineLayout(VulkanResource& vk) {
-    size_t uboAlignment = vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment;
+    auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.dynUboData.resize(uboAlignment, 16);
     vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
     vk.sharedUboBuf.emplace(*vk.physDev, *vk.device, sizeof(vk.sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
@@ -167,22 +167,22 @@ void setupImgui(VulkanResource& vk) {
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForVulkan(vk.surfData->window.handle, true);
     ImGui_ImplVulkan_InitInfo init_info{
-            .Instance = vk.inst,
-            .PhysicalDevice = *vk.physDev,
-            .Device = *vk.device,
+            .Instance = static_cast<VkInstance>(vk.inst),
+            .PhysicalDevice = static_cast<VkPhysicalDevice>(*vk.physDev),
+            .Device = static_cast<VkDevice>(*vk.device),
             .QueueFamily = vk.graphicsFamilyIdx,
-            .Queue = *vk.graphicsQueue,
-            .PipelineCache = *vk.pipelineCache,
-            .DescriptorPool = *vk.descriptorPool,
+            .Queue = static_cast<VkQueue>(*vk.graphicsQueue),
+            .PipelineCache = static_cast<VkPipelineCache>(*vk.pipelineCache),
+            .DescriptorPool = static_cast<VkDescriptorPool>(*vk.descriptorPool),
             .Subpass = 0,
             .MinImageCount = 2,
             .ImageCount = 2,
             .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
     };
-    ImGui_ImplVulkan_Init(&init_info, *vk.renderPass);
+    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.renderPass));
 
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-    ImGui_ImplVulkan_CreateFontsTexture(*vk.cmdBuf);
+    ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*vk.cmdBuf));
     vk.cmdBuf->end();
     vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
     vk.device->waitIdle();
@@ -278,7 +278,7 @@ void renderImGui(VulkanResource& vk) {
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *vk.cmdBuf);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
 
 void tryRenderVulkan(World& world) {
@@ -316,9 +316,9 @@ void tryRenderVulkan(World& world) {
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     renderOpaque(vk, world);
-    if (auto it = world->view<UI>().each(); std::any_of(it.begin(), it.end(),
-                                                        [](std::tuple<entt::entity, UI>&& t) { return std::get<1>(t).visible; }))
-        renderImGui(vk);
+    auto it = world->view<UI>().each();
+    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
+    if (uiVisible) renderImGui(vk);
     vk.cmdBuf->endRenderPass();
     vk.cmdBuf->end();
 
@@ -338,7 +338,7 @@ void tryRenderVulkan(World& world) {
             default:
                 throw std::runtime_error("Bad present KHR result");
         }
-    } catch (vk::OutOfDateKHRError const& outOfDateError) {
+    } catch (vk::OutOfDateKHRError const&) {
         recreatePipeline(vk);
     }
 

@@ -1,13 +1,13 @@
 {
   "entt": {
-    "uri": "git@github.com:skypjack/entt.git",
+    "uri": "https://github.com/skypjack/entt.git",
     "reference": "v3.10.1",
     "includes": [
       "src"
     ]
   },
   "glm": {
-    "uri": "git@github.com:g-truc/glm.git",
+    "uri": "https://github.com/g-truc/glm.git",
     "reference": "0.9.9.8",
     "includes": [
       ""
@@ -17,7 +17,7 @@
     ]
   },
   "glfw": {
-    "uri": "git@github.com:glfw/glfw.git",
+    "uri": "https://github.com/glfw/glfw.git",
     "reference": "v3.3.7",
     "includes": [
       "include"
@@ -27,7 +27,7 @@
     ]
   },
   "glslang": {
-    "uri": "git@github.com:KhronosGroup/glslang.git",
+    "uri": "https://github.com/KhronosGroup/glslang.git",
     "reference": "master",
     "includes": [
       ""
@@ -39,7 +39,7 @@
     ]
   },
   "imgui": {
-    "uri": "git@github.com:ocornut/imgui.git",
+    "uri": "https://github.com/ocornut/imgui.git",
     "reference": "v1.87",
     "includes": [
       ""

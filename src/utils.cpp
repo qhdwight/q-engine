@@ -95,7 +95,7 @@ namespace vk {
 
             float queuePriority = 0.0f;
             vk::DeviceQueueCreateInfo deviceQueueCreateInfo({}, queueFamilyIndex, 1, &queuePriority);
-            vk::DeviceCreateInfo deviceCreateInfo({}, deviceQueueCreateInfo, {}, enabledExtensions, physicalDeviceFeatures, pNext);
+            vk::DeviceCreateInfo deviceCreateInfo({}, deviceQueueCreateInfo, {}, enabledExtensions, physicalDeviceFeatures);
 
             vk::Device device = physicalDevice.createDevice(deviceCreateInfo);
 #if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)

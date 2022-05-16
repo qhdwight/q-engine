@@ -10,7 +10,11 @@ private:
 
     void cleanup() {
         if (!mPtr) return;
+#ifdef _WIN32
+        _aligned_free(mPtr);
+#else
         free(mPtr);
+#endif
     }
 
 public:
@@ -24,7 +28,11 @@ public:
             mBlockSize = (mBlockSize + alignment - 1) & ~(alignment - 1);
         }
         mSize = size;
+#ifdef _WIN32
+        mPtr = _aligned_malloc(mBlockSize, mem_size());
+#else
         mPtr = aligned_alloc(mBlockSize, mem_size());
+#endif
         if (!mPtr) {
             throw std::runtime_error("Failed to allocate aligned memory");
         }

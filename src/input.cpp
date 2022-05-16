@@ -19,7 +19,7 @@ void input(World& world) {
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
     auto it = world->view<UI>().each();
-    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI>&& t) { return std::get<1>(t).visible; });
+    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
     glfwSetInputMode(glfwWindow, GLFW_CURSOR, uiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
     for (auto [ent, input, ui]: world->view<Input, UI>().each()) {
