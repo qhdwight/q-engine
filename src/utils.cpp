@@ -85,8 +85,7 @@ namespace vk {
         vk::Device createDevice(vk::PhysicalDevice const& physicalDevice,
                                 uint32_t queueFamilyIndex,
                                 std::vector<std::string> const& extensions,
-                                vk::PhysicalDeviceFeatures const* physicalDeviceFeatures,
-                                void const* pNext) {
+                                vk::PhysicalDeviceFeatures const* physicalDeviceFeatures) {
             std::vector<char const*> enabledExtensions;
             enabledExtensions.reserve(extensions.size());
             for (auto const& ext: extensions) {

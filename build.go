@@ -65,6 +65,11 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(OpenGL_GL_PREFERENCE GLVND CACHE BOOL "" FORCE)
+
 set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 
 find_package(Vulkan REQUIRED)
@@ -91,7 +96,14 @@ find_package(Vulkan REQUIRED)
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("target_link_libraries(${PROJECT_NAME} %s)\n", library)))
 		}
 	}
-	_, _ = cmakeFile.Write([]byte(`target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+	_, _ = cmakeFile.Write([]byte(`
+if(MSVC)
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
 target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
 if (WIN32)
     target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)

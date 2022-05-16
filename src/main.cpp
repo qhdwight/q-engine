@@ -29,7 +29,7 @@ int main() {
 
         auto worldEnt = reg.create();
         reg.emplace<VulkanResource>(worldEnt);
-        reg.emplace<WindowResource>(worldEnt, true);
+        reg.emplace<WindowResource>(worldEnt, true, false);
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();

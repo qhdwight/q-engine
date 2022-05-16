@@ -178,6 +178,8 @@ void setupImgui(VulkanResource& vk) {
             .MinImageCount = 2,
             .ImageCount = 2,
             .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+            .Allocator = nullptr,
+            .CheckVkResultFn = nullptr
     };
     ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.renderPass));
 

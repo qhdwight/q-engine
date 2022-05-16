@@ -4,6 +4,13 @@
     "reference": "v3.10.1",
     "includes": [
       "src"
+    ],
+    "filter": [
+      "/*",
+      "!/*/",
+      "src/",
+      "cmake/",
+      ".github/"
     ]
   },
   "glm": {
@@ -14,6 +21,12 @@
     ],
     "libraries": [
       "glm"
+    ],
+    "filter": [
+      "/*",
+      "!/*/",
+      "glm/",
+      "cmake/"
     ]
   },
   "glfw": {
@@ -24,6 +37,13 @@
     ],
     "libraries": [
       "glfw"
+    ],
+    "filter": [
+      "/*",
+      "!/*/",
+      "src/",
+      "include/",
+      "CMake/"
     ]
   },
   "glslang": {
@@ -36,6 +56,16 @@
       "glslang",
       "glslang-default-resource-limits",
       "SPIRV"
+    ],
+    "filter": [
+      "/*",
+      "!/*/",
+      "glslang/",
+      "SPIRV/",
+      "glslang/",
+      "hlsl/",
+      "OGLCompilersDLL/",
+      "StandAlone/"
     ]
   },
   "imgui": {
@@ -52,6 +82,23 @@
       "imgui_widgets.cpp",
       "backends/imgui_impl_vulkan.cpp",
       "backends/imgui_impl_glfw.cpp"
+    ],
+    "filter": [
+      "/*",
+      "!/*/",
+      "backends/"
+    ]
+  },
+  "bullet3": {
+    "uri": "https://github.com/bulletphysics/bullet3.git",
+    "reference": "3.24",
+    "includes": [
+      "src"
+    ],
+    "libraries": [
+      "BulletCollision",
+      "BulletDynamics",
+      "LinearMath"
     ]
   }
 }

@@ -1,4 +1,3 @@
-#include "math.hpp"
 #include "input.hpp"
 #include "state.hpp"
 #include "render.hpp"

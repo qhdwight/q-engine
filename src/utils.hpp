@@ -355,8 +355,7 @@ namespace vk {
         vk::Device createDevice(vk::PhysicalDevice const& physicalDevice,
                                 uint32_t queueFamilyIndex,
                                 std::vector<std::string> const& extensions = {},
-                                vk::PhysicalDeviceFeatures const* physicalDeviceFeatures = nullptr,
-                                void const* pNext = nullptr);
+                                vk::PhysicalDeviceFeatures const* physicalDeviceFeatures = nullptr);
 
         std::vector<vk::Framebuffer> createFramebuffers(vk::Device const& device,
                                                         vk::RenderPass& renderPass,
