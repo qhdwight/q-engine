@@ -4,7 +4,6 @@
 #include <filesystem>
 
 #include <SPIRV/GlslangToSpv.h>
-#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_access.hpp>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
@@ -182,6 +181,7 @@ void setupImgui(VulkanResource& vk) {
             .CheckVkResultFn = nullptr
     };
     ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.renderPass));
+    std::cout << "[ImGui] " << IMGUI_VERSION << " initialized" << std::endl;
 
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
     ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*vk.cmdBuf));
@@ -195,6 +195,7 @@ void setupImgui(VulkanResource& vk) {
 void init(VulkanResource& vk) {
     std::string const appName = "Game Engine", engineName = "QEngine";
     vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
+    std::cout << "[Vulkan] Instance created" << std::endl;
 
 #if !defined(NDEBUG)
     auto result = vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
@@ -208,6 +209,13 @@ void init(VulkanResource& vk) {
         throw std::runtime_error("No physical vk.devices found");
     }
     vk.physDev = physDevs.front();
+
+    vk::PhysicalDeviceProperties const& props = vk.physDev->getProperties();
+    std::cout << "[Vulkan] Chose physical device: " << props.deviceName
+              << std::endl;
+    uint32_t apiVer = props.apiVersion;
+    std::cout << "[Vulkan] Device API version: " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.' << VK_VERSION_PATCH(apiVer)
+              << std::endl;
 
     // Creates window as well
     vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(640, 480));
@@ -231,13 +239,19 @@ void init(VulkanResource& vk) {
     vk.graphicsQueue = vk.device->getQueue(vk.graphicsFamilyIdx, 0);
     vk.presentQueue = vk.device->getQueue(vk.presentFamilyIdx, 0);
 
+    vk.drawFence = vk.device->createFence(vk::FenceCreateInfo());
+    vk.imgAcqSem = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
+//    vk.imgAcqSem.push_back(vk.device->createSemaphore(vk::SemaphoreCreateInfo()));
+//    vk.imgAcqSem.push_back(vk.device->createSemaphore(vk::SemaphoreCreateInfo()));
+
     vk.pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
     createPipeline(vk);
 
     setupImgui(vk);
 }
 
-void renderOpaque(VulkanResource& vk, World& world) {
+void renderOpaque(World& world) {
+    auto& vk = world->get<VulkanResource>(world.sharedEnt);
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
     vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
@@ -274,11 +288,51 @@ void renderOpaque(VulkanResource& vk, World& world) {
     }
 }
 
-void renderImGui(VulkanResource& vk) {
+void renderImGuiOverlay(World& world) {
+    auto& diagnostics = world->get<DiagnosticResource>(world.sharedEnt);
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                    ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    static bool open = true;
+    static int corner = 0;
+    if (corner != -1) {
+        const float PAD = 10.0f;
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+        ImVec2 work_size = viewport->WorkSize;
+        ImVec2 window_pos, window_pos_pivot;
+        window_pos.x = (corner & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
+        window_pos.y = (corner & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
+        window_pos_pivot.x = (corner & 1) ? 1.0f : 0.0f;
+        window_pos_pivot.y = (corner & 2) ? 1.0f : 0.0f;
+        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+        window_flags |= ImGuiWindowFlags_NoMove;
+    }
+    ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+    if (ImGui::Begin("Diagnostics", &open, window_flags)) {
+        double avgFrameTime = diagnostics.getAvgFrameTime();
+        ImGui::Text("%.3f ms/frame (%.1f FPS)", avgFrameTime / 10000000.0f, 1000000000.0f / avgFrameTime);
+        if (ImGui::BeginPopupContextWindow()) {
+            if (ImGui::MenuItem("Custom", nullptr, corner == -1)) corner = -1;
+            if (ImGui::MenuItem("Top-left", nullptr, corner == 0)) corner = 0;
+            if (ImGui::MenuItem("Top-right", nullptr, corner == 1)) corner = 1;
+            if (ImGui::MenuItem("Bottom-left", nullptr, corner == 2)) corner = 2;
+            if (ImGui::MenuItem("Bottom-right", nullptr, corner == 3)) corner = 3;
+            if (open && ImGui::MenuItem("Close")) open = false;
+            ImGui::EndPopup();
+        }
+    }
+    ImGui::End();
+}
+
+void renderImGui(World& world) {
+    auto& vk = world->get<VulkanResource>(world.sharedEnt);
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    ImGui::ShowDemoWindow();
+//    ImGui::ShowDemoWindow();
+//    auto it = world->view<UI>().each();
+//    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
+    renderImGuiOverlay(world);
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
@@ -292,8 +346,7 @@ void tryRenderVulkan(World& world) {
         init(vk);
     }
 
-    vk::Semaphore imgAcqSem = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
-    vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout, imgAcqSem, nullptr);
+    vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout, *vk.imgAcqSem, nullptr);
 
     if (curBuf.result == vk::Result::eSuboptimalKHR) {
         recreatePipeline(vk);
@@ -317,19 +370,16 @@ void tryRenderVulkan(World& world) {
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    renderOpaque(vk, world);
-    auto it = world->view<UI>().each();
-    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-    if (uiVisible) renderImGui(vk);
+    renderOpaque(world);
+    renderImGui(world);
     vk.cmdBuf->endRenderPass();
     vk.cmdBuf->end();
 
-    vk::Fence drawFence = vk.device->createFence(vk::FenceCreateInfo());
-
     vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    vk.graphicsQueue->submit(vk::SubmitInfo(imgAcqSem, waitDestStageMask, *vk.cmdBuf), drawFence);
+    vk.device->resetFences(*vk.drawFence);
+    vk.graphicsQueue->submit(vk::SubmitInfo(*vk.imgAcqSem, waitDestStageMask, *vk.cmdBuf), *vk.drawFence);
 
-    while (vk::Result::eTimeout == vk.device->waitForFences(drawFence, VK_TRUE, vk::su::FenceTimeout));
+    while (vk::Result::eTimeout == vk.device->waitForFences(*vk.drawFence, VK_TRUE, vk::su::FenceTimeout));
 
     try {
         vk::Result result = vk.presentQueue->presentKHR(vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));

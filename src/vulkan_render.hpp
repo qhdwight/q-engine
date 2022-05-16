@@ -34,6 +34,8 @@ struct VulkanResource {
     std::optional<vk::Pipeline> pipeline;
     std::optional<vk::PipelineCache> pipelineCache;
     std::optional<vk::DescriptorPool> descriptorPool;
+    std::optional<vk::Semaphore> imgAcqSem;
+    std::optional<vk::Fence> drawFence;
     aligned_vector<DynamicUboData> dynUboData;
     SharedUboData sharedUboData;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;

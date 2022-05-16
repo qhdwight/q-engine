@@ -10,7 +10,7 @@ void modify(World& world) {
         look.vec.y = input.lean * glm::radians(15.0);
     }
     for (auto [ent, input, pos, look]: world->view<const Input, position, const look>().each()) {
-        auto mult = 10.0 * static_cast<double>(world->get<timestamp>(world.sharedEnt).nsDelta) / 1e9;
+        auto mult = 10.0 * static_cast<double>(world->get<timestamp>(world.sharedEnt).deltaNs) / 1e9;
         pos.vec += fromEuler(look.vec) * glm::dvec3{input.move.x, input.move.y, 0.0} * mult;
         pos.vec += glm::dvec3{0.0, 0.0, input.move.z} * mult;
     }

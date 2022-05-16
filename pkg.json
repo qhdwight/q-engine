@@ -19,9 +19,6 @@
     "includes": [
       ""
     ],
-    "libraries": [
-      "glm"
-    ],
     "filter": [
       "/*",
       "!/*/",

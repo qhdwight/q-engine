@@ -995,6 +995,7 @@ namespace vk {
             struct glfwContext {
                 glfwContext() {
                     glfwInit();
+                    std::cout << "[GLFW] \"" << glfwGetVersionString() << "\" initialized" << std::endl;
                     glfwSetErrorCallback(
                             [](int error, const char* msg) {
                                 std::cerr << "glfw: "

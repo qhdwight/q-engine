@@ -1,9 +1,10 @@
 #include "input.hpp"
+
+#include <GLFW/glfw3.h>
+
 #include "state.hpp"
 #include "render.hpp"
 #include "vulkan_render.hpp"
-
-#include <GLFW/glfw3.h>
 
 void input(World& world) {
     auto vkPtr = world->try_get<VulkanResource>(world.sharedEnt);

@@ -1,12 +1,14 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+#include <numeric>
+#include <unordered_map>
+
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/detail/type_vec3.hpp>
-
-#include <string>
-#include <unordered_map>
 
 struct position {
     glm::dvec3 vec;
@@ -20,7 +22,7 @@ struct look {
 };
 
 struct timestamp {
-    long long ns, nsDelta;
+    long long ns, deltaNs;
 };
 
 struct Player {
@@ -45,6 +47,26 @@ struct Input {
 
 struct UI {
     bool visible;
+};
+
+struct DiagnosticResource {
+    std::array<long long, 128> frameTimesNs;
+    size_t frameTimesIndex;
+    size_t readingCount;
+
+    void addFrameTime(long long deltaNs) {
+        frameTimesNs[frameTimesIndex++] = deltaNs;
+        frameTimesIndex %= frameTimesNs.size();
+        readingCount = std::min(readingCount + 1, frameTimesNs.size());
+    }
+
+    [[nodiscard]] double getAvgFrameTime() const {
+        double avgFrameTime;
+        for (size_t i = 0; i < readingCount; ++i) {
+            avgFrameTime += static_cast<double>(frameTimesNs[i]) / static_cast<double>(readingCount);
+        }
+        return avgFrameTime;
+    }
 };
 
 struct World {

@@ -9,6 +9,7 @@
 #include "input.hpp"
 #include "render.hpp"
 #include "player.hpp"
+#include "physics.hpp"
 #include "vulkan_render.hpp"
 
 int main() {
@@ -30,6 +31,8 @@ int main() {
         auto worldEnt = reg.create();
         reg.emplace<VulkanResource>(worldEnt);
         reg.emplace<WindowResource>(worldEnt, true, false);
+        reg.emplace<BulletResource>(worldEnt);
+        reg.emplace<DiagnosticResource>(worldEnt);
         World world{std::move(reg), worldEnt};
 
         auto start = std::chrono::steady_clock::now();
@@ -38,7 +41,10 @@ int main() {
             auto now = std::chrono::steady_clock::now();
             long long prevNs = world->get<timestamp>(world.sharedEnt).ns;
             long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
-            world->emplace_or_replace<timestamp>(worldEnt, ns, ns - prevNs);
+            long long deltaNs = ns - prevNs;
+            world->emplace_or_replace<timestamp>(worldEnt, ns, deltaNs);
+            auto& diagnostics = world->get<DiagnosticResource>(worldEnt);
+            diagnostics.addFrameTime(deltaNs);
             for (auto ent: world->view<position, orientation, Cube>()) {
                 double add = std::cos(static_cast<double>(ns) / 1e9);
                 double x_pos = ((int) ent - 0) * 3.0;
@@ -47,6 +53,7 @@ int main() {
             input(world);
             modify(world);
             render(world);
+            physics(world);
         }
     }
     catch (std::exception const& err) {
