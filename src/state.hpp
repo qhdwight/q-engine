@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
 #include <string>
 #include <numeric>
+#include <iostream>
 #include <unordered_map>
 
 #include <entt/entt.hpp>
@@ -74,7 +74,7 @@ struct DiagnosticResource {
     }
 
     [[nodiscard]] double getAvgFrameTime() const {
-        double avgFrameTime;
+        double avgFrameTime = 0.0;
         for (size_t i = 0; i < readingCount; ++i) {
             avgFrameTime += static_cast<double>(frameTimesNs[i]) / static_cast<double>(readingCount);
         }
@@ -86,7 +86,5 @@ struct World {
     entt::registry reg;
     entt::registry::entity_type sharedEnt;
 
-    entt::registry* operator->() noexcept {
-        return &reg;
-    }
+    entt::registry* operator->() noexcept { return &reg; }
 };

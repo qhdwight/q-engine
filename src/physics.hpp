@@ -1,5 +1,7 @@
 #pragma once
 
+#include <variant>
+
 #include "bullet_physics.hpp"
 
 #include "state.hpp"

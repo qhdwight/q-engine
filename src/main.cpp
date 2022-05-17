@@ -29,8 +29,7 @@ int main() {
         reg.emplace<LinearVelocity>(playerEnt);
 
         auto groundEnt = reg.create();
-        reg.emplace<btBoxShape>(groundEnt, btVector3{0.5f, 0.5f, 0.5f});
-        reg.emplace<btBroadphaseProxy>(groundEnt);
+        reg.emplace<BoxCollider>(groundEnt, btBoxShape{{0.5f, 0.5f, 0.5f}});
         reg.emplace<Position>(groundEnt);
         reg.emplace<Orientation>(groundEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
 

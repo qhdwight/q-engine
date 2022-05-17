@@ -30,12 +30,19 @@ void bulletPhysics(World& world) {
         btTransform btTfPred;
         btTransformUtil::integrateTransform(btTf, toBt(linVel), {}, 1.0f, btTfPred);
     }
-    for (auto [ent, pos, orien, box, proxy]: world->view<Position, Orientation, btBoxShape, btBroadphaseProxy>().each()) {
+
+    std::array<btBroadphaseProxy*, 128> proxies{};
+    size_t proxyIndex = 0;
+    for (auto [ent, pos, orien, box]: world->view<Position, Orientation, BoxCollider>().each()) {
         btTransform btTf = toBt(pos, orien);
-        bullet.broadphase->createProxy()
-        proxy.m_uniqueId = static_cast<int>(ent);
-        box.getAabb(btTf, proxy.m_aabbMin, proxy.m_aabbMax);
-        bullet.broadphase->setAabb(&proxy, proxy.m_aabbMin, proxy.m_aabbMax, nullptr);
+        btVector3 minAabb, maxAabb;
+        box.getAabb(btTf, minAabb, maxAabb);
+        btBroadphaseProxy* proxy = proxies[proxyIndex++] = bullet.broadphase->createProxy(minAabb, maxAabb, 0, &ent, 0, 0, nullptr);
+        bullet.broadphase->setAabb(proxy, minAabb, maxAabb, nullptr);
     }
     bullet.broadphase->calculateOverlappingPairs(nullptr);
+
+    for (size_t index = 0; index < proxyIndex; ++index) {
+        bullet.broadphase->destroyProxy(proxies[index], nullptr);
+    }
 }
