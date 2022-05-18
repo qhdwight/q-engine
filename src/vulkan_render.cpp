@@ -15,7 +15,7 @@
 #include "geometries.hpp"
 
 glm::dmat4 calcView(Position const& eye, Look const& look) {
-    glm::dvec3 right{1.0, 0.0, 0.0}, fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
+    glm::dvec3 fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
     return glm::lookAtRH(eye.vec, eye.vec + fromEuler(look.vec) * fwd, fromEuler(look.vec) * up);
 }
 
