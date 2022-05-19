@@ -75,7 +75,7 @@ set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 find_package(Vulkan REQUIRED)
 
 `))
-
+	_, _ = cmakeFile.Write([]byte("set(CMAKE_BUILD_TYPE RelWithDebInfo)\n"))
 	for pkgName, pkg := range packages {
 		if _, err := os.Stat(filepath.Join("pkg", pkgName, "CMakeLists.txt")); err == nil {
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../../build/%[1]s)\n", pkgName)))
@@ -84,6 +84,7 @@ find_package(Vulkan REQUIRED)
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("include_directories(../pkg/%s/%s)\n", pkgName, include)))
 		}
 	}
+	_, _ = cmakeFile.Write([]byte("set(CMAKE_BUILD_TYPE Debug)\n"))
 	_, _ = cmakeFile.Write([]byte("file(GLOB SOURCE_FILES CONFIGURE_DEPENDS \"*.cpp\")\n"))
 	for pkgName, pkg := range packages {
 		for _, source := range pkg.Source {

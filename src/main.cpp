@@ -29,14 +29,14 @@ int main() {
         reg.emplace<LinearVelocity>(playerEnt);
 
         auto groundEnt = reg.create();
-        reg.emplace<BoxCollider>(groundEnt, btBoxShape{{0.5f, 0.5f, 0.5f}});
+//        reg.emplace<BoxCollider>(groundEnt, btBoxShape{{0.5f, 0.5f, 0.5f}});
         reg.emplace<Position>(groundEnt);
         reg.emplace<Orientation>(groundEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
 
         auto worldEnt = reg.create();
         reg.emplace<GraphicsResource>(worldEnt);
         reg.emplace<WindowResource>(worldEnt, false, true, false);
-        reg.emplace<PhysicsResource>(worldEnt);
+//        reg.emplace<PhysicsResource>(worldEnt);
         reg.emplace<DiagnosticResource>(worldEnt);
         World world{std::move(reg), worldEnt};
 

@@ -81,21 +81,19 @@
       "backends/imgui_impl_glfw.cpp"
     ],
     "filter": [
-      "/*",
+      "/*", 
       "!/*/",
       "backends/"
     ]
   },
-  "bullet3": {
-    "uri": "https://github.com/bulletphysics/bullet3.git",
-    "reference": "3.24",
+  "edyn": {
+    "uri": "https://github.com/qhdwight/edyn",
+    "reference": "entt-3-10-1",
     "includes": [
-      "src"
+      "include/edyn"
     ],
     "libraries": [
-      "BulletCollision",
-      "BulletDynamics",
-      "LinearMath"
+      "Edyn"
     ]
   }
 }
