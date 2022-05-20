@@ -6,10 +6,9 @@
 
 #include "state.hpp"
 #include "input.hpp"
-#include "render.hpp"
 #include "player.hpp"
-
 #include "physics.hpp"
+#include "vulkan_render.hpp"
 
 int main() {
     try {
@@ -28,10 +27,15 @@ int main() {
         world.emplace<Input>(playerEnt);
         world.emplace<UI>(playerEnt);
 
-        resources.emplace<GraphicsResource>();
-        resources.emplace<WindowResource>(false, true, false);
 //        reg.emplace<PhysicsResource>(worldEnt);
         resources.emplace<DiagnosticResource>();
+
+        ExecuteContext ctx{world, resources};
+
+        PhysicsPlugin physics;
+        VulkanRenderPlugin render;
+        physics.build(ctx);
+        render.build(ctx);
 
         auto start = std::chrono::steady_clock::now();
         world.emplace<Timestamp>(playerEnt, 0, 0);
@@ -48,11 +52,10 @@ int main() {
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 world.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }
-            ExecuteContext ctx{world, resources};
             input(ctx);
             modify(ctx);
-            render(ctx);
-            physics(ctx);
+            render.execute(ctx);
+            physics.execute(ctx);
         }
     }
     catch (std::exception const& err) {

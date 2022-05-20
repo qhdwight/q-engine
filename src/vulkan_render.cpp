@@ -9,10 +9,12 @@
 #include <SPIRV/GlslangToSpv.h>
 
 #include "math.hpp"
-#include "render.hpp"
 #include "shaders.hpp"
 #include "geometries.hpp"
 
+/**
+ * @brief We do all of our calculations in doubles, but current GPUs work best with float
+ */
 mat4f toShader(mat4 const& m) {
     return {
             std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
@@ -377,7 +379,12 @@ void renderImGui(ExecuteContext& ctx) {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
 
-void tryRenderVulkan(ExecuteContext& ctx) {
+void VulkanRenderPlugin::build(ExecuteContext& ctx) {
+    ctx.resources.emplace<VulkanResource>();
+    ctx.resources.emplace<WindowResource>(false, true, false);
+}
+
+void VulkanRenderPlugin::execute(ExecuteContext& ctx) {
     auto pVk = ctx.resources.find<VulkanResource>();
     if (!pVk) return;
 

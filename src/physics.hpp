@@ -1,7 +1,11 @@
 #pragma once
 
 #include "state.hpp"
+#include "plugin.hpp"
 
-void build(ExecuteContext& ctx);
+class PhysicsPlugin : Plugin {
+public:
+    void build(ExecuteContext& ctx) override;
 
-void physics(ExecuteContext& ctx);
+    void execute(ExecuteContext& ctx) override;
+};

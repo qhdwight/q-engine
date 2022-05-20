@@ -2,7 +2,7 @@
 
 #include <edyn/edyn.hpp>
 
-void build(ExecuteContext& ctx) {
+void PhysicsPlugin::build(ExecuteContext& ctx) {
     edyn::init();
     edyn::attach(ctx.world);
 
@@ -15,6 +15,6 @@ void build(ExecuteContext& ctx) {
     edyn::make_rigidbody(ctx.world, floor_def);
 }
 
-void physics(ExecuteContext& ctx) {
+void PhysicsPlugin::execute(ExecuteContext& ctx) {
 //    edyn::update(ctx.world);
 }

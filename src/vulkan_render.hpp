@@ -8,8 +8,20 @@
 
 #include "utils.hpp"
 #include "state.hpp"
+#include "plugin.hpp"
 #include "matrix4x4.hpp"
 #include "aligned_vector.hpp"
+
+class VulkanRenderPlugin : Plugin {
+public:
+    void build(ExecuteContext& ctx) override;
+
+    void execute(ExecuteContext& ctx) override;
+};
+
+struct WindowResource {
+    bool isReady, keepOpen, isFocused;
+};
 
 struct mat4f {
     std::array<std::array<float, 4>, 4> col;
