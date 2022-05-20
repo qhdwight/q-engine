@@ -10,4 +10,4 @@ struct WindowResource {
     bool isReady, keepOpen, isFocused;
 };
 
-void render(World& world);
+void render(ExecuteContext& ctx);

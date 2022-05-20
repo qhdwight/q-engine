@@ -2,6 +2,6 @@
 
 #include "state.hpp"
 
-void build(World& world);
+void build(ExecuteContext& ctx);
 
-void physics(World& world);
+void physics(ExecuteContext& ctx);

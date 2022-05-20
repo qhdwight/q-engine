@@ -2,4 +2,4 @@
 
 #include "state.hpp"
 
-void input(World& world);
+void input(ExecuteContext& ctx);

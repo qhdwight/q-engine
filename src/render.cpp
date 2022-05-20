@@ -1,5 +1,5 @@
 #include "render.hpp"
 
-void render(World& world) {
-    tryRenderVulkan(world);
+void render(ExecuteContext& ctx) {
+    tryRenderVulkan(ctx);
 }

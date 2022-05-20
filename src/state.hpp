@@ -104,9 +104,12 @@ struct DiagnosticResource {
     [[nodiscard]] double getAvgFrameTime() const;
 };
 
-struct World {
-    entt::registry reg;
-    entt::registry::entity_type sharedEnt;
+struct World : entt::registry {
+};
 
-    entt::registry* operator->() noexcept { return &reg; }
+typedef entt::registry::context Resources;
+
+struct ExecuteContext {
+    World& world;
+    Resources& resources;
 };

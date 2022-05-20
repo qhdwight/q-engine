@@ -47,4 +47,4 @@ struct VulkanResource {
     ImGui_ImplVulkanH_Window imGuiWindow;
 };
 
-void tryRenderVulkan(World& world);
+void tryRenderVulkan(ExecuteContext& ctx);

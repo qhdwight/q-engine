@@ -5,24 +5,24 @@
 #include "state.hpp"
 #include "render.hpp"
 
-void input(World& world) {
+void input(ExecuteContext& ctx) {
     // TODO:arch restructure so it is graphics API agnostic
-    auto vkPtr = world->try_get<VulkanResource>(world.sharedEnt);
+    auto vkPtr = ctx.resources.find<VulkanResource>();
     if (!vkPtr) return;
 
     VulkanResource& vk = *vkPtr;
     if (!vk.surfData) return;
 
-    auto& window = world->get<WindowResource>(world.sharedEnt);
+    auto& window = ctx.resources.at<WindowResource>();
 
     GLFWwindow* glfwWindow = vk.surfData->window.handle;
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
-    auto it = world->view<UI>().each();
+    auto it = ctx.world.view<UI>().each();
     bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
     glfwSetInputMode(glfwWindow, GLFW_CURSOR, uiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
-    for (auto [ent, input, ui]: world->view<Input, UI>().each()) {
+    for (auto [ent, input, ui]: ctx.world.view<Input, UI>().each()) {
         vec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
         if (window.isFocused == isFocused && !uiVisible) {

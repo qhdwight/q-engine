@@ -290,8 +290,8 @@ void init(VulkanResource& vk) {
     setupImgui(vk);
 }
 
-void renderOpaque(World& world) {
-    auto& vk = world->get<VulkanResource>(world.sharedEnt);
+void renderOpaque(ExecuteContext& ctx) {
+    auto& vk = ctx.resources.at<VulkanResource>();
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
     vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
@@ -299,7 +299,7 @@ void renderOpaque(World& world) {
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto playerView = world->view<const Position, const Look, const Player>();
+    auto playerView = ctx.world.view<const Position, const Look, const Player>();
     for (auto [ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
                 toShader(calcView(pos, look)),
@@ -310,7 +310,7 @@ void renderOpaque(World& world) {
     }
 
     size_t drawIdx = 0;
-    auto entView = world->view<const Position, const Orientation, const Cube>();
+    auto entView = ctx.world.view<const Position, const Orientation, const Cube>();
     for (auto [ent, pos, orien]: entView.each()) {
         vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
@@ -328,8 +328,8 @@ void renderOpaque(World& world) {
     }
 }
 
-void renderImGuiOverlay(World& world) {
-    auto& diagnostics = world->get<DiagnosticResource>(world.sharedEnt);
+void renderImGuiOverlay(ExecuteContext& ctx) {
+    auto& diagnostics = ctx.resources.at<DiagnosticResource>();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     static bool open = true;
@@ -364,21 +364,21 @@ void renderImGuiOverlay(World& world) {
     ImGui::End();
 }
 
-void renderImGui(World& world) {
-    auto& vk = world->get<VulkanResource>(world.sharedEnt);
+void renderImGui(ExecuteContext& ctx) {
+    auto& vk = ctx.resources.at<VulkanResource>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 //    ImGui::ShowDemoWindow();
 //    auto it = world->view<UI>().each();
 //    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-    renderImGuiOverlay(world);
+    renderImGuiOverlay(ctx);
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
 
-void tryRenderVulkan(World& world) {
-    auto pVk = world->try_get<VulkanResource>(world.sharedEnt);
+void tryRenderVulkan(ExecuteContext& ctx) {
+    auto pVk = ctx.resources.find<VulkanResource>();
     if (!pVk) return;
 
     VulkanResource& vk = *pVk;
@@ -411,8 +411,8 @@ void tryRenderVulkan(World& world) {
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    renderOpaque(world);
-    renderImGui(world);
+    renderOpaque(ctx);
+    renderImGui(ctx);
     vk.cmdBuf->endRenderPass();
     vk.cmdBuf->end();
 
@@ -440,7 +440,7 @@ void tryRenderVulkan(World& world) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = world->get<WindowResource>(world.sharedEnt).keepOpen;
+    bool& keepOpen = ctx.resources.at<WindowResource>().keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();
