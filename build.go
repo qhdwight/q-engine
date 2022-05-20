@@ -98,11 +98,11 @@ find_package(Vulkan REQUIRED)
 		}
 	}
 	_, _ = cmakeFile.Write([]byte(`
-if(MSVC)
+if (MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
-else()
+else ()
   target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
-endif()
+endif ()
 
 target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
 target_compile_definitions(${PROJECT_NAME} PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)

@@ -44,9 +44,9 @@ int main() {
         world->emplace<Timestamp>(world.sharedEnt, 0, 0);
         while (world->get<WindowResource>(worldEnt).keepOpen) {
             auto now = std::chrono::steady_clock::now();
-            long long prevNs = world->get<Timestamp>(world.sharedEnt).ns;
-            long long ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
-            long long deltaNs = ns - prevNs;
+            ns_t prevNs = world->get<Timestamp>(world.sharedEnt).ns;
+            ns_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
+            ns_t deltaNs = ns - prevNs;
             world->emplace_or_replace<Timestamp>(worldEnt, ns, deltaNs);
             auto& diagnostics = world->get<DiagnosticResource>(worldEnt);
             diagnostics.addFrameTime(deltaNs);

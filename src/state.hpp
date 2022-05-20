@@ -3,12 +3,19 @@
 #include <string>
 #include <numeric>
 #include <iostream>
+#include <optional>
 #include <unordered_map>
 
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/detail/type_vec3.hpp>
+
+typedef int64_t ns_t;
+typedef std::string ItemName;
+typedef std::string ItemStateName;
+typedef std::string EquipStateName;
+typedef entt::registry::entity_type ent_t;
 
 struct Position {
     glm::dvec3 vec;
@@ -35,7 +42,7 @@ struct Look {
 };
 
 struct Timestamp {
-    long long ns, deltaNs;
+    ns_t ns, deltaNs;
 };
 
 struct Player {
@@ -62,24 +69,54 @@ struct UI {
     bool visible;
 };
 
+struct ItemStateProps {
+    ns_t duration;
+    bool isPersistent;
+};
+
+struct ItemProps {
+    ItemName name;
+    double moveFactor;
+    std::unordered_map<ItemStateName, ItemStateProps> states;
+    std::unordered_map<EquipStateName, ItemStateProps> equipStates;
+};
+
+struct WeaponProps {
+    uint16_t damage;
+    double headshotFactor;
+    ItemProps itemProps;
+};
+
+struct Gun {
+    uint16_t ammo;
+    uint16_t ammoInReserve;
+};
+
+struct Item {
+    ItemName name;
+    uint16_t amount;
+    ItemStateName stateName;
+    ns_t stateDur;
+    ent_t invEnt;
+    uint8_t invSlot;
+};
+
+struct Inventory {
+    std::optional<uint8_t> equippedSlot;
+    std::optional<uint8_t> prevEquippedSlot;
+    EquipStateName equipStateName;
+    ns_t equipStateDur;
+    std::array<std::optional<ent_t>, 10> items;
+};
+
 struct DiagnosticResource {
     std::array<long long, 128> frameTimesNs;
     size_t frameTimesIndex;
     size_t readingCount;
 
-    void addFrameTime(long long deltaNs) {
-        frameTimesNs[frameTimesIndex++] = deltaNs;
-        frameTimesIndex %= frameTimesNs.size();
-        readingCount = std::min(readingCount + 1, frameTimesNs.size());
-    }
+    void addFrameTime(ns_t deltaNs);
 
-    [[nodiscard]] double getAvgFrameTime() const {
-        double avgFrameTime = 0.0;
-        for (size_t i = 0; i < readingCount; ++i) {
-            avgFrameTime += static_cast<double>(frameTimesNs[i]) / static_cast<double>(readingCount);
-        }
-        return avgFrameTime;
-    }
+    [[nodiscard]] double getAvgFrameTime() const;
 };
 
 struct World {
