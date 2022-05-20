@@ -11,12 +11,16 @@
 #include "matrix4x4.hpp"
 #include "aligned_vector.hpp"
 
+struct mat4f {
+    std::array<std::array<float, 4>, 4> col;
+};
+
 struct SharedUboData {
-    mat4 view, proj, clip;
+    mat4f view, proj, clip;
 };
 
 struct DynamicUboData {
-    mat4 model;
+    mat4f model;
 };
 
 struct VulkanResource {

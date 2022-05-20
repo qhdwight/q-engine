@@ -22,7 +22,6 @@ typedef edyn::orientation Orientation;
 typedef edyn::scalar scalar;
 typedef edyn::vector3 vec3;
 typedef edyn::vector2 vec2;
-typedef edyn::matrix3x3 mat3;
 
 struct Look : vec3 {
 };

@@ -13,19 +13,6 @@
       ".github/"
     ]
   },
-  "glm": {
-    "uri": "https://github.com/g-truc/glm.git",
-    "reference": "0.9.9.8",
-    "includes": [
-      ""
-    ],
-    "filter": [
-      "/*",
-      "!/*/",
-      "glm/",
-      "cmake/"
-    ]
-  },
   "glfw": {
     "uri": "https://github.com/glfw/glfw.git",
     "reference": "v3.3.7",

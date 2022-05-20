@@ -13,15 +13,24 @@
 #include "shaders.hpp"
 #include "geometries.hpp"
 
+mat4f toShader(mat4 const& m) {
+    return {
+            std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
+            std::array<float, 4>{static_cast<float>(m[1][0]), static_cast<float>(m[1][1]), static_cast<float>(m[1][2]), static_cast<float>(m[1][3])},
+            std::array<float, 4>{static_cast<float>(m[2][0]), static_cast<float>(m[2][1]), static_cast<float>(m[2][2]), static_cast<float>(m[2][3])},
+            std::array<float, 4>{static_cast<float>(m[3][0]), static_cast<float>(m[3][1]), static_cast<float>(m[3][2]), static_cast<float>(m[3][3])},
+    };
+}
+
 mat4 calcView(Position const& eye, Look const& look) {
-    vec3 center = eye + edyn::rotate(fromEuler(look), {0.0, 1.0, 0.0});
-    vec3 up = edyn::rotate(fromEuler(look), vec3{0.0, 0.0, 1.0});
+    vec3 center = eye + rotate(fromEuler(look), edyn::vector3_y);
+    vec3 up = rotate(fromEuler(look), edyn::vector3_z);
 
-    vec3 f(edyn::normalize(center - eye));
-    vec3 s(edyn::normalize(edyn::cross(f, up)));
-    vec3 u(edyn::cross(s, f));
+    vec3 f = normalize(center - eye);
+    vec3 s = normalize(cross(f, up));
+    vec3 u = cross(s, f);
 
-    mat4 view = matrix4x4_identity;
+    mat4 view{};
     view[0][0] = +s.x;
     view[1][0] = +s.y;
     view[2][0] = +s.z;
@@ -34,6 +43,7 @@ mat4 calcView(Position const& eye, Look const& look) {
     view[3][0] = -dot(s, eye);
     view[3][1] = -dot(u, eye);
     view[3][2] = +dot(f, eye);
+    view[3][3] = 1.0;
     return view;
 }
 
@@ -53,12 +63,12 @@ mat4 calcProj(vk::Extent2D const& extent) {
 
 mat4 getClip() {
     // vulkan clip space has inverted y and half z
-    return {{
-                    vec4{1.0, 0.0, 0.0, 0.0},
-                    vec4{0.0, -1.0, 0.0, 0.0},
-                    vec4{0.0, 0.0, 0.5, 0.0},
-                    vec4{0.0, 0.0, 0.5, 1.0},
-            }};
+    return {
+            vec4{1.0, 0.0, 0.0, 0.0},
+            vec4{0.0, -1.0, 0.0, 0.0},
+            vec4{0.0, 0.0, 0.5, 0.0},
+            vec4{0.0, 0.0, 0.5, 1.0},
+    };
 }
 
 mat4 translate(mat4 m, vec3 v) {
@@ -292,9 +302,9 @@ void renderOpaque(World& world) {
     auto playerView = world->view<const Position, const Look, const Player>();
     for (auto [ent, pos, look]: playerView.each()) {
         SharedUboData sharedUbo{
-                calcView(pos, look),
-                calcProj(vk.surfData->extent),
-                getClip()
+                toShader(calcView(pos, look)),
+                toShader(calcProj(vk.surfData->extent)),
+                toShader(getClip())
         };
         vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
     }
@@ -302,7 +312,7 @@ void renderOpaque(World& world) {
     size_t drawIdx = 0;
     auto entView = world->view<const Position, const Orientation, const Cube>();
     for (auto [ent, pos, orien]: entView.each()) {
-        vk.dynUboData[drawIdx++] = {calcModel(pos)};
+        vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
 //        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
     size_t drawCount = drawIdx;

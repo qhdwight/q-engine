@@ -6,6 +6,10 @@ struct vec4 {
     constexpr scalar& operator[](size_t i) noexcept {
         return (&x)[i];
     }
+
+    constexpr scalar const& operator[](size_t i) const noexcept {
+        return (&x)[i];
+    }
 };
 
 constexpr vec4 operator+(const vec4& v, const vec4& w) noexcept {
@@ -22,11 +26,23 @@ struct mat4 {
     constexpr vec4& operator[](size_t i) noexcept {
         return row[i];
     }
+
+    constexpr vec4 const& operator[](size_t i) const noexcept {
+        return row[i];
+    }
+
+    constexpr vec4 column(size_t i) const noexcept {
+        return {row[0][i], row[1][i], row[2][i], row[3][i]};
+    }
 };
 
+constexpr mat4 transpose(mat4 const& m) noexcept {
+    return {m.column(0), m.column(1), m.column(2), m.column(3)};
+}
+
 inline constexpr mat4 matrix4x4_identity{
-        {vec4{1.0, 0.0, 0.0, 0.0},
-         vec4{0.0, 1.0, 0.0, 0.0},
-         vec4{0.0, 0.0, 1.0, 0.0},
-         vec4{0.0, 0.0, 0.0, 1.0}}
+        vec4{1.0, 0.0, 0.0, 0.0},
+        vec4{0.0, 1.0, 0.0, 0.0},
+        vec4{0.0, 0.0, 1.0, 0.0},
+        vec4{0.0, 0.0, 0.0, 1.0}
 };

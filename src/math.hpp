@@ -14,7 +14,7 @@ T saturating_add(T a, T b) {
 }
 
 static edyn::quaternion fromEuler(vec3 const& vec) {
-    vec3 right{1.0, 0.0, 0.0}, fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
+    vec3 right = edyn::vector3_x, fwd = edyn::vector3_y, up = edyn::vector3_z;
     return edyn::quaternion_axis_angle(fwd, -vec.y)
            * edyn::quaternion_axis_angle(up, -vec.z)
            * edyn::quaternion_axis_angle(right, vec.x);
