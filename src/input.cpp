@@ -23,7 +23,7 @@ void input(World& world) {
     glfwSetInputMode(glfwWindow, GLFW_CURSOR, uiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
     for (auto [ent, input, ui]: world->view<Input, UI>().each()) {
-        glm::dvec2 prevMouse = input.cursor;
+        vec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
         if (window.isFocused == isFocused && !uiVisible) {
             input.cursorDelta = (input.cursor - prevMouse) * 0.005;

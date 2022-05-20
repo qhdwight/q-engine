@@ -3,42 +3,72 @@
 #include <fstream>
 #include <filesystem>
 
-#include <SPIRV/GlslangToSpv.h>
-#include <glm/gtc/matrix_access.hpp>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+#include <SPIRV/GlslangToSpv.h>
 
 #include "math.hpp"
 #include "render.hpp"
 #include "shaders.hpp"
 #include "geometries.hpp"
 
-glm::dmat4 calcView(Position const& eye, Look const& look) {
-    glm::dvec3 fwd{0.0, 1.0, 0.0}, up{0.0, 0.0, 1.0};
-    return glm::lookAtRH(eye.vec, eye.vec + fromEuler(look.vec) * fwd, fromEuler(look.vec) * up);
+mat4 calcView(Position const& eye, Look const& look) {
+    vec3 center = eye + edyn::rotate(fromEuler(look), {0.0, 1.0, 0.0});
+    vec3 up = edyn::rotate(fromEuler(look), vec3{0.0, 0.0, 1.0});
+
+    vec3 f(edyn::normalize(center - eye));
+    vec3 s(edyn::normalize(edyn::cross(f, up)));
+    vec3 u(edyn::cross(s, f));
+
+    mat4 view = matrix4x4_identity;
+    view[0][0] = +s.x;
+    view[1][0] = +s.y;
+    view[2][0] = +s.z;
+    view[0][1] = +u.x;
+    view[1][1] = +u.y;
+    view[2][1] = +u.z;
+    view[0][2] = -f.x;
+    view[1][2] = -f.y;
+    view[2][2] = -f.z;
+    view[3][0] = -dot(s, eye);
+    view[3][1] = -dot(u, eye);
+    view[3][2] = +dot(f, eye);
+    return view;
 }
 
-glm::dmat4 calcProj(vk::Extent2D const& extent) {
-    return glm::perspectiveFovRH_ZO(
-            glm::radians(45.0),
-            static_cast<double>(extent.width), static_cast<double>(extent.height),
-            0.1, 100.0
-    );
+mat4 calcProj(vk::Extent2D const& extent) {
+    double rad = edyn::to_radians(45.0);
+    double h = std::cos(0.5 * rad) / std::sin(0.5 * rad);
+    double w = h * static_cast<double>(extent.height) / static_cast<double>(extent.width);
+    double zNear = 0.1, zFar = 100.0;
+    mat4 proj{};
+    proj[0][0] = w;
+    proj[1][1] = h;
+    proj[2][2] = zFar / (zNear - zFar);
+    proj[2][3] = -1.0;
+    proj[3][2] = -(zFar * zNear) / (zFar - zNear);
+    return proj;
 }
 
-glm::dmat4 getClip() {
-    return { // vulkan clip space has inverted y and half z!
-            1.0, 0.0, 0.0, 0.0,
-            0.0, -1.0, 0.0, 0.0,
-            0.0, 0.0, 0.5, 0.0,
-            0.0, 0.0, 0.5, 1.0
-    };
+mat4 getClip() {
+    // vulkan clip space has inverted y and half z
+    return {{
+                    vec4{1.0, 0.0, 0.0, 0.0},
+                    vec4{0.0, -1.0, 0.0, 0.0},
+                    vec4{0.0, 0.0, 0.5, 0.0},
+                    vec4{0.0, 0.0, 0.5, 1.0},
+            }};
 }
 
-glm::dmat4 calcModel(Position const& pos) {
-    glm::dmat4 model(1.0);
-    return glm::translate(model, pos.vec);
+mat4 translate(mat4 m, vec3 v) {
+    m[3] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
+    return m;
+}
+
+mat4 calcModel(Position const& pos) {
+    mat4 model = matrix4x4_identity;
+    return translate(model, pos);
 }
 
 vk::ShaderModule createShaderModule(VulkanResource& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
@@ -63,7 +93,7 @@ void createPipelineLayout(VulkanResource& vk) {
                     {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}
             }
     );
-    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4));
+    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4));
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout, pushConstRange);
     vk.pipelineLayout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
 

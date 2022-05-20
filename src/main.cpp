@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include <entt/entt.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 #include "state.hpp"
 #include "input.hpp"
@@ -18,20 +17,14 @@ int main() {
             auto cubeEnt = reg.create();
             reg.emplace<Cube>(cubeEnt);
             reg.emplace<Position>(cubeEnt);
-            reg.emplace<Orientation>(cubeEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
+            reg.emplace<Orientation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
         }
         auto playerEnt = reg.create();
         reg.emplace<Player>(playerEnt);
-        reg.emplace<Position>(playerEnt, glm::dvec3{0.0, 0.0, 0.0});
+        reg.emplace<Position>(playerEnt, 0.0, 0.0, 0.0);
         reg.emplace<Look>(playerEnt);
         reg.emplace<Input>(playerEnt);
         reg.emplace<UI>(playerEnt);
-        reg.emplace<LinearVelocity>(playerEnt);
-
-        auto groundEnt = reg.create();
-//        reg.emplace<BoxCollider>(groundEnt, btBoxShape{{0.5f, 0.5f, 0.5f}});
-        reg.emplace<Position>(groundEnt);
-        reg.emplace<Orientation>(groundEnt, glm::dquat{1.0, 0.0, 0.0, 0.0});
 
         auto worldEnt = reg.create();
         reg.emplace<GraphicsResource>(worldEnt);
@@ -51,9 +44,9 @@ int main() {
             auto& diagnostics = world->get<DiagnosticResource>(worldEnt);
             diagnostics.addFrameTime(deltaNs);
             for (auto ent: world->view<Position, Orientation, Cube>()) {
-                double add = std::cos(static_cast<double>(ns) / 1e9);
-                double x_pos = ((int) ent - 0) * 3.0;
-                world->emplace_or_replace<Position>(ent, glm::dvec3{x_pos, 10.0, add - 1});
+                scalar add = std::cos(static_cast<double>(ns) / 1e9);
+                scalar x_pos = ((int) ent - 0) * 3.0;
+                world->emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }
             input(world);
             modify(world);

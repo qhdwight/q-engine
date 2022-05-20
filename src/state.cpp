@@ -1,6 +1,6 @@
 #include "state.hpp"
 
-void DiagnosticResource::addFrameTime(long long int deltaNs) {
+void DiagnosticResource::addFrameTime(ns_t deltaNs) {
     frameTimesNs[frameTimesIndex++] = deltaNs;
     frameTimesIndex %= frameTimesNs.size();
     readingCount = std::min(readingCount + 1, frameTimesNs.size());

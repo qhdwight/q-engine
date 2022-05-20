@@ -1,7 +1,7 @@
 #pragma once
 
-#include <variant>
-
 #include "state.hpp"
+
+void build(World& world);
 
 void physics(World& world);

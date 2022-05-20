@@ -2,20 +2,21 @@
 
 #include <optional>
 
-#include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
+#include <edyn/math/matrix3x3.hpp>
 #include <backends/imgui_impl_vulkan.h>
 
 #include "utils.hpp"
 #include "state.hpp"
+#include "matrix4x4.hpp"
 #include "aligned_vector.hpp"
 
 struct SharedUboData {
-    glm::mat4 view, proj, clip;
+    mat4 view, proj, clip;
 };
 
 struct DynamicUboData {
-    glm::mat4 model;
+    mat4 model;
 };
 
 struct VulkanResource {

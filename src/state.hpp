@@ -7,38 +7,24 @@
 #include <unordered_map>
 
 #include <entt/entt.hpp>
-#include <glm/glm.hpp>
-#include <glm/detail/type_quat.hpp>
-#include <glm/detail/type_vec3.hpp>
+#include <edyn/math/vector2.hpp>
+#include <edyn/math/matrix3x3.hpp>
+#include <edyn/comp/position.hpp>
+#include <edyn/comp/orientation.hpp>
 
 typedef int64_t ns_t;
 typedef std::string ItemName;
 typedef std::string ItemStateName;
 typedef std::string EquipStateName;
 typedef entt::registry::entity_type ent_t;
+typedef edyn::position Position;
+typedef edyn::orientation Orientation;
+typedef edyn::scalar scalar;
+typedef edyn::vector3 vec3;
+typedef edyn::vector2 vec2;
+typedef edyn::matrix3x3 mat3;
 
-struct Position {
-    glm::dvec3 vec;
-
-    glm::dvec3* operator->() noexcept { return &vec; }
-};
-
-struct LinearVelocity {
-    glm::dvec3 vec;
-
-    glm::dvec3* operator->() noexcept { return &vec; }
-};
-
-struct Orientation {
-    glm::dquat quat;
-
-    glm::dquat* operator->() noexcept { return &quat; }
-};
-
-struct Look {
-    glm::dvec3 vec;
-
-    glm::dvec3* operator->() noexcept { return &vec; }
+struct Look : vec3 {
 };
 
 struct Timestamp {
@@ -59,8 +45,8 @@ struct Key {
 };
 
 struct Input {
-    glm::dvec2 cursor, cursorDelta;
-    glm::dvec3 move;
+    vec2 cursor, cursorDelta;
+    vec3 move;
     double lean;
     Key menu;
 };
@@ -110,7 +96,7 @@ struct Inventory {
 };
 
 struct DiagnosticResource {
-    std::array<long long, 128> frameTimesNs;
+    std::array<ns_t, 128> frameTimesNs;
     size_t frameTimesIndex;
     size_t readingCount;
 
