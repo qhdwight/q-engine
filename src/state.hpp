@@ -22,6 +22,7 @@ typedef edyn::orientation Orientation;
 typedef edyn::scalar scalar;
 typedef edyn::vector3 vec3;
 typedef edyn::vector2 vec2;
+typedef uint8_t player_id_t;
 
 struct Look : vec3 {
 };
@@ -30,8 +31,16 @@ struct Timestamp {
     ns_t ns, deltaNs;
 };
 
-struct Player {
+struct LocalContext {
+    player_id_t localId;
+};
 
+struct RenderContext {
+    std::optional<player_id_t> playerId;
+};
+
+struct Player {
+    player_id_t id;
 };
 
 struct Cube {
@@ -46,7 +55,7 @@ struct Key {
 struct Input {
     vec2 cursor, cursorDelta;
     vec3 move;
-    double lean;
+    scalar lean;
     Key menu;
 };
 
@@ -61,7 +70,7 @@ struct ItemStateProps {
 
 struct ItemProps {
     ItemName name;
-    double moveFactor;
+    scalar moveFactor;
     std::unordered_map<ItemStateName, ItemStateProps> states;
     std::unordered_map<EquipStateName, ItemStateProps> equipStates;
 };
@@ -108,6 +117,12 @@ struct World : entt::registry {
 };
 
 typedef entt::registry::context Resources;
+
+struct App {
+    World logicWorld;
+    World renderWorld;
+    Resources resources;
+};
 
 struct ExecuteContext {
     World& world;

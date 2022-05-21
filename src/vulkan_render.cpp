@@ -292,7 +292,7 @@ void init(VulkanResource& vk) {
     setupImgui(vk);
 }
 
-void renderOpaque(ExecuteContext& ctx) {
+void renderOpaque(ExecuteContext const& ctx) {
     auto& vk = ctx.resources.at<VulkanResource>();
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
@@ -301,8 +301,11 @@ void renderOpaque(ExecuteContext& ctx) {
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto playerView = ctx.world.view<const Position, const Look, const Player>();
-    for (auto [ent, pos, look]: playerView.each()) {
+    auto renderCtx = ctx.world.ctx().at<RenderContext>();
+    auto playerIt = ctx.world.view<const Position, const Look, const Player>().each();
+    for (auto [ent, pos, look, player]: playerIt) {
+        if (player.id != renderCtx.playerId) continue;
+
         SharedUboData sharedUbo{
                 toShader(calcView(pos, look)),
                 toShader(calcProj(vk.surfData->extent)),
@@ -315,7 +318,6 @@ void renderOpaque(ExecuteContext& ctx) {
     auto entView = ctx.world.view<const Position, const Orientation, const Cube>();
     for (auto [ent, pos, orien]: entView.each()) {
         vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
-//        std::cout << glm::to_string(dynUboData[drawIdx - 1].model) << std::endl;
     }
     size_t drawCount = drawIdx;
 
@@ -330,7 +332,7 @@ void renderOpaque(ExecuteContext& ctx) {
     }
 }
 
-void renderImGuiOverlay(ExecuteContext& ctx) {
+void renderImGuiOverlay(ExecuteContext const& ctx) {
     auto& diagnostics = ctx.resources.at<DiagnosticResource>();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
@@ -366,7 +368,7 @@ void renderImGuiOverlay(ExecuteContext& ctx) {
     ImGui::End();
 }
 
-void renderImGui(ExecuteContext& ctx) {
+void renderImGui(ExecuteContext const& ctx) {
     auto& vk = ctx.resources.at<VulkanResource>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -384,7 +386,7 @@ void VulkanRenderPlugin::build(ExecuteContext& ctx) {
     ctx.resources.emplace<WindowResource>(false, true, false);
 }
 
-void VulkanRenderPlugin::execute(ExecuteContext& ctx) {
+void VulkanRenderPlugin::execute(ExecuteContext const& ctx) {
     auto pVk = ctx.resources.find<VulkanResource>();
     if (!pVk) return;
 

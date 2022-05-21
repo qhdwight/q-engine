@@ -16,7 +16,7 @@ class VulkanRenderPlugin : Plugin {
 public:
     void build(ExecuteContext& ctx) override;
 
-    void execute(ExecuteContext& ctx) override;
+    void execute(ExecuteContext const& ctx) override;
 };
 
 struct WindowResource {
@@ -58,5 +58,3 @@ struct VulkanResource {
     uint32_t graphicsFamilyIdx, presentFamilyIdx;
     ImGui_ImplVulkanH_Window imGuiWindow;
 };
-
-void tryRenderVulkan(ExecuteContext& ctx);

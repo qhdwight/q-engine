@@ -1,10 +1,12 @@
 #include "physics.hpp"
 
-#include <edyn/edyn.hpp>
+#include <iostream>
 
 void PhysicsPlugin::build(ExecuteContext& ctx) {
     edyn::init();
     edyn::attach(ctx.world);
+
+    std::cout << "[Edyn]" << " physics attached" << std::endl;
 
     auto floor_def = edyn::rigidbody_def();
     floor_def.kind = edyn::rigidbody_kind::rb_static;
@@ -15,6 +17,6 @@ void PhysicsPlugin::build(ExecuteContext& ctx) {
     edyn::make_rigidbody(ctx.world, floor_def);
 }
 
-void PhysicsPlugin::execute(ExecuteContext& ctx) {
-//    edyn::update(ctx.world);
+void PhysicsPlugin::execute(ExecuteContext const& ctx) {
+    edyn::update(ctx.world);
 }
