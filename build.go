@@ -72,6 +72,8 @@ set(OpenGL_GL_PREFERENCE GLVND CACHE BOOL "" FORCE)
 
 set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 
+add_compile_definitions(EDYN_DOUBLE_PRECISION)
+
 find_package(Vulkan REQUIRED)
 
 `))

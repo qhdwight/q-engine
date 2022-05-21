@@ -7,10 +7,7 @@
 #include <unordered_map>
 
 #include <entt/entt.hpp>
-#include <edyn/math/vector2.hpp>
-#include <edyn/math/matrix3x3.hpp>
-#include <edyn/comp/position.hpp>
-#include <edyn/comp/orientation.hpp>
+#include <edyn/edyn.hpp>
 
 typedef int64_t ns_t;
 typedef std::string ItemName;
@@ -19,6 +16,7 @@ typedef std::string EquipStateName;
 typedef entt::registry::entity_type ent_t;
 typedef edyn::position Position;
 typedef edyn::orientation Orientation;
+typedef edyn::linvel LinearVelocity;
 typedef edyn::scalar scalar;
 typedef edyn::vector3 vec3;
 typedef edyn::vector2 vec2;
@@ -124,7 +122,7 @@ struct App {
     Resources resources;
 };
 
-struct ExecuteContext {
+struct SystemContext {
     World& world;
     Resources& resources;
 };

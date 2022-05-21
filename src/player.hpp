@@ -2,4 +2,4 @@
 
 #include "state.hpp"
 
-void modify(ExecuteContext& ctx);
+void modify(SystemContext const& ctx);

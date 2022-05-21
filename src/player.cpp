@@ -1,22 +1,25 @@
 #include "player.hpp"
 
+#include <numbers>
+
 #include <edyn/edyn.hpp>
 
 #include "math.hpp"
 
-constexpr scalar X_TURN_CAP = edyn::to_radians(90.0);
+constexpr scalar Tau = std::numbers::pi * 2.0;
+constexpr scalar XLookCap = Tau / 4.0;
 
-void modify(ExecuteContext& ctx) {
+void modify(SystemContext const& ctx) {
     for (auto [ent, input, look]: ctx.world.view<const Input, Look>().each()) {
         look += vec3{-input.cursorDelta.y, 0.0, input.cursorDelta.x};
-        look.x = std::clamp(look.x, -X_TURN_CAP, X_TURN_CAP);
-        look.z = std::fmod(look.z + edyn::to_radians(180.0), edyn::to_radians(360.0)) - edyn::to_radians(180.0);
+        look.x = std::clamp(look.x, -XLookCap, XLookCap);
+        look.z = std::fmod(look.z + Tau / 2.0, Tau) - Tau / 2.0;
         look.y = input.lean * edyn::to_radians(15.0);
     }
-    for (auto [ent, input, pos, look, ts]: ctx.world.view<const Input, Position, const Look, Timestamp>().each()) {
-        auto mult = 10.0 * static_cast<double>(ts.deltaNs) / 1e9;
-        pos += edyn::rotate(fromEuler(look), vec3{input.move.x, input.move.y, 0.0}) * mult;
-        pos += vec3{0.0, 0.0, input.move.z} * mult;
-        edyn::refresh<Position>(ctx.world, ent);
+    for (auto [ent, input, linVel, look, ts]: ctx.world.view<const Input, LinearVelocity, const Look, Timestamp>().each()) {
+        linVel = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
+        linVel.z = input.move.z;
+        linVel *= 10;
+        edyn::refresh<LinearVelocity>(ctx.world, ent);
     }
 }

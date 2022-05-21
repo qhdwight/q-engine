@@ -223,7 +223,7 @@ void setupImgui(VulkanResource& vk) {
             .CheckVkResultFn = nullptr
     };
     ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.renderPass));
-    std::cout << "[ImGui] " << IMGUI_VERSION << " initialized" << std::endl;
+    std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
     ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*vk.cmdBuf));
@@ -292,7 +292,7 @@ void init(VulkanResource& vk) {
     setupImgui(vk);
 }
 
-void renderOpaque(ExecuteContext const& ctx) {
+void renderOpaque(SystemContext const& ctx) {
     auto& vk = ctx.resources.at<VulkanResource>();
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
@@ -332,7 +332,7 @@ void renderOpaque(ExecuteContext const& ctx) {
     }
 }
 
-void renderImGuiOverlay(ExecuteContext const& ctx) {
+void renderImGuiOverlay(SystemContext const& ctx) {
     auto& diagnostics = ctx.resources.at<DiagnosticResource>();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
@@ -368,7 +368,7 @@ void renderImGuiOverlay(ExecuteContext const& ctx) {
     ImGui::End();
 }
 
-void renderImGui(ExecuteContext const& ctx) {
+void renderImGui(SystemContext const& ctx) {
     auto& vk = ctx.resources.at<VulkanResource>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -381,12 +381,12 @@ void renderImGui(ExecuteContext const& ctx) {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
 
-void VulkanRenderPlugin::build(ExecuteContext& ctx) {
+void VulkanRenderPlugin::build(SystemContext const& ctx) {
     ctx.resources.emplace<VulkanResource>();
     ctx.resources.emplace<WindowResource>(false, true, false);
 }
 
-void VulkanRenderPlugin::execute(ExecuteContext const& ctx) {
+void VulkanRenderPlugin::execute(SystemContext const& ctx) {
     auto pVk = ctx.resources.find<VulkanResource>();
     if (!pVk) return;
 

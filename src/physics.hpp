@@ -7,7 +7,9 @@
 
 class PhysicsPlugin : Plugin {
 public:
-    void build(ExecuteContext& ctx) override;
+    void build(SystemContext const& ctx) override;
 
-    void execute(ExecuteContext const& ctx) override;
+    void execute(SystemContext const& ctx) override;
+
+    void cleanup(SystemContext const& ctx) override;
 };

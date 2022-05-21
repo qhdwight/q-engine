@@ -75,7 +75,7 @@
   },
   "edyn": {
     "uri": "https://github.com/qhdwight/edyn",
-    "reference": "entt-3-10-1",
+    "reference": "custom",
     "includes": [
       "include/edyn"
     ],

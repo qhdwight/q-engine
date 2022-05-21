@@ -15,7 +15,7 @@ int main() {
         App app;
         PhysicsPlugin physics;
         VulkanRenderPlugin render;
-        ExecuteContext logicCtx{app.logicWorld, app.resources};
+        SystemContext logicCtx{app.logicWorld, app.resources};
         physics.build(logicCtx);
         render.build(logicCtx);
 
@@ -31,6 +31,9 @@ int main() {
         player_def.kind = edyn::rigidbody_kind::rb_dynamic;
         player_def.sleeping_disabled = true;
         player_def.shape = edyn::capsule_shape{0.5, 1.0};
+        player_def.gravity = edyn::vector3_zero;
+        player_def.presentation = false;
+        player_def.continuous_contacts = true;
         edyn::make_rigidbody(playerEnt, app.logicWorld, player_def);
 
         for (int i = 0; i < 3; ++i) {
@@ -80,6 +83,7 @@ int main() {
             }
             render.execute({app.renderWorld, app.resources});
         }
+        physics.cleanup(logicCtx);
     }
     catch (std::exception const& err) {
         std::cerr << "exception: " << err.what() << std::endl;

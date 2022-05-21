@@ -5,7 +5,7 @@
 #include "state.hpp"
 #include "vulkan_render.hpp"
 
-void input(ExecuteContext& ctx) {
+void input(SystemContext& ctx) {
     // TODO:arch restructure so it is graphics API agnostic
     auto vkPtr = ctx.resources.find<VulkanResource>();
     if (!vkPtr) return;
