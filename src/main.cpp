@@ -21,7 +21,7 @@ int main() {
         physics.build(logicCtx);
         render.build(logicCtx);
 
-        app.sceneAssets.load("model"_hs, "model");
+        app.sceneAssets.load("M4"_hs, "assets/models/M4.glb");
 
         app.logicWorld.ctx().emplace<LocalContext>(player_id_t{0});
 

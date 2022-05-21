@@ -157,8 +157,9 @@ void createPipeline(VulkanContext& vk) {
     );
 
     glslang::InitializeProcess();
-    vk::ShaderModule vertexShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eVertex, "shaders/vertex.glsl");
-    vk::ShaderModule fragmentShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eFragment, "shaders/fragment.glsl");
+    auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
+    vk::ShaderModule vertexShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eVertex, shadersPath  / "vertex.glsl");
+    vk::ShaderModule fragmentShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eFragment, shadersPath  / "fragment.glsl");
     glslang::FinalizeProcess();
 
     vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
