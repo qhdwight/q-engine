@@ -16,7 +16,7 @@ void modify(SystemContext const& ctx) {
         look.z = std::fmod(look.z + Tau / 2.0, Tau) - Tau / 2.0;
         look.y = input.lean * edyn::to_radians(15.0);
     }
-    for (auto [ent, input, linVel, look, ts]: ctx.world.view<const Input, LinearVelocity, const Look, Timestamp>().each()) {
+    for (auto [ent, input, linVel, look, ts]: ctx.world.view<const Input, LinearVelocity, const Look, const Timestamp>().each()) {
         linVel = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
         linVel.z = input.move.z;
         linVel *= 10;

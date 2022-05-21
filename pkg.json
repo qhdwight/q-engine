@@ -82,5 +82,12 @@
     "libraries": [
       "Edyn"
     ]
+  },
+  "tinygltf": {
+    "uri": "https://github.com/syoyo/tinygltf.git",
+    "reference": "v2.5.0",
+    "includes": [
+      ""
+    ]
   }
 }

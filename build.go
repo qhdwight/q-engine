@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 type Package struct {
@@ -40,10 +41,10 @@ func main() {
 		repo, err := git.PlainOpen(path)
 		if err == git.ErrRepositoryNotExists {
 			repo, err = git.PlainClone(path, false, &git.CloneOptions{
-				URL:          pkg.URI,
-				Progress:     os.Stdout,
-				SingleBranch: true,
-				RemoteName:   pkg.Reference,
+				URL:           pkg.URI,
+				Progress:      os.Stdout,
+				SingleBranch:  true,
+				ReferenceName: plumbing.NewTagReferenceName(pkg.Reference),
 			})
 			handleError(err)
 		} else if err != nil {
@@ -59,20 +60,16 @@ func main() {
 	_, _ = cmakeFile.Write([]byte(`cmake_minimum_required(VERSION 3.10)
 project(game)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
-set(BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
-set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-set(OpenGL_GL_PREFERENCE GLVND CACHE BOOL "" FORCE)
-
 set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 
-add_compile_definitions(EDYN_DOUBLE_PRECISION)
+set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE INTERNAL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
 
 find_package(Vulkan REQUIRED)
 
@@ -86,8 +83,13 @@ find_package(Vulkan REQUIRED)
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("include_directories(../pkg/%s/%s)\n", pkgName, include)))
 		}
 	}
-	_, _ = cmakeFile.Write([]byte("set(CMAKE_BUILD_TYPE Debug)\n"))
-	_, _ = cmakeFile.Write([]byte("file(GLOB SOURCE_FILES CONFIGURE_DEPENDS \"*.cpp\")\n"))
+	_, _ = cmakeFile.Write([]byte(`
+target_compile_definitions(Edyn PUBLIC EDYN_DOUBLE_PRECISION)
+target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CPP14)
+
+set(CMAKE_BUILD_TYPE Debug)
+file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "*.cpp")
+`))
 	for pkgName, pkg := range packages {
 		for _, source := range pkg.Source {
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("list(APPEND SOURCE_FILES ../pkg/%s/%s)\n", pkgName, source)))
@@ -101,9 +103,9 @@ find_package(Vulkan REQUIRED)
 	}
 	_, _ = cmakeFile.Write([]byte(`
 if (MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+	target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
 else ()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+	target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif ()
 
 target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)

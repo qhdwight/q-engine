@@ -9,6 +9,8 @@
 #include <entt/entt.hpp>
 #include <edyn/edyn.hpp>
 
+#include "assets.hpp"
+
 typedef int64_t ns_t;
 typedef std::string ItemName;
 typedef std::string ItemStateName;
@@ -114,15 +116,16 @@ struct DiagnosticResource {
 struct World : entt::registry {
 };
 
-typedef entt::registry::context Resources;
+typedef entt::registry::context Context;
 
 struct App {
     World logicWorld;
     World renderWorld;
-    Resources resources;
+    Context globalCtx;
+    entt::resource_cache<Scene, SceneLoader> sceneAssets;
 };
 
 struct SystemContext {
     World& world;
-    Resources& resources;
+    Context& globalCtx;
 };

@@ -8,16 +8,20 @@
 #include "input.hpp"
 #include "player.hpp"
 #include "physics.hpp"
-#include "vulkan_render.hpp"
+#include "render.hpp"
+
+using namespace entt::literals;
 
 int main() {
     try {
         App app;
         PhysicsPlugin physics;
         VulkanRenderPlugin render;
-        SystemContext logicCtx{app.logicWorld, app.resources};
+        SystemContext logicCtx{app.logicWorld, app.globalCtx};
         physics.build(logicCtx);
         render.build(logicCtx);
+
+        app.sceneAssets.load("model"_hs, "model");
 
         app.logicWorld.ctx().emplace<LocalContext>(player_id_t{0});
 
@@ -44,17 +48,17 @@ int main() {
         }
 
 //        reg.emplace<PhysicsResource>(worldEnt);
-        app.resources.emplace<DiagnosticResource>();
+        app.globalCtx.emplace<DiagnosticResource>();
 
         auto start = std::chrono::steady_clock::now();
         app.logicWorld.emplace<Timestamp>(playerEnt, 0, 0);
-        while (app.resources.at<WindowResource>().keepOpen) {
+        while (app.globalCtx.at<WindowContext>().keepOpen) {
             auto now = std::chrono::steady_clock::now();
             ns_t prevNs = app.logicWorld.get<Timestamp>(playerEnt).ns;
             ns_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
             ns_t deltaNs = ns - prevNs;
             app.logicWorld.emplace_or_replace<Timestamp>(playerEnt, ns, deltaNs);
-            auto& diagnostics = app.resources.at<DiagnosticResource>();
+            auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
             diagnostics.addFrameTime(deltaNs);
             for (auto ent: app.logicWorld.view<Position, Orientation, Cube>()) {
                 scalar add = std::cos(static_cast<double>(ns) / 1e9);
@@ -81,7 +85,7 @@ int main() {
                 app.renderWorld.emplace<Orientation>(ent, orien);
                 app.renderWorld.emplace<Cube>(ent);
             }
-            render.execute({app.renderWorld, app.resources});
+            render.execute({app.renderWorld, app.globalCtx});
         }
         physics.cleanup(logicCtx);
     }

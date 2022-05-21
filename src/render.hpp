@@ -19,7 +19,7 @@ public:
     void execute(SystemContext const& ctx) override;
 };
 
-struct WindowResource {
+struct WindowContext {
     bool isReady, keepOpen, isFocused;
 };
 
@@ -35,7 +35,7 @@ struct DynamicUboData {
     mat4f model;
 };
 
-struct VulkanResource {
+struct VulkanContext {
     vk::Instance inst;
     std::optional<vk::PhysicalDevice> physDev;
     std::optional<vk::Device> device;

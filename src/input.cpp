@@ -3,17 +3,17 @@
 #include <GLFW/glfw3.h>
 
 #include "state.hpp"
-#include "vulkan_render.hpp"
+#include "render.hpp"
 
 void input(SystemContext& ctx) {
     // TODO:arch restructure so it is graphics API agnostic
-    auto vkPtr = ctx.resources.find<VulkanResource>();
+    auto vkPtr = ctx.globalCtx.find<VulkanContext>();
     if (!vkPtr) return;
 
-    VulkanResource& vk = *vkPtr;
+    VulkanContext& vk = *vkPtr;
     if (!vk.surfData) return;
 
-    auto& window = ctx.resources.at<WindowResource>();
+    auto& window = ctx.globalCtx.at<WindowContext>();
 
     GLFWwindow* glfwWindow = vk.surfData->window.handle;
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);

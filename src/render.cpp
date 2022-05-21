@@ -1,4 +1,4 @@
-#include "vulkan_render.hpp"
+#include "render.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -83,7 +83,7 @@ mat4 calcModel(Position const& pos) {
     return translate(model, pos);
 }
 
-vk::ShaderModule createShaderModule(VulkanResource& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
+vk::ShaderModule createShaderModule(VulkanContext& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     shaderFile.open(path);
@@ -92,7 +92,7 @@ vk::ShaderModule createShaderModule(VulkanResource& vk, vk::ShaderStageFlagBits 
     return vk::su::createShaderModule(*vk.device, shaderStage, strStream.str());
 }
 
-void createPipelineLayout(VulkanResource& vk) {
+void createPipelineLayout(VulkanContext& vk) {
     auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.dynUboData.resize(uboAlignment, 16);
     vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
@@ -143,7 +143,7 @@ void createPipelineLayout(VulkanResource& vk) {
 }
 
 
-void createPipeline(VulkanResource& vk) {
+void createPipeline(VulkanContext& vk) {
     auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
             *vk.physDev,
@@ -190,7 +190,7 @@ void createPipeline(VulkanResource& vk) {
     );
 }
 
-void recreatePipeline(VulkanResource& vk) {
+void recreatePipeline(VulkanContext& vk) {
     vk.device->waitIdle();
     int width, height;
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
@@ -200,7 +200,7 @@ void recreatePipeline(VulkanResource& vk) {
 }
 
 
-void setupImgui(VulkanResource& vk) {
+void setupImgui(VulkanContext& vk) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -234,7 +234,7 @@ void setupImgui(VulkanResource& vk) {
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void init(VulkanResource& vk) {
+void init(VulkanContext& vk) {
     std::string const appName = "Game Engine", engineName = "QEngine";
     vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
     std::cout << "[Vulkan] Instance created" << std::endl;
@@ -293,7 +293,7 @@ void init(VulkanResource& vk) {
 }
 
 void renderOpaque(SystemContext const& ctx) {
-    auto& vk = ctx.resources.at<VulkanResource>();
+    auto& vk = ctx.globalCtx.at<VulkanContext>();
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
     vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
@@ -333,7 +333,7 @@ void renderOpaque(SystemContext const& ctx) {
 }
 
 void renderImGuiOverlay(SystemContext const& ctx) {
-    auto& diagnostics = ctx.resources.at<DiagnosticResource>();
+    auto& diagnostics = ctx.globalCtx.at<DiagnosticResource>();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     static bool open = true;
@@ -369,7 +369,7 @@ void renderImGuiOverlay(SystemContext const& ctx) {
 }
 
 void renderImGui(SystemContext const& ctx) {
-    auto& vk = ctx.resources.at<VulkanResource>();
+    auto& vk = ctx.globalCtx.at<VulkanContext>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -382,15 +382,15 @@ void renderImGui(SystemContext const& ctx) {
 }
 
 void VulkanRenderPlugin::build(SystemContext const& ctx) {
-    ctx.resources.emplace<VulkanResource>();
-    ctx.resources.emplace<WindowResource>(false, true, false);
+    ctx.globalCtx.emplace<VulkanContext>();
+    ctx.globalCtx.emplace<WindowContext>(false, true, false);
 }
 
 void VulkanRenderPlugin::execute(SystemContext const& ctx) {
-    auto pVk = ctx.resources.find<VulkanResource>();
+    auto pVk = ctx.globalCtx.find<VulkanContext>();
     if (!pVk) return;
 
-    VulkanResource& vk = *pVk;
+    VulkanContext& vk = *pVk;
     if (!vk.inst) {
         init(vk);
     }
@@ -449,7 +449,7 @@ void VulkanRenderPlugin::execute(SystemContext const& ctx) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = ctx.resources.at<WindowResource>().keepOpen;
+    bool& keepOpen = ctx.globalCtx.at<WindowContext>().keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();
