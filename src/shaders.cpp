@@ -15,91 +15,90 @@
 
 #include "shaders.hpp"
 
-#include "SPIRV/GlslangToSpv.h"
 #include "StandAlone/ResourceLimits.h"
 #include "vulkan/vulkan.hpp"
 
-namespace vk {
-    namespace su {
-        EShLanguage translateShaderStage(vk::ShaderStageFlagBits stage) {
-            switch (stage) {
-                case vk::ShaderStageFlagBits::eVertex:
-                    return EShLangVertex;
-                case vk::ShaderStageFlagBits::eTessellationControl:
-                    return EShLangTessControl;
-                case vk::ShaderStageFlagBits::eTessellationEvaluation:
-                    return EShLangTessEvaluation;
-                case vk::ShaderStageFlagBits::eGeometry:
-                    return EShLangGeometry;
-                case vk::ShaderStageFlagBits::eFragment:
-                    return EShLangFragment;
-                case vk::ShaderStageFlagBits::eCompute:
-                    return EShLangCompute;
-                case vk::ShaderStageFlagBits::eRaygenNV:
-                    return EShLangRayGenNV;
-                case vk::ShaderStageFlagBits::eAnyHitNV:
-                    return EShLangAnyHitNV;
-                case vk::ShaderStageFlagBits::eClosestHitNV:
-                    return EShLangClosestHitNV;
-                case vk::ShaderStageFlagBits::eMissNV:
-                    return EShLangMissNV;
-                case vk::ShaderStageFlagBits::eIntersectionNV:
-                    return EShLangIntersectNV;
-                case vk::ShaderStageFlagBits::eCallableNV:
-                    return EShLangCallableNV;
-                case vk::ShaderStageFlagBits::eTaskNV:
-                    return EShLangTaskNV;
-                case vk::ShaderStageFlagBits::eMeshNV:
-                    return EShLangMeshNV;
-                default:
-                    assert(false && "Unknown shader stage");
-                    return EShLangVertex;
-            }
+namespace vk::su {
+    EShLanguage translateShaderStage(vk::ShaderStageFlagBits stage) {
+        switch (stage) {
+            case vk::ShaderStageFlagBits::eVertex:
+                return EShLangVertex;
+            case vk::ShaderStageFlagBits::eTessellationControl:
+                return EShLangTessControl;
+            case vk::ShaderStageFlagBits::eTessellationEvaluation:
+                return EShLangTessEvaluation;
+            case vk::ShaderStageFlagBits::eGeometry:
+                return EShLangGeometry;
+            case vk::ShaderStageFlagBits::eFragment:
+                return EShLangFragment;
+            case vk::ShaderStageFlagBits::eCompute:
+                return EShLangCompute;
+            case vk::ShaderStageFlagBits::eRaygenNV:
+                return EShLangRayGenNV;
+            case vk::ShaderStageFlagBits::eAnyHitNV:
+                return EShLangAnyHitNV;
+            case vk::ShaderStageFlagBits::eClosestHitNV:
+                return EShLangClosestHitNV;
+            case vk::ShaderStageFlagBits::eMissNV:
+                return EShLangMissNV;
+            case vk::ShaderStageFlagBits::eIntersectionNV:
+                return EShLangIntersectNV;
+            case vk::ShaderStageFlagBits::eCallableNV:
+                return EShLangCallableNV;
+            case vk::ShaderStageFlagBits::eTaskNV:
+                return EShLangTaskNV;
+            case vk::ShaderStageFlagBits::eMeshNV:
+                return EShLangMeshNV;
+            default:
+                assert(false && "Unknown shader stage");
+        }
+    }
+
+    std::shared_ptr<glslang::TProgram>
+    GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, std::string const& glslShader, std::vector<unsigned int>& spvShader) {
+        EShLanguage stage = translateShaderStage(shaderType);
+
+        const char* shaderStrings[1];
+        shaderStrings[0] = glslShader.data();
+
+        glslang::TShader shader(stage);
+        shader.setStrings(shaderStrings, 1);
+
+        // Enable SPIR-V and Vulkan rules when parsing GLSL
+        auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules);
+
+        if (!shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
+            puts(shader.getInfoLog());
+            puts(shader.getInfoDebugLog());
+            return {};  // something didn't work
         }
 
-        bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, std::string const& glslShader, std::vector<unsigned int>& spvShader) {
-            EShLanguage stage = translateShaderStage(shaderType);
+        auto program = std::make_shared<glslang::TProgram>();
+        program->addShader(&shader);
 
-            const char* shaderStrings[1];
-            shaderStrings[0] = glslShader.data();
+        //
+        // Program-level processing...
+        //
 
-            glslang::TShader shader(stage);
-            shader.setStrings(shaderStrings, 1);
-
-            // Enable SPIR-V and Vulkan rules when parsing GLSL
-            EShMessages messages = (EShMessages) (EShMsgSpvRules | EShMsgVulkanRules);
-
-            if (!shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
-                puts(shader.getInfoLog());
-                puts(shader.getInfoDebugLog());
-                return false;  // something didn't work
-            }
-
-            glslang::TProgram program;
-            program.addShader(&shader);
-
-            //
-            // Program-level processing...
-            //
-
-            if (!program.link(messages)) {
-                puts(shader.getInfoLog());
-                puts(shader.getInfoDebugLog());
-                fflush(stdout);
-                return false;
-            }
-
-            glslang::GlslangToSpv(*program.getIntermediate(stage), spvShader);
-            return true;
+        if (!program->link(messages)) {
+            puts(shader.getInfoLog());
+            puts(shader.getInfoDebugLog());
+            fflush(stdout);
+            return {};
         }
 
-        vk::ShaderModule createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText) {
-            std::vector<unsigned int> shaderSPV;
-            if (!GLSLtoSPV(shaderStage, shaderText, shaderSPV)) {
-                throw std::runtime_error("Could not convert glsl shader to spir-v -> terminating");
-            }
+        glslang::GlslangToSpv(*program->getIntermediate(stage), spvShader);
+        return program;
+    }
 
-            return device.createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV));
+    std::pair<vk::ShaderModule, std::shared_ptr<glslang::TProgram>>
+    createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText) {
+        std::vector<unsigned int> shaderSPV;
+        std::shared_ptr<glslang::TProgram> program = GLSLtoSPV(shaderStage, shaderText, shaderSPV);
+        if (!program) {
+            throw std::runtime_error("Could not convert glsl shader to spir-v -> terminating");
         }
-    }  // namespace su
+
+        return {device.createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV)), program};
+    }
 }  // namespace vk

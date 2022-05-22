@@ -2,3 +2,4 @@ pkg/
 build/
 src/CMakeLists.txt
 assets/models
+staging/

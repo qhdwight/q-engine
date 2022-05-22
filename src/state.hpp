@@ -26,8 +26,14 @@ using player_id_t = uint8_t;
 using asset_handle_t = entt::id_type;
 using ModelAssets = entt::resource_cache<Model, ModelLoader>;
 
-struct ModelHandle {
+struct Handle {
     asset_handle_t value;
+};
+
+struct ModelHandle : Handle {
+};
+
+struct ShaderHandle : Handle {
 };
 
 struct Look : vec3 {

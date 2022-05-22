@@ -79,12 +79,13 @@ int main() {
                 app.renderWorld.emplace<Look>(ent, look);
                 app.renderWorld.emplace<Player>(ent, player);
             }
-            for (auto [ent, pos, orien, hModel]: app.logicWorld.view<const Position, const Orientation, const ModelHandle>().each()) {
+            for (auto [ent, pos, orien, modelHandle]: app.logicWorld.view<const Position, const Orientation, const ModelHandle>().each()) {
                 auto actualEnt = app.renderWorld.create(ent);
                 assert(actualEnt == ent);
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Orientation>(ent, orien);
-                app.renderWorld.emplace<ModelHandle>(ent, hModel);
+                app.renderWorld.emplace<ModelHandle>(ent, modelHandle);
+                app.renderWorld.emplace<ShaderHandle>(ent, "Default"_hs);
             }
             render.execute(app);
         }

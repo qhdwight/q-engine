@@ -86,59 +86,19 @@ mat4 calcModel(Position const& pos) {
     return translate(model, pos);
 }
 
-vk::ShaderModule createShaderModule(VulkanContext& vk, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
+Shader& createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     shaderFile.open(path);
     std::stringstream strStream;
     strStream << shaderFile.rdbuf();
-    return vk::su::createShaderModule(*vk.device, shaderStage, strStream.str());
+
+    Shader& shader = pipeline.shaders.emplace_back();
+    std::tie(shader.module, shader.info) = vk::su::createShaderModule(*vk.device, shaderStage, strStream.str());
+    return shader;
 }
 
-void createPipelineLayout(VulkanContext& vk) {
-    auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
-    vk.dynUboData.resize(uboAlignment, 16);
-    vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
-    vk.sharedUboBuf.emplace(*vk.physDev, *vk.device, sizeof(vk.sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
-
-    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
-            *vk.device,
-            {
-                    {vk::DescriptorType::eUniformBuffer,        1, vk::ShaderStageFlagBits::eVertex},
-                    {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}
-            }
-    );
-    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
-    vk.pipelineLayout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
-
-    vk.descriptorPool = vk::su::createDescriptorPool(
-            *vk.device, {
-                    {vk::DescriptorType::eSampler,              64},
-                    {vk::DescriptorType::eCombinedImageSampler, 64},
-                    {vk::DescriptorType::eSampledImage,         64},
-                    {vk::DescriptorType::eStorageImage,         64},
-                    {vk::DescriptorType::eUniformTexelBuffer,   64},
-                    {vk::DescriptorType::eStorageTexelBuffer,   64},
-                    {vk::DescriptorType::eUniformBuffer,        64},
-                    {vk::DescriptorType::eStorageBuffer,        64},
-                    {vk::DescriptorType::eUniformBufferDynamic, 64},
-                    {vk::DescriptorType::eStorageBufferDynamic, 64},
-                    {vk::DescriptorType::eInputAttachment,      64},
-            }
-    );
-
-    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
-    vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
-
-    vk::DescriptorBufferInfo sharedDescBufInfo{vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE};
-    vk::WriteDescriptorSet sharedWriteDescSet{*vk.descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &sharedDescBufInfo};
-    vk::DescriptorBufferInfo dynDescBufInfo{vk.dynUboBuf->buffer, 0, sizeof(DynamicUboData)};
-    vk::WriteDescriptorSet dynWriteDescSet{*vk.descSet, 1, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &dynDescBufInfo};
-    vk.device->updateDescriptorSets({sharedWriteDescSet, dynWriteDescSet}, nullptr);
-}
-
-void createPipeline(VulkanContext& vk) {
+void createSwapChain(VulkanContext& vk) {
     auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
             *vk.physDev,
@@ -150,13 +110,6 @@ void createPipeline(VulkanContext& vk) {
             graphicsFamilyIdx,
             presentFamilyIdx
     );
-
-    glslang::InitializeProcess();
-    auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
-    vk::ShaderModule vertexShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eVertex, shadersPath / "vertex.glsl");
-    vk::ShaderModule fragmentShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eFragment, shadersPath / "fragment.glsl");
-    glslang::FinalizeProcess();
-
     vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
 
     vk.renderPass = vk::su::createRenderPass(
@@ -166,22 +119,50 @@ void createPipeline(VulkanContext& vk) {
     );
 
     vk.framebufs = vk::su::createFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
+}
 
-    if (!vk.pipelineLayout) {
-        createPipelineLayout(vk);
-    }
+void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
+    glslang::InitializeProcess();
+    auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
+    Shader& fragmentShader = createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "flat.vert");
+    Shader& vertexShader = createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "flat.frag");
+    glslang::FinalizeProcess();
 
-    vk.pipeline = vk::su::createGraphicsPipeline(
+    auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
+    vk.dynUboData.resize(uboAlignment, 16);
+    vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
+    vk.sharedUboBuf.emplace(*vk.physDev, *vk.device, sizeof(vk.sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
+
+    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
+            *vk.device,
+            {{vk::DescriptorType::eUniformBuffer,        1, vk::ShaderStageFlagBits::eVertex},
+             {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}}
+    );
+    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
+
+    pipeline.layout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
+
+    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
+    vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
+
+    vk::DescriptorBufferInfo sharedDescBufInfo{vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE};
+    vk::WriteDescriptorSet sharedWriteDescSet{*vk.descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &sharedDescBufInfo};
+    vk::DescriptorBufferInfo dynDescBufInfo{vk.dynUboBuf->buffer, 0, sizeof(DynamicUboData)};
+    vk::WriteDescriptorSet dynWriteDescSet{*vk.descSet, 1, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &dynDescBufInfo};
+    vk.device->updateDescriptorSets({sharedWriteDescSet, dynWriteDescSet}, nullptr);
+
+    pipeline.value = vk::su::createGraphicsPipeline(
             *vk.device,
             *vk.pipelineCache,
-            {vertexShaderModule, nullptr},
-            {fragmentShaderModule, nullptr},
+            {*vertexShader.module, nullptr},
+            {*fragmentShader.module, nullptr},
             sizeof(VertexData),
             {{vk::Format::eR32G32B32A32Sfloat, 0},
              {vk::Format::eR32G32B32A32Sfloat, 16}},
             vk::FrontFace::eClockwise,
             true,
-            *vk.pipelineLayout,
+            *pipeline.layout,
             *vk.renderPass
     );
 }
@@ -192,7 +173,11 @@ void recreatePipeline(VulkanContext& vk) {
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
     vk.surfData->extent = vk::Extent2D(width, height);
     vk.swapChainData->clear(*vk.device);
-    createPipeline(vk);
+    // Force recreation of pipelines, as they depend on the swap chain
+    for (auto& [modelHandle, pipeline]: vk.modelPipelines) {
+        pipeline.value.reset();
+    }
+    createSwapChain(vk);
 }
 
 void setupImgui(VulkanContext& vk) {
@@ -279,84 +264,120 @@ void init(VulkanContext& vk) {
 
     vk.drawFence = vk.device->createFence(vk::FenceCreateInfo());
     vk.imgAcqSem = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
-//    vk.imgAcqSem.push_back(vk.device->createSemaphore(vk::SemaphoreCreateInfo()));
-//    vk.imgAcqSem.push_back(vk.device->createSemaphore(vk::SemaphoreCreateInfo()));
 
     vk.pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
-    createPipeline(vk);
+
+    vk.descriptorPool = vk::su::createDescriptorPool(
+            *vk.device, {
+                    {vk::DescriptorType::eSampler,              64},
+                    {vk::DescriptorType::eCombinedImageSampler, 64},
+                    {vk::DescriptorType::eSampledImage,         64},
+                    {vk::DescriptorType::eStorageImage,         64},
+                    {vk::DescriptorType::eUniformTexelBuffer,   64},
+                    {vk::DescriptorType::eStorageTexelBuffer,   64},
+                    {vk::DescriptorType::eUniformBuffer,        64},
+                    {vk::DescriptorType::eStorageBuffer,        64},
+                    {vk::DescriptorType::eUniformBufferDynamic, 64},
+                    {vk::DescriptorType::eStorageBufferDynamic, 64},
+                    {vk::DescriptorType::eInputAttachment,      64},
+            }
+    );
+
+    createSwapChain(vk);
 
     setupImgui(vk);
 }
 
+vk::su::BufferData createBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, std::string const& attrName) {
+    auto data = reinterpret_cast<std::byte*>(model->buffers.front().data.data());
+    tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
+    auto attrIdx = primitive.attributes.at(attrName);
+    tinygltf::Accessor& acc = model->accessors[attrIdx];
+    tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
+    size_t stride = acc.ByteStride(view);
+    vk::BufferUsageFlagBits usage{};
+    size_t devStride = 0;
+    if (attrName == "POSITION") {
+        usage = vk::BufferUsageFlagBits::eVertexBuffer;
+    } else if (attrName == "INDEX") {
+        usage = vk::BufferUsageFlagBits::eIndexBuffer;
+        devStride = sizeof(VertexData);
+    }
+    vk::su::BufferData bufferData{*vk.physDev, *vk.device, view.byteLength, usage};
+    vk.device->mapMemory(bufferData.deviceMemory, 0, view.byteLength);
+    if (attrName == "POSITION") {
+
+    } else if (attrName == "INDEX") {
+
+    }
+    vk.device->unmapMemory(bufferData.deviceMemory);
+    return bufferData;
+}
+
 void renderOpaque(App& app) {
     auto& vk = app.globalCtx.at<VulkanContext>();
-    vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
     vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
                                            static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
-    auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
-    for (auto [ent, pos, look, player]: playerIt) {
-        if (player.id != renderCtx.playerId) continue;
+    for (auto& [handle, shader]: vk.modelPipelines) {
+        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *shader.value);
+        auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
+        auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
+        for (auto [ent, pos, look, player]: playerIt) {
+            if (player.id != renderCtx.playerId) continue;
 
-        SharedUboData sharedUbo{
-                .view = toShader(calcView(pos, look)),
-                .proj = toShader(calcProj(vk.surfData->extent)),
-                .clip = toShader(getClip())
-        };
-        vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
-    }
-
-    size_t drawIdx;
-    auto entView = app.renderWorld.view<const Position, const Orientation, const ModelHandle>();
-    // We store data per model in a dynamic UBO to save memory
-    // This way we only have one upload
-    drawIdx = 0;
-    for (auto [ent, pos, orien, hModel]: entView.each()) {
-        vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
-    }
-
-    void* devUboPtr = vk.device->mapMemory(vk.dynUboBuf->deviceMemory, 0, vk.dynUboData.mem_size());
-    memcpy(devUboPtr, vk.dynUboData.data(), vk.dynUboData.mem_size());
-    vk.device->unmapMemory(vk.dynUboBuf->deviceMemory);
-
-    // TODO: is this same order?
-    drawIdx = 0;
-    for (auto [ent, pos, orien, hModel]: entView.each()) {
-        vk::Buffer* rawVertBuffer;
-        auto vertBufDataIt = vk.vertBufData.find(hModel.value);
-        // Check if we need to create a vertex buffer for this model
-        if (vertBufDataIt == vk.vertBufData.end()) {
-            auto [assetIt, wasAssetAdded] = app.modelAssets.load(hModel.value, "models/Cube.glb");
-            assert(wasAssetAdded);
-            entt::resource<Model>& model = assetIt->second;
-            assert(model);
-            std::vector<unsigned char> data = model->buffers.front().data;
-            tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
-            auto attrIdx = primitive.attributes.at("POSITION");
-            tinygltf::Accessor& acc = model->accessors[attrIdx];
-            tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
-            size_t stride = acc.ByteStride(view);
-            size_t vertCount = view.byteLength / stride;
-            auto [bufIt, wasBufAdded] = vk.vertBufData.emplace(hModel.value, vk::su::BufferData{
-                    *vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eVertexBuffer
-            });
-            assert(wasBufAdded);
-            vk::su::copyToDevice(*vk.device, bufIt->second.deviceMemory, reinterpret_cast<vec3*>(data.data() + view.byteOffset), vertCount, stride);
-            rawVertBuffer = &bufIt->second.buffer;
-        } else {
-            rawVertBuffer = &vertBufDataIt->second.buffer;
+            SharedUboData sharedUbo{
+                    .view = toShader(calcView(pos, look)),
+                    .proj = toShader(calcProj(vk.surfData->extent)),
+                    .clip = toShader(getClip())
+            };
+            vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
         }
-        if (rawVertBuffer) {
-            vk.cmdBuf->bindVertexBuffers(0, *rawVertBuffer, {0});
-            uint32_t off = drawIdx * vk.dynUboData.block_size();
-            vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *vk.pipelineLayout, 0, *vk.descSet, off);
-            vk.cmdBuf->drawIndexed(0, 0, 0, 0, 0);
+
+        size_t drawIdx;
+        auto modelView = app.renderWorld.view<const Position, const Orientation, const ModelHandle>();
+        // We store data per model in a dynamic UBO to save memory
+        // This way we only have one upload
+        drawIdx = 0;
+        for (auto [ent, pos, orien, hModel]: modelView.each()) {
+            vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
+        }
+
+        void* devUboPtr = vk.device->mapMemory(vk.dynUboBuf->deviceMemory, 0, vk.dynUboData.mem_size());
+        memcpy(devUboPtr, vk.dynUboData.data(), vk.dynUboData.mem_size());
+        vk.device->unmapMemory(vk.dynUboBuf->deviceMemory);
+
+        // TODO: is this same order?
+        drawIdx = 0;
+        for (auto [ent, pos, orien, hModel]: modelView.each()) {
+            ModelBuffers* rawModelBuffers;
+            auto vertBufDataIt = vk.modelBufData.find(hModel.value);
+            // Check if we need to create a vertex buffer for this model
+            if (vertBufDataIt == vk.modelBufData.end()) {
+                auto [assetIt, wasAssetAdded] = app.modelAssets.load(hModel.value, "models/Cube.glb");
+                assert(wasAssetAdded);
+                entt::resource<Model>& model = assetIt->second;
+                assert(model);
+                auto [bufIt, wasBufAdded] = vk.modelBufData.emplace(hModel.value, ModelBuffers{
+                        createBufferData(vk, model, "INDEX"),
+                        createBufferData(vk, model, "POSITION")
+                });
+                assert(wasBufAdded);
+                rawModelBuffers = &bufIt->second;
+            } else {
+                rawModelBuffers = &vertBufDataIt->second;
+            }
+            if (rawModelBuffers) {
+                vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
+                uint32_t off = drawIdx * vk.dynUboData.block_size();
+                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *shader.layout, 0, *vk.descSet, off);
+                vk.cmdBuf->drawIndexed(0, 0, 0, 0, 0);
 //            vk.cmdBuf->draw(12 * 3, 1, 0, 0);
-        };
-        drawIdx++;
+            };
+            drawIdx++;
+        }
     }
 }
 
@@ -438,7 +459,7 @@ void VulkanRenderPlugin::execute(App& app) {
     }
 
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
-    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>({{0.2f, 0.2f, 0.2f, 0.2f}}));
+    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
     vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
     std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
     vk::RenderPassBeginInfo renderPassBeginInfo(
@@ -448,6 +469,12 @@ void VulkanRenderPlugin::execute(App& app) {
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
+        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
+
+        // Create blank shader and fill it in
+        createPipeline(vk, vk.modelPipelines[shaderHandle.value]);
+    }
     renderOpaque(app);
     renderImGui(app);
     vk.cmdBuf->endRenderPass();
