@@ -17,11 +17,8 @@ int main() {
         App app;
         PhysicsPlugin physics;
         VulkanRenderPlugin render;
-        SystemContext logicCtx{app.logicWorld, app.globalCtx};
-        physics.build(logicCtx);
-        render.build(logicCtx);
-
-        app.sceneAssets.load("M4"_hs, "assets/models/M4.glb");
+        physics.build(app);
+        render.build(app);
 
         app.logicWorld.ctx().emplace<LocalContext>(player_id_t{0});
 
@@ -30,6 +27,10 @@ int main() {
         app.logicWorld.emplace<Look>(playerEnt);
         app.logicWorld.emplace<Input>(playerEnt);
         app.logicWorld.emplace<UI>(playerEnt);
+
+        auto pickupEnt = app.logicWorld.create();
+        app.logicWorld.emplace<ItemPickup>(pickupEnt, "M4"_hs);
+        app.logicWorld.emplace<ModelHandle>(pickupEnt, "M4"_hs);
 
         auto player_def = edyn::rigidbody_def();
         player_def.kind = edyn::rigidbody_kind::rb_dynamic;
@@ -42,7 +43,7 @@ int main() {
 
         for (int i = 0; i < 3; ++i) {
             auto cubeEnt = app.logicWorld.create();
-            app.logicWorld.emplace<Cube>(cubeEnt);
+            app.logicWorld.emplace<ModelHandle>(cubeEnt, "Cube"_hs);
             app.logicWorld.emplace<Position>(cubeEnt);
             app.logicWorld.emplace<Orientation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
         }
@@ -60,14 +61,14 @@ int main() {
             app.logicWorld.emplace_or_replace<Timestamp>(playerEnt, ns, deltaNs);
             auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
             diagnostics.addFrameTime(deltaNs);
-            for (auto ent: app.logicWorld.view<Position, Orientation, Cube>()) {
+            for (auto [ent, pos, orien, hModel]: app.logicWorld.view<Position, Orientation, ModelHandle>().each()) {
                 scalar add = std::cos(static_cast<double>(ns) / 1e9);
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }
-            input(logicCtx);
-            modify(logicCtx);
-            physics.execute(logicCtx);
+            input(app);
+            modify(app);
+            physics.execute(app);
 
             app.renderWorld.clear();
             app.renderWorld.ctx().emplace<RenderContext>(app.logicWorld.ctx().at<LocalContext>().localId);
@@ -78,16 +79,16 @@ int main() {
                 app.renderWorld.emplace<Look>(ent, look);
                 app.renderWorld.emplace<Player>(ent, player);
             }
-            for (auto [ent, pos, orien]: app.logicWorld.view<const Position, const Orientation, const Cube>().each()) {
+            for (auto [ent, pos, orien, hModel]: app.logicWorld.view<const Position, const Orientation, const ModelHandle>().each()) {
                 auto actualEnt = app.renderWorld.create(ent);
                 assert(actualEnt == ent);
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Orientation>(ent, orien);
-                app.renderWorld.emplace<Cube>(ent);
+                app.renderWorld.emplace<ModelHandle>(ent, hModel);
             }
-            render.execute({app.renderWorld, app.globalCtx});
+            render.execute(app);
         }
-        physics.cleanup(logicCtx);
+        physics.cleanup(app);
     }
     catch (std::exception const& err) {
         std::cerr << "exception: " << err.what() << std::endl;

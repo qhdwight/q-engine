@@ -4,10 +4,10 @@
 
 #include <tiny_gltf.h>
 
-typedef tinygltf::Scene Scene;
+typedef tinygltf::Model Model;
 
-struct SceneLoader {
-    using result_type = std::shared_ptr<Scene>;
+struct ModelLoader {
+    using result_type = std::shared_ptr<Model>;
 
     result_type operator()(std::string const& name);
 };

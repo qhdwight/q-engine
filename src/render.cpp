@@ -10,7 +10,8 @@
 
 #include "math.hpp"
 #include "shaders.hpp"
-#include "geometries.hpp"
+
+using namespace entt::literals;
 
 /**
  * @brief We do all of our calculations in doubles, but current GPUs work best with float
@@ -25,6 +26,7 @@ mat4f toShader(mat4 const& m) {
 }
 
 mat4 calcView(Position const& eye, Look const& look) {
+    // Calculations from GLM
     vec3 center = eye + rotate(fromEuler(look), edyn::vector3_y);
     vec3 up = rotate(fromEuler(look), edyn::vector3_z);
 
@@ -50,6 +52,7 @@ mat4 calcView(Position const& eye, Look const& look) {
 }
 
 mat4 calcProj(vk::Extent2D const& extent) {
+    // Calculations from GLM
     double rad = edyn::to_radians(45.0);
     double h = std::cos(0.5 * rad) / std::sin(0.5 * rad);
     double w = h * static_cast<double>(extent.height) / static_cast<double>(extent.width);
@@ -64,7 +67,7 @@ mat4 calcProj(vk::Extent2D const& extent) {
 }
 
 mat4 getClip() {
-    // vulkan clip space has inverted y and half z
+    // Vulkan clip space has inverted y and half z
     return {
             vec4{1.0, 0.0, 0.0, 0.0},
             vec4{0.0, -1.0, 0.0, 0.0},
@@ -105,17 +108,10 @@ void createPipelineLayout(VulkanContext& vk) {
                     {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}
             }
     );
-    vk::PushConstantRange pushConstRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4));
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo({}, descSetLayout, pushConstRange);
+    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
     vk.pipelineLayout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
 
-    vk.vertBufData.emplace(*vk.physDev, *vk.device, sizeof(coloredCubeData), vk::BufferUsageFlagBits::eVertexBuffer);
-    vk::su::copyToDevice(
-            *vk.device,
-            vk.vertBufData->deviceMemory,
-            coloredCubeData,
-            sizeof(coloredCubeData) / sizeof(coloredCubeData[0])
-    );
     vk.descriptorPool = vk::su::createDescriptorPool(
             *vk.device, {
                     {vk::DescriptorType::eSampler,              64},
@@ -142,7 +138,6 @@ void createPipelineLayout(VulkanContext& vk) {
     vk.device->updateDescriptorSets({sharedWriteDescSet, dynWriteDescSet}, nullptr);
 }
 
-
 void createPipeline(VulkanContext& vk) {
     auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
     vk.swapChainData = vk::su::SwapChainData(
@@ -158,8 +153,8 @@ void createPipeline(VulkanContext& vk) {
 
     glslang::InitializeProcess();
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
-    vk::ShaderModule vertexShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eVertex, shadersPath  / "vertex.glsl");
-    vk::ShaderModule fragmentShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eFragment, shadersPath  / "fragment.glsl");
+    vk::ShaderModule vertexShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eVertex, shadersPath / "vertex.glsl");
+    vk::ShaderModule fragmentShaderModule = createShaderModule(vk, vk::ShaderStageFlagBits::eFragment, shadersPath / "fragment.glsl");
     glslang::FinalizeProcess();
 
     vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
@@ -181,7 +176,7 @@ void createPipeline(VulkanContext& vk) {
             *vk.pipelineCache,
             {vertexShaderModule, nullptr},
             {fragmentShaderModule, nullptr},
-            sizeof(coloredCubeData[0]),
+            sizeof(VertexData),
             {{vk::Format::eR32G32B32A32Sfloat, 0},
              {vk::Format::eR32G32B32A32Sfloat, 16}},
             vk::FrontFace::eClockwise,
@@ -199,7 +194,6 @@ void recreatePipeline(VulkanContext& vk) {
     vk.swapChainData->clear(*vk.device);
     createPipeline(vk);
 }
-
 
 void setupImgui(VulkanContext& vk) {
     IMGUI_CHECKVERSION();
@@ -254,10 +248,11 @@ void init(VulkanContext& vk) {
     vk.physDev = physDevs.front();
 
     vk::PhysicalDeviceProperties const& props = vk.physDev->getProperties();
-    std::cout << "[Vulkan] Chose physical device: " << props.deviceName
+    std::cout << "[Vulkan]" << " Chose physical device: " << props.deviceName
               << std::endl;
     uint32_t apiVer = props.apiVersion;
-    std::cout << "[Vulkan] Device API version: " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.' << VK_VERSION_PATCH(apiVer)
+    std::cout << "[Vulkan]" << " Device API version: " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.'
+              << VK_VERSION_PATCH(apiVer)
               << std::endl;
 
     // Creates window as well
@@ -293,48 +288,80 @@ void init(VulkanContext& vk) {
     setupImgui(vk);
 }
 
-void renderOpaque(SystemContext const& ctx) {
-    auto& vk = ctx.globalCtx.at<VulkanContext>();
+void renderOpaque(App& app) {
+    auto& vk = app.globalCtx.at<VulkanContext>();
     vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *vk.pipeline);
-    vk.cmdBuf->bindVertexBuffers(0, vk.vertBufData->buffer, {0});
     vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
                                            static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    auto renderCtx = ctx.world.ctx().at<RenderContext>();
-    auto playerIt = ctx.world.view<const Position, const Look, const Player>().each();
+    auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
+    auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
     for (auto [ent, pos, look, player]: playerIt) {
         if (player.id != renderCtx.playerId) continue;
 
         SharedUboData sharedUbo{
-                toShader(calcView(pos, look)),
-                toShader(calcProj(vk.surfData->extent)),
-                toShader(getClip())
+                .view = toShader(calcView(pos, look)),
+                .proj = toShader(calcProj(vk.surfData->extent)),
+                .clip = toShader(getClip())
         };
         vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
     }
 
-    size_t drawIdx = 0;
-    auto entView = ctx.world.view<const Position, const Orientation, const Cube>();
-    for (auto [ent, pos, orien]: entView.each()) {
+    size_t drawIdx;
+    auto entView = app.renderWorld.view<const Position, const Orientation, const ModelHandle>();
+    // We store data per model in a dynamic UBO to save memory
+    // This way we only have one upload
+    drawIdx = 0;
+    for (auto [ent, pos, orien, hModel]: entView.each()) {
         vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
     }
-    size_t drawCount = drawIdx;
 
     void* devUboPtr = vk.device->mapMemory(vk.dynUboBuf->deviceMemory, 0, vk.dynUboData.mem_size());
     memcpy(devUboPtr, vk.dynUboData.data(), vk.dynUboData.mem_size());
     vk.device->unmapMemory(vk.dynUboBuf->deviceMemory);
 
-    for (drawIdx = 0; drawIdx < drawCount; ++drawIdx) {
-        uint32_t off = drawIdx * vk.dynUboData.block_size();
-        vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *vk.pipelineLayout, 0, *vk.descSet, off);
-        vk.cmdBuf->draw(12 * 3, 1, 0, 0);
+    // TODO: is this same order?
+    drawIdx = 0;
+    for (auto [ent, pos, orien, hModel]: entView.each()) {
+        vk::Buffer* rawVertBuffer;
+        auto vertBufDataIt = vk.vertBufData.find(hModel.value);
+        // Check if we need to create a vertex buffer for this model
+        if (vertBufDataIt == vk.vertBufData.end()) {
+            auto [assetIt, wasAssetAdded] = app.modelAssets.load(hModel.value, "models/Cube.glb");
+            assert(wasAssetAdded);
+            entt::resource<Model>& model = assetIt->second;
+            assert(model);
+            std::vector<unsigned char> data = model->buffers.front().data;
+            tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
+            auto attrIdx = primitive.attributes.at("POSITION");
+            tinygltf::Accessor& acc = model->accessors[attrIdx];
+            tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
+            size_t stride = acc.ByteStride(view);
+            size_t vertCount = view.byteLength / stride;
+            auto [bufIt, wasBufAdded] = vk.vertBufData.emplace(hModel.value, vk::su::BufferData{
+                    *vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eVertexBuffer
+            });
+            assert(wasBufAdded);
+            vk::su::copyToDevice(*vk.device, bufIt->second.deviceMemory, reinterpret_cast<vec3*>(data.data() + view.byteOffset), vertCount, stride);
+            rawVertBuffer = &bufIt->second.buffer;
+        } else {
+            rawVertBuffer = &vertBufDataIt->second.buffer;
+        }
+        if (rawVertBuffer) {
+            vk.cmdBuf->bindVertexBuffers(0, *rawVertBuffer, {0});
+            uint32_t off = drawIdx * vk.dynUboData.block_size();
+            vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *vk.pipelineLayout, 0, *vk.descSet, off);
+            vk.cmdBuf->drawIndexed(0, 0, 0, 0, 0);
+//            vk.cmdBuf->draw(12 * 3, 1, 0, 0);
+        };
+        drawIdx++;
     }
 }
 
-void renderImGuiOverlay(SystemContext const& ctx) {
-    auto& diagnostics = ctx.globalCtx.at<DiagnosticResource>();
+void renderImGuiOverlay(App& app) {
+    auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     static bool open = true;
@@ -369,26 +396,26 @@ void renderImGuiOverlay(SystemContext const& ctx) {
     ImGui::End();
 }
 
-void renderImGui(SystemContext const& ctx) {
-    auto& vk = ctx.globalCtx.at<VulkanContext>();
+void renderImGui(App& app) {
+    auto& vk = app.globalCtx.at<VulkanContext>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 //    ImGui::ShowDemoWindow();
 //    auto it = world->view<UI>().each();
 //    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-    renderImGuiOverlay(ctx);
+    renderImGuiOverlay(app);
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
 }
 
-void VulkanRenderPlugin::build(SystemContext const& ctx) {
-    ctx.globalCtx.emplace<VulkanContext>();
-    ctx.globalCtx.emplace<WindowContext>(false, true, false);
+void VulkanRenderPlugin::build(App& app) {
+    app.globalCtx.emplace<VulkanContext>();
+    app.globalCtx.emplace<WindowContext>(false, true, false);
 }
 
-void VulkanRenderPlugin::execute(SystemContext const& ctx) {
-    auto pVk = ctx.globalCtx.find<VulkanContext>();
+void VulkanRenderPlugin::execute(App& app) {
+    auto pVk = app.globalCtx.find<VulkanContext>();
     if (!pVk) return;
 
     VulkanContext& vk = *pVk;
@@ -421,8 +448,8 @@ void VulkanRenderPlugin::execute(SystemContext const& ctx) {
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    renderOpaque(ctx);
-    renderImGui(ctx);
+    renderOpaque(app);
+    renderImGui(app);
     vk.cmdBuf->endRenderPass();
     vk.cmdBuf->end();
 
@@ -450,7 +477,7 @@ void VulkanRenderPlugin::execute(SystemContext const& ctx) {
     }
 
     glfwPollEvents();
-    bool& keepOpen = ctx.globalCtx.at<WindowContext>().keepOpen;
+    bool& keepOpen = app.globalCtx.at<WindowContext>().keepOpen;
     keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
     if (!keepOpen) {
         vk.device->waitIdle();

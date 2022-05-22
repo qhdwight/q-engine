@@ -11,18 +11,24 @@
 
 #include "assets.hpp"
 
-typedef int64_t ns_t;
-typedef std::string ItemName;
-typedef std::string ItemStateName;
-typedef std::string EquipStateName;
-typedef entt::registry::entity_type ent_t;
-typedef edyn::position Position;
-typedef edyn::orientation Orientation;
-typedef edyn::linvel LinearVelocity;
-typedef edyn::scalar scalar;
-typedef edyn::vector3 vec3;
-typedef edyn::vector2 vec2;
-typedef uint8_t player_id_t;
+using ns_t = int64_t;
+using ItemName = entt::hashed_string;
+using ItemStateName = entt::hashed_string;
+using EquipStateName = entt::hashed_string;
+using ent_t = entt::registry::entity_type;
+using Position = edyn::position;
+using Orientation = edyn::orientation;
+using LinearVelocity = edyn::linvel;
+using scalar = edyn::scalar;
+using vec3 = edyn::vector3;
+using vec2 = edyn::vector2;
+using player_id_t = uint8_t;
+using asset_handle_t = entt::id_type;
+using ModelAssets = entt::resource_cache<Model, ModelLoader>;
+
+struct ModelHandle {
+    asset_handle_t value;
+};
 
 struct Look : vec3 {
 };
@@ -41,10 +47,6 @@ struct RenderContext {
 
 struct Player {
     player_id_t id;
-};
-
-struct Cube {
-
 };
 
 struct Key {
@@ -95,6 +97,10 @@ struct Item {
     uint8_t invSlot;
 };
 
+struct ItemPickup {
+    ItemName name;
+};
+
 struct Inventory {
     std::optional<uint8_t> equippedSlot;
     std::optional<uint8_t> prevEquippedSlot;
@@ -122,10 +128,5 @@ struct App {
     World logicWorld;
     World renderWorld;
     Context globalCtx;
-    entt::resource_cache<Scene, SceneLoader> sceneAssets;
-};
-
-struct SystemContext {
-    World& world;
-    Context& globalCtx;
+    ModelAssets modelAssets;
 };

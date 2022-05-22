@@ -5,11 +5,12 @@
 
 #include "assets.hpp"
 
-SceneLoader::result_type SceneLoader::operator()(std::string const& name) {
+ModelLoader::result_type ModelLoader::operator()(std::string const& name) {
     tinygltf::TinyGLTF loader;
     auto model = std::make_shared<tinygltf::Model>();
     std::string err;
     std::string warn;
-    loader.LoadBinaryFromFile(model.get(), &err, &warn, name);
-    return nullptr;
+    std::filesystem::path path = std::filesystem::current_path() / "assets" / name;
+    loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
+    return model;
 }

@@ -2,9 +2,9 @@
 
 #include <iostream>
 
-void PhysicsPlugin::build(SystemContext const& ctx) {
+void PhysicsPlugin::build(App& app) {
     edyn::init();
-    edyn::attach(ctx.world);
+    edyn::attach(app.logicWorld);
 
     std::cout << "[Edyn]" << " physics attached" << std::endl;
 
@@ -14,14 +14,14 @@ void PhysicsPlugin::build(SystemContext const& ctx) {
     floor_def.material->friction = 0.5;
     // Plane at the origin with normal pointing up.
     floor_def.shape = edyn::plane_shape{{0, 0, 1}, 0};
-    edyn::make_rigidbody(ctx.world, floor_def);
+    edyn::make_rigidbody(app.logicWorld, floor_def);
 }
 
-void PhysicsPlugin::execute(SystemContext const& ctx) {
-    edyn::update(ctx.world);
+void PhysicsPlugin::execute(App& app) {
+    edyn::update(app.logicWorld);
 }
 
-void PhysicsPlugin::cleanup(SystemContext const& ctx) {
-    edyn::detach(ctx.world);
+void PhysicsPlugin::cleanup(App& app) {
+    edyn::detach(app.logicWorld);
     edyn::deinit();
 }

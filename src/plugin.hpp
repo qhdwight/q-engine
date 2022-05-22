@@ -3,9 +3,9 @@
 #include "state.hpp"
 
 class Plugin {
-    virtual void build(SystemContext const& ctx) = 0;
+    virtual void build(App& app) = 0;
 
-    virtual void cleanup([[maybe_unused]] SystemContext const& ctx) {};
+    virtual void cleanup([[maybe_unused]] App& app) {};
 
-    virtual void execute(SystemContext const& ctx) = 0;
+    virtual void execute(App& app) = 0;
 };

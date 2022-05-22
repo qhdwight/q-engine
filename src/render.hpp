@@ -14,9 +14,9 @@
 
 class VulkanRenderPlugin : Plugin {
 public:
-    void build(SystemContext const& ctx) override;
+    void build(App& app) override;
 
-    void execute(SystemContext const& ctx) override;
+    void execute(App& app) override;
 };
 
 struct WindowContext {
@@ -35,6 +35,10 @@ struct DynamicUboData {
     mat4f model;
 };
 
+struct VertexData {
+    vec4 pos, color;
+};
+
 struct VulkanContext {
     vk::Instance inst;
     std::optional<vk::PhysicalDevice> physDev;
@@ -46,13 +50,14 @@ struct VulkanContext {
     std::optional<vk::PipelineLayout> pipelineLayout;
     std::optional<vk::RenderPass> renderPass;
     std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::su::BufferData> sharedUboBuf, dynUboBuf, vertBufData;
+    std::optional<vk::su::BufferData> sharedUboBuf, dynUboBuf;
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::Pipeline> pipeline;
     std::optional<vk::PipelineCache> pipelineCache;
     std::optional<vk::DescriptorPool> descriptorPool;
     std::optional<vk::Semaphore> imgAcqSem;
     std::optional<vk::Fence> drawFence;
+    std::unordered_map<asset_handle_t, vk::su::BufferData> vertBufData;
     aligned_vector<DynamicUboData> dynUboData;
     SharedUboData sharedUboData;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;

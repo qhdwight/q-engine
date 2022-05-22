@@ -2,4 +2,4 @@
 
 #include "state.hpp"
 
-void input(SystemContext& ctx);
+void input(App& app);
