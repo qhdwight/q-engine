@@ -4,9 +4,9 @@
 #include <filesystem>
 
 #include <imgui.h>
+#include <spirv_reflect.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
-#include <SPIRV/GlslangToSpv.h>
 
 #include "math.hpp"
 #include "shaders.hpp"
@@ -86,16 +86,49 @@ mat4 calcModel(Position const& pos) {
     return translate(model, pos);
 }
 
-Shader& createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
+void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     shaderFile.open(path);
     std::stringstream strStream;
     strStream << shaderFile.rdbuf();
+    std::string code = strStream.str();
 
-    Shader& shader = pipeline.shaders.emplace_back();
-    std::tie(shader.module, shader.info) = vk::su::createShaderModule(*vk.device, shaderStage, strStream.str());
-    return shader;
+    EShLanguage stage = vk::su::translateShaderStage(shaderStage);
+
+    std::array<const char*, 1> shaderStrings{code.c_str()};
+
+    glslang::TShader shader(stage);
+    shader.setStrings(shaderStrings.data(), 1);
+
+    // Enable SPIR-V and Vulkan rules when parsing GLSL
+    auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules);
+
+    if (!shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
+        puts(shader.getInfoLog());
+        puts(shader.getInfoDebugLog());
+        throw std::runtime_error("Failed to parse shader");
+    }
+
+    glslang::TProgram program;
+    program.addShader(&shader);
+
+    if (!program.link(messages)) {
+        puts(shader.getInfoLog());
+        puts(shader.getInfoDebugLog());
+        throw std::runtime_error("Failed to link shader");
+    }
+
+    std::vector<unsigned int> shaderSPV;
+    glslang::GlslangToSpv(*program.getIntermediate(stage), shaderSPV);
+
+    auto reflect = std::make_shared<SpvReflectShaderModule>();
+    SpvReflectResult result = spvReflectCreateShaderModule(shaderSPV.size() * sizeof(unsigned int), shaderSPV.data(), reflect.get());
+    if (result != SPV_REFLECT_RESULT_SUCCESS) {
+        throw std::runtime_error("Failed to reflect shader module");
+    }
+
+    pipeline.shaders.push_back(Shader{vk.device->createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV)), reflect});
 }
 
 void createSwapChain(VulkanContext& vk) {
@@ -122,21 +155,37 @@ void createSwapChain(VulkanContext& vk) {
 }
 
 void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
-    glslang::InitializeProcess();
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
-    Shader& fragmentShader = createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "flat.vert");
-    Shader& vertexShader = createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "flat.frag");
-    glslang::FinalizeProcess();
+    pipeline.shaders.clear();
+    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "flat.vert");
+    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "flat.frag");
 
     auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.dynUboData.resize(uboAlignment, 16);
     vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
     vk.sharedUboBuf.emplace(*vk.physDev, *vk.device, sizeof(vk.sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
 
+    int uniform = 0;
+    int dynamicUniform = 0;
+    for (Shader& shader: pipeline.shaders) {
+        uint32_t bindingCount = 0;
+        SpvReflectResult result;
+        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, nullptr);
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        shader.bindingsReflect.resize(bindingCount);
+        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, shader.bindingsReflect.data());
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        for (size_t i = 0; i < bindingCount; ++i) {
+            std::string_view name(shader.bindingsReflect[i]->name);
+            if (name.find("dynamic") == std::string::npos) uniform++;
+            else dynamicUniform++;
+        }
+    }
+
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
             *vk.device,
-            {{vk::DescriptorType::eUniformBuffer,        1, vk::ShaderStageFlagBits::eVertex},
-             {vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex}}
+            {{vk::DescriptorType::eUniformBuffer,        uniform,        vk::ShaderStageFlagBits::eVertex},
+             {vk::DescriptorType::eUniformBufferDynamic, dynamicUniform, vk::ShaderStageFlagBits::eVertex}}
     );
     vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
@@ -146,17 +195,37 @@ void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
     vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
     vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
 
-    vk::DescriptorBufferInfo sharedDescBufInfo{vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE};
-    vk::WriteDescriptorSet sharedWriteDescSet{*vk.descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &sharedDescBufInfo};
-    vk::DescriptorBufferInfo dynDescBufInfo{vk.dynUboBuf->buffer, 0, sizeof(DynamicUboData)};
-    vk::WriteDescriptorSet dynWriteDescSet{*vk.descSet, 1, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &dynDescBufInfo};
-    vk.device->updateDescriptorSets({sharedWriteDescSet, dynWriteDescSet}, nullptr);
+    std::vector<vk::DescriptorBufferInfo> descBufInfos; // Extends lifetime until we update descriptor sets
+    std::vector<vk::WriteDescriptorSet> descSets;
+    descBufInfos.reserve(uniform + dynamicUniform);
+    descSets.reserve(uniform + dynamicUniform);
+    for (Shader const& shader: pipeline.shaders) {
+        for (const auto& item: shader.bindingsReflect) {
+
+        }
+        for (int bind = 0; bind < shader.info->getNumUniformBlocks(); ++bind) {
+            if (bind == 0) {
+                descBufInfos.emplace_back(vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE);
+                descSets.emplace_back(*vk.descSet, bind, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+            } else {
+                auto bruh = shader.info->getUniformBlock(bind);
+                auto b = shader.info->getUniform(0);
+                shader.info->getUniformBlock(bind).dump();
+                shader.info->getUniform(bind).dump();
+                vk::DeviceSize size = shader.info->getUniformBlock(bind).size;
+                descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, size);
+                descSets.emplace_back(*vk.descSet, bind, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
+            }
+        }
+    }
+
+    vk.device->updateDescriptorSets(descSets, nullptr);
 
     pipeline.value = vk::su::createGraphicsPipeline(
             *vk.device,
             *vk.pipelineCache,
-            {*vertexShader.module, nullptr},
-            {*fragmentShader.module, nullptr},
+            {pipeline.shaders[0].module, nullptr},
+            {pipeline.shaders[1].module, nullptr},
             sizeof(VertexData),
             {{vk::Format::eR32G32B32A32Sfloat, 0},
              {vk::Format::eR32G32B32A32Sfloat, 16}},
@@ -286,6 +355,8 @@ void init(VulkanContext& vk) {
     createSwapChain(vk);
 
     setupImgui(vk);
+
+    glslang::InitializeProcess();
 }
 
 vk::su::BufferData createBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, std::string const& attrName) {
@@ -509,4 +580,8 @@ void VulkanRenderPlugin::execute(App& app) {
     if (!keepOpen) {
         vk.device->waitIdle();
     }
+}
+
+void VulkanRenderPlugin::cleanup(App& app) {
+    glslang::FinalizeProcess();
 }

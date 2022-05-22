@@ -68,7 +68,7 @@
       "backends/imgui_impl_glfw.cpp"
     ],
     "filter": [
-      "/*", 
+      "/*",
       "!/*/",
       "backends/"
     ]
@@ -88,6 +88,16 @@
     "reference": "v2.5.0",
     "includes": [
       ""
+    ]
+  },
+  "spirv-reflect": {
+    "uri": "https://github.com/KhronosGroup/SPIRV-Reflect.git",
+    "reference": "master",
+    "includes": [
+      ""
+    ],
+    "libraries": [
+      "spirv-reflect-static"
     ]
   }
 }

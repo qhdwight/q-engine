@@ -3,14 +3,14 @@
 #extension GL_ARB_separate_shader_objects  : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (binding = 0) uniform u1
+layout (binding = 0) uniform SharedUbo
 {
     mat4 view;
     mat4 proj;
     mat4 clip;
 } sharedUbo;
 
-layout (binding = 1) uniform u2
+layout (binding = 1) uniform DynamicUbo
 {
     mat4 model;
 } dynamicUbo;

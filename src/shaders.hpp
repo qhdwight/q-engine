@@ -14,19 +14,21 @@
 //
 
 #include "vulkan/vulkan.hpp"
+
 #include "SPIRV/GlslangToSpv.h"
+#include "StandAlone/ResourceLimits.h"
 
 #include <string>
 #include <vector>
-#include <memory>
-#include <utility>
 
-namespace vk::su {
-    std::pair<vk::ShaderModule, std::shared_ptr<glslang::TProgram>>
-    createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText);
+namespace vk {
+    namespace su {
+        vk::ShaderModule createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText);
 
-    std::shared_ptr<glslang::TProgram>
-    GLSLtoSPV(vk::ShaderStageFlagBits shaderType, std::string const& glslShader, std::vector<unsigned int>& spvShader);
+        bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, std::string const& glslShader, std::vector<unsigned int>& spvShader);
+
+        EShLanguage translateShaderStage(vk::ShaderStageFlagBits stage);
+    }  // namespace su
 }  // namespace vk
 
 // vertex shader with (P)osition and (C)olor in and (C)olor out

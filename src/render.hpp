@@ -2,10 +2,10 @@
 
 #include <optional>
 
+#include <spirv_reflect.h>
 #include <vulkan/vulkan.hpp>
 #include <edyn/math/matrix3x3.hpp>
 #include <backends/imgui_impl_vulkan.h>
-#include <glslang/Public/ShaderLang.h>
 
 #include "utils.hpp"
 #include "state.hpp"
@@ -18,6 +18,8 @@ public:
     void build(App& app) override;
 
     void execute(App& app) override;
+
+    void cleanup(App& app) override;
 };
 
 struct WindowContext {
@@ -46,8 +48,9 @@ struct ModelBuffers {
 };
 
 struct Shader {
-    std::optional<vk::ShaderModule> module;
-    std::shared_ptr<glslang::TProgram> info;
+    vk::ShaderModule module;
+    std::shared_ptr<SpvReflectShaderModule> reflect;
+    std::vector<SpvReflectDescriptorBinding> bindingsReflect;
 };
 
 struct Pipeline {

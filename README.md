@@ -7,3 +7,7 @@
 - C++ package manager written in Go
 
 ![demo](demo.png)
+
+### Developing & Building
+
+Run `go run build.go` to generate a `CMakeLists.txt`. Then use your favorite editor of choice!
