@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 
 #include <spirv_reflect.h>
@@ -38,8 +39,19 @@ struct DynamicUboData {
     mat4f model;
 };
 
-struct VertexData {
-    vec4 pos, color;
+using vec3f = std::array<float, 3>;
+using vec4f = std::array<float, 4>;
+
+struct FlatVertexData {
+    vec4f pos;
+    vec4f color;
+};
+
+struct PbrVertexData {
+    vec3f pos;
+    vec3f norm;
+    vec3f uv0;
+    vec3f uv1;
 };
 
 struct ModelBuffers {

@@ -154,7 +154,7 @@ void createSwapChain(VulkanContext& vk) {
     vk.framebufs = vk::su::createFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
 }
 
-void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
+void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
     pipeline.shaders.clear();
     createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "flat.vert");
@@ -172,14 +172,19 @@ void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        shader.bindingsReflect.resize(bindingCount);
-        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, shader.bindingsReflect.data());
+        auto** bindingVars = static_cast<SpvReflectDescriptorBinding**>(malloc(bindingCount * sizeof(SpvReflectDescriptorBinding*)));
+        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, bindingVars);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        for (size_t i = 0; i < bindingCount; ++i) {
-            std::string_view name(shader.bindingsReflect[i]->name);
+
+        shader.bindingsReflect.reserve(bindingCount);
+        for (size_t bind = 0; bind < bindingCount; ++bind) {
+            shader.bindingsReflect.push_back(*bindingVars[bind]);
+            std::string_view name(shader.bindingsReflect[bind].name);
             if (name.find("dynamic") == std::string::npos) uniform++;
             else dynamicUniform++;
         }
+
+        free(bindingVars);
     }
 
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
@@ -200,21 +205,15 @@ void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
     descBufInfos.reserve(uniform + dynamicUniform);
     descSets.reserve(uniform + dynamicUniform);
     for (Shader const& shader: pipeline.shaders) {
-        for (const auto& item: shader.bindingsReflect) {
-
-        }
-        for (int bind = 0; bind < shader.info->getNumUniformBlocks(); ++bind) {
-            if (bind == 0) {
+        for (SpvReflectDescriptorBinding const& binding: shader.bindingsReflect) {
+            std::string_view name(binding.name);
+            if (name.find("dynamic") == std::string::npos) {
                 descBufInfos.emplace_back(vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE);
-                descSets.emplace_back(*vk.descSet, bind, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+                descSets.emplace_back(*vk.descSet, binding.binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
             } else {
-                auto bruh = shader.info->getUniformBlock(bind);
-                auto b = shader.info->getUniform(0);
-                shader.info->getUniformBlock(bind).dump();
-                shader.info->getUniform(bind).dump();
-                vk::DeviceSize size = shader.info->getUniformBlock(bind).size;
+                vk::DeviceSize size = binding.block.size;
                 descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, size);
-                descSets.emplace_back(*vk.descSet, bind, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
+                descSets.emplace_back(*vk.descSet, binding.binding, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
             }
         }
     }
@@ -226,7 +225,7 @@ void createPipeline(VulkanContext& vk, Pipeline& pipeline) {
             *vk.pipelineCache,
             {pipeline.shaders[0].module, nullptr},
             {pipeline.shaders[1].module, nullptr},
-            sizeof(VertexData),
+            sizeof(FlatVertexData),
             {{vk::Format::eR32G32B32A32Sfloat, 0},
              {vk::Format::eR32G32B32A32Sfloat, 16}},
             vk::FrontFace::eClockwise,
@@ -359,30 +358,42 @@ void init(VulkanContext& vk) {
     glslang::InitializeProcess();
 }
 
-vk::su::BufferData createBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, std::string const& attrName) {
-    auto data = reinterpret_cast<std::byte*>(model->buffers.front().data.data());
+template<typename T>
+vk::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
-    auto attrIdx = primitive.attributes.at(attrName);
-    tinygltf::Accessor& acc = model->accessors[attrIdx];
+    tinygltf::Accessor& acc = model->accessors.at(primitive.indices);
+    assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
-    size_t stride = acc.ByteStride(view);
-    vk::BufferUsageFlagBits usage{};
-    size_t devStride = 0;
-    if (attrName == "POSITION") {
-        usage = vk::BufferUsageFlagBits::eVertexBuffer;
-    } else if (attrName == "INDEX") {
-        usage = vk::BufferUsageFlagBits::eIndexBuffer;
-        devStride = sizeof(VertexData);
+    tinygltf::Buffer& buf = model->buffers.at(view.buffer);
+    vk::su::BufferData bufData{*vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eIndexBuffer};
+    auto dataStart = reinterpret_cast<std::byte*>(buf.data.data());
+    auto data = reinterpret_cast<T*>(dataStart + view.byteOffset + acc.byteOffset);
+    auto devData = static_cast<T*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength));
+//    vk::su::copyToDevice(*vk.device, bufData.deviceMemory, data, acc.count);
+    for (size_t i = 0; i < acc.count; ++i) {
+        devData[i] = data[i];
     }
-    vk::su::BufferData bufferData{*vk.physDev, *vk.device, view.byteLength, usage};
-    vk.device->mapMemory(bufferData.deviceMemory, 0, view.byteLength);
-    if (attrName == "POSITION") {
+    vk.device->unmapMemory(bufData.deviceMemory);
+    return bufData;
+}
 
-    } else if (attrName == "INDEX") {
-
+void fillAttributeBuffer(
+        VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, vk::su::BufferData& bufData, std::string const& attrName,
+        size_t modelStride, vk::DeviceSize shaderStride, vk::DeviceSize offset
+) {
+    tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
+    size_t attrIdx = primitive.attributes.at(attrName);
+    tinygltf::Accessor& acc = model->accessors.at(attrIdx);
+    tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
+    tinygltf::Buffer& buf = model->buffers.at(view.buffer);
+    auto modelData = reinterpret_cast<std::byte*>(buf.data.data()) + view.byteOffset + acc.byteOffset;
+    auto devData = static_cast<std::byte*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength)) + offset;
+    for (size_t i = 0; i < acc.count; i++) {
+        std::memcpy(devData, modelData, modelStride);
+        modelData += modelStride;
+        devData += shaderStride;
     }
-    vk.device->unmapMemory(bufferData.deviceMemory);
-    return bufferData;
+    vk.device->unmapMemory(bufData.deviceMemory);
 }
 
 void renderOpaque(App& app) {
@@ -422,30 +433,40 @@ void renderOpaque(App& app) {
 
         // TODO: is this same order?
         drawIdx = 0;
-        for (auto [ent, pos, orien, hModel]: modelView.each()) {
+        for (auto [ent, pos, orien, modelHandle]: modelView.each()) {
+            entt::resource<Model> model;
             ModelBuffers* rawModelBuffers;
-            auto vertBufDataIt = vk.modelBufData.find(hModel.value);
+            auto modelBufIt = vk.modelBufData.find(modelHandle.value);
             // Check if we need to create a vertex buffer for this model
-            if (vertBufDataIt == vk.modelBufData.end()) {
-                auto [assetIt, wasAssetAdded] = app.modelAssets.load(hModel.value, "models/Cube.glb");
+            if (modelBufIt == vk.modelBufData.end()) {
+                auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Cube.glb");
                 assert(wasAssetAdded);
-                entt::resource<Model>& model = assetIt->second;
+                model = assetIt->second;
                 assert(model);
-                auto [bufIt, wasBufAdded] = vk.modelBufData.emplace(hModel.value, ModelBuffers{
-                        createBufferData(vk, model, "INDEX"),
-                        createBufferData(vk, model, "POSITION")
+
+                size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at("POSITION")].count;
+                vk::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * sizeof(FlatVertexData), vk::BufferUsageFlagBits::eVertexBuffer};
+                fillAttributeBuffer(vk, model, vertBufData, "POSITION", sizeof(vec3f), sizeof(FlatVertexData), offsetof(FlatVertexData, pos));
+//                fillAttributeBuffer<vec3>(vk, model, vertBufData, "POSITION", sizeof(VertexData), offsetof(VertexData, pos));
+//                fillAttributeBuffer<vec3>(vk, model, vertBufData, "NORMAL", sizeof(VertexData), offsetof(VertexData, norm));
+//                fillAttributeBuffer<vec2>(vk, model, vertBufData, "UV", sizeof(VertexData), offsetof(VertexData, uv0));
+                auto [addedIt, wasBufAdded] = vk.modelBufData.emplace(modelHandle.value, ModelBuffers{
+                        createIndexBufferData<uint16_t>(vk, model),
+                        vertBufData
                 });
                 assert(wasBufAdded);
-                rawModelBuffers = &bufIt->second;
+                rawModelBuffers = &addedIt->second;
             } else {
-                rawModelBuffers = &vertBufDataIt->second;
+                model = app.modelAssets[modelHandle.value];
+                rawModelBuffers = &modelBufIt->second;
             }
             if (rawModelBuffers) {
                 vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
+                vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 uint32_t off = drawIdx * vk.dynUboData.block_size();
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *shader.layout, 0, *vk.descSet, off);
-                vk.cmdBuf->drawIndexed(0, 0, 0, 0, 0);
-//            vk.cmdBuf->draw(12 * 3, 1, 0, 0);
+                uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
+                vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
             };
             drawIdx++;
         }
@@ -529,6 +550,13 @@ void VulkanRenderPlugin::execute(App& app) {
         throw std::runtime_error("Invalid framebuffer size");
     }
 
+    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
+        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
+
+        // Create blank shader and fill it in
+        createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
+    }
+
     vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
     vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
     vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
@@ -540,12 +568,6 @@ void VulkanRenderPlugin::execute(App& app) {
             clearVals
     );
     vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
-        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
-
-        // Create blank shader and fill it in
-        createPipeline(vk, vk.modelPipelines[shaderHandle.value]);
-    }
     renderOpaque(app);
     renderImGui(app);
     vk.cmdBuf->endRenderPass();

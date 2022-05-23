@@ -1,7 +1,7 @@
 {
   "entt": {
     "uri": "https://github.com/skypjack/entt.git",
-    "reference": "v3.10.1",
+    "reference": "refs/tags/v3.10.1",
     "includes": [
       "src"
     ],
@@ -15,7 +15,7 @@
   },
   "glfw": {
     "uri": "https://github.com/glfw/glfw.git",
-    "reference": "v3.3.7",
+    "reference": "refs/tags/3.3.7",
     "includes": [
       "include"
     ],
@@ -32,7 +32,7 @@
   },
   "glslang": {
     "uri": "https://github.com/KhronosGroup/glslang.git",
-    "reference": "master",
+    "reference": "refs/heads/master",
     "includes": [
       ""
     ],
@@ -54,7 +54,7 @@
   },
   "imgui": {
     "uri": "https://github.com/ocornut/imgui.git",
-    "reference": "v1.87",
+    "reference": "refs/tags/v1.87",
     "includes": [
       ""
     ],
@@ -75,7 +75,7 @@
   },
   "edyn": {
     "uri": "https://github.com/qhdwight/edyn",
-    "reference": "custom",
+    "reference": "refs/heads/custom",
     "includes": [
       "include/edyn"
     ],
@@ -85,14 +85,14 @@
   },
   "tinygltf": {
     "uri": "https://github.com/syoyo/tinygltf.git",
-    "reference": "v2.5.0",
+    "reference": "refs/heads/master",
     "includes": [
       ""
     ]
   },
   "spirv-reflect": {
     "uri": "https://github.com/KhronosGroup/SPIRV-Reflect.git",
-    "reference": "master",
+    "reference": "refs/heads/master",
     "includes": [
       ""
     ],

@@ -85,7 +85,7 @@ int main() {
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Orientation>(ent, orien);
                 app.renderWorld.emplace<ModelHandle>(ent, modelHandle);
-                app.renderWorld.emplace<ShaderHandle>(ent, "Default"_hs);
+                app.renderWorld.emplace<ShaderHandle>(ent, "Flat"_hs);
             }
             render.execute(app);
         }

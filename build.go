@@ -44,7 +44,7 @@ func main() {
 				URL:           pkg.URI,
 				Progress:      os.Stdout,
 				SingleBranch:  true,
-				ReferenceName: plumbing.NewBranchReferenceName(pkg.Reference),
+				ReferenceName: plumbing.ReferenceName(pkg.Reference),
 			})
 			handleError(err)
 		} else if err != nil {
@@ -71,9 +71,9 @@ set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
 set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE INTERNAL "" FORCE)
 set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
 
-set(SPIRV_REFLECT_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SPIRV_REFLECT_EXECUTABLE OFF CACHE BOOL "" FORCE)
-set(SPIRV_REFLECT_STATIC_LIB ON CACHE BOOL "" FORCE)
+set(SPIRV_REFLECT_EXAMPLES OFF CACHE BOOl "" FORCE)
+set(SPIRV_REFLECT_EXECUTABLE OFF CACHE BOOl "" FORCE)
+set(SPIRV_REFLECT_STATIC_LIB ON CACHE BOOl "" FORCE)
 
 find_package(Vulkan REQUIRED)
 
