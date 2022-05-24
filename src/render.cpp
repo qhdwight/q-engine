@@ -13,9 +13,7 @@
 
 using namespace entt::literals;
 
-/**
- * @brief We do all of our calculations in doubles, but current GPUs work best with float
- */
+/** @brief We do all of our calculations in doubles, but current GPUs work best with float */
 mat4f toShader(mat4 const& m) {
     return {
             std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
@@ -122,13 +120,13 @@ void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFl
     std::vector<unsigned int> shaderSPV;
     glslang::GlslangToSpv(*program.getIntermediate(stage), shaderSPV);
 
-    auto reflect = std::make_shared<SpvReflectShaderModule>();
-    SpvReflectResult result = spvReflectCreateShaderModule(shaderSPV.size() * sizeof(unsigned int), shaderSPV.data(), reflect.get());
+    Shader shaderExt{vk.device->createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV))};
+    SpvReflectResult result = spvReflectCreateShaderModule(shaderSPV.size() * sizeof(unsigned int), shaderSPV.data(), &shaderExt.reflect);
     if (result != SPV_REFLECT_RESULT_SUCCESS) {
         throw std::runtime_error("Failed to reflect shader module");
     }
 
-    pipeline.shaders.push_back(Shader{vk.device->createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV)), reflect});
+    pipeline.shaders.push_back(shaderExt);
 }
 
 void createSwapChain(VulkanContext& vk) {
@@ -168,23 +166,24 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     int uniform = 0;
     int dynamicUniform = 0;
     for (Shader& shader: pipeline.shaders) {
-        uint32_t bindingCount = 0;
         SpvReflectResult result;
-        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, nullptr);
+        result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        auto** bindingVars = static_cast<SpvReflectDescriptorBinding**>(malloc(bindingCount * sizeof(SpvReflectDescriptorBinding*)));
-        result = spvReflectEnumerateDescriptorBindings(shader.reflect.get(), &bindingCount, bindingVars);
+        shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding*)));
+        result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, shader.bindingsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-        shader.bindingsReflect.reserve(bindingCount);
-        for (size_t bind = 0; bind < bindingCount; ++bind) {
-            shader.bindingsReflect.push_back(*bindingVars[bind]);
-            std::string_view name(shader.bindingsReflect[bind].name);
+        spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, nullptr);
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable*)));
+        result = spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, shader.inputsReflect);
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+        for (size_t bind = 0; bind < shader.bindCount; ++bind) {
+            std::string_view name(shader.bindingsReflect[bind]->name);
             if (name.find("dynamic") == std::string::npos) uniform++;
             else dynamicUniform++;
         }
-
-        free(bindingVars);
     }
 
     vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
@@ -205,29 +204,43 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     descBufInfos.reserve(uniform + dynamicUniform);
     descSets.reserve(uniform + dynamicUniform);
     for (Shader const& shader: pipeline.shaders) {
-        for (SpvReflectDescriptorBinding const& binding: shader.bindingsReflect) {
-            std::string_view name(binding.name);
+        for (size_t i = 0; i < shader.bindCount; ++i) {
+            auto const binding = shader.bindingsReflect[i];
+            std::string_view name(binding->name);
             if (name.find("dynamic") == std::string::npos) {
                 descBufInfos.emplace_back(vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE);
-                descSets.emplace_back(*vk.descSet, binding.binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+                descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
             } else {
-                vk::DeviceSize size = binding.block.size;
+                vk::DeviceSize size = binding->block.size;
                 descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, size);
-                descSets.emplace_back(*vk.descSet, binding.binding, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
+                descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
             }
         }
     }
 
     vk.device->updateDescriptorSets(descSets, nullptr);
 
+    std::vector<std::pair<vk::Format, uint32_t>> vertexAttrs;
+    size_t offset = 0;
+    for (size_t i = 0; i < pipeline.shaders[0].inputCount; ++i) {
+        auto const input = pipeline.shaders[0].inputsReflect[i];
+        uint32_t compCount = input->numeric.vector.component_count;
+        uint32_t elemSize = input->numeric.scalar.width;
+        if ((compCount == 3 || compCount == 4) && elemSize == sizeof(float) * 8) {
+            vertexAttrs.emplace_back(vk::Format::eR32G32B32A32Sfloat, offset);
+            offset += sizeof(vec4f);
+        } else if (compCount == 2 && elemSize == sizeof(float) * 8) {
+            vertexAttrs.emplace_back(vk::Format::eR32G32Sfloat, offset);
+            offset += sizeof(vec2f);
+        }
+    }
     pipeline.value = vk::su::createGraphicsPipeline(
             *vk.device,
             *vk.pipelineCache,
             {pipeline.shaders[0].module, nullptr},
             {pipeline.shaders[1].module, nullptr},
             sizeof(FlatVertexData),
-            {{vk::Format::eR32G32B32A32Sfloat, 0},
-             {vk::Format::eR32G32B32A32Sfloat, 16}},
+            vertexAttrs,
             vk::FrontFace::eClockwise,
             true,
             *pipeline.layout,
@@ -467,7 +480,7 @@ void renderOpaque(App& app) {
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *shader.layout, 0, *vk.descSet, off);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
                 vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
-            };
+            }
             drawIdx++;
         }
     }
@@ -606,4 +619,9 @@ void VulkanRenderPlugin::execute(App& app) {
 
 void VulkanRenderPlugin::cleanup(App& app) {
     glslang::FinalizeProcess();
+    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
+        for (auto& item: pipeline.shaders) {
+            spvReflectDestroyShaderModule(&item.reflect);
+        }
+    }
 }

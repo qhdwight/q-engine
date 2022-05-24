@@ -39,6 +39,7 @@ struct DynamicUboData {
     mat4f model;
 };
 
+using vec2f = std::array<float, 2>;
 using vec3f = std::array<float, 3>;
 using vec4f = std::array<float, 4>;
 
@@ -48,10 +49,10 @@ struct FlatVertexData {
 };
 
 struct PbrVertexData {
-    vec3f pos;
-    vec3f norm;
-    vec3f uv0;
-    vec3f uv1;
+    alignas(sizeof(vec4f)) vec3f pos;
+    alignas(sizeof(vec4f)) vec3f norm;
+    alignas(sizeof(vec4f)) vec3f uv0;
+    alignas(sizeof(vec4f)) vec3f uv1;
 };
 
 struct ModelBuffers {
@@ -61,8 +62,11 @@ struct ModelBuffers {
 
 struct Shader {
     vk::ShaderModule module;
-    std::shared_ptr<SpvReflectShaderModule> reflect;
-    std::vector<SpvReflectDescriptorBinding> bindingsReflect;
+    SpvReflectShaderModule reflect{};
+    uint32_t bindCount{};
+    SpvReflectDescriptorBinding** bindingsReflect = nullptr;
+    uint32_t inputCount{};
+    SpvReflectInterfaceVariable** inputsReflect = nullptr;
 };
 
 struct Pipeline {
