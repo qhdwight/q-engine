@@ -3,8 +3,8 @@
 #extension GL_ARB_separate_shader_objects  : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout (location = 0) in vec3 inPos;
-layout (location = 1) in vec3 inNorm;
+layout (location = 0) in vec3 inPosition;
+layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV0;
 layout (location = 3) in vec2 inUV1;
 layout (location = 4) in vec4 inJoint0;
@@ -38,8 +38,8 @@ out gl_PerVertex
 
 void main()
 {
-    vec4 locPos = dynamicUbo.model * vec4(inPos, 1.0);
-    outNorm = normalize(transpose(inverse(mat3(dynamicUbo.model))) * inNorm);
+    vec4 locPos = dynamicUbo.model * vec4(inPosition, 1.0);
+    outNorm = normalize(transpose(inverse(mat3(dynamicUbo.model))) * inNormal);
     outUV0 = inUV0;
     outUV1 = inUV1;
     mat4 vpc = sharedUbo.clip * sharedUbo.proj * sharedUbo.view;

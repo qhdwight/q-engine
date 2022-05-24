@@ -43,25 +43,22 @@ using vec2f = std::array<float, 2>;
 using vec3f = std::array<float, 3>;
 using vec4f = std::array<float, 4>;
 
-struct FlatVertexData {
-    vec4f pos;
-    vec4f color;
-};
-
-struct PbrVertexData {
-    alignas(sizeof(vec4f)) vec3f pos;
-    alignas(sizeof(vec4f)) vec3f norm;
-    alignas(sizeof(vec4f)) vec3f uv0;
-    alignas(sizeof(vec4f)) vec3f uv1;
-};
-
 struct ModelBuffers {
     vk::su::BufferData indexBufData;
     vk::su::BufferData vertBufData;
 };
 
+struct VertexAttr {
+    std::string name;
+    vk::Format format;
+    size_t size;
+    size_t offset;
+};
+
 struct Shader {
     vk::ShaderModule module;
+    std::unordered_map<uint32_t, VertexAttr> vertAttrs;
+    size_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
     SpvReflectDescriptorBinding** bindingsReflect = nullptr;

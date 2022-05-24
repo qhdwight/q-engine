@@ -13,8 +13,19 @@
 
 using namespace entt::literals;
 
+#define PositionAttr "POSITION"
+#define NormalAttr "NORMAL"
+
+// Vulkan clip space has inverted y and half z
+constexpr mat4 ClipMat = {
+        vec4{1.0, 0.0, 0.0, 0.0},
+        vec4{0.0, -1.0, 0.0, 0.0},
+        vec4{0.0, 0.0, 0.5, 0.0},
+        vec4{0.0, 0.0, 0.5, 1.0},
+};
+
 /** @brief We do all of our calculations in doubles, but current GPUs work best with float */
-mat4f toShader(mat4 const& m) {
+constexpr mat4f toShader(mat4 const& m) {
     return {
             std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
             std::array<float, 4>{static_cast<float>(m[1][0]), static_cast<float>(m[1][1]), static_cast<float>(m[1][2]), static_cast<float>(m[1][3])},
@@ -62,16 +73,6 @@ mat4 calcProj(vk::Extent2D const& extent) {
     proj[2][3] = -1.0;
     proj[3][2] = -(zFar * zNear) / (zFar - zNear);
     return proj;
-}
-
-mat4 getClip() {
-    // Vulkan clip space has inverted y and half z
-    return {
-            vec4{1.0, 0.0, 0.0, 0.0},
-            vec4{0.0, -1.0, 0.0, 0.0},
-            vec4{0.0, 0.0, 0.5, 0.0},
-            vec4{0.0, 0.0, 0.5, 1.0},
-    };
 }
 
 mat4 translate(mat4 m, vec3 v) {
@@ -211,8 +212,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                 descBufInfos.emplace_back(vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE);
                 descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
             } else {
-                vk::DeviceSize size = binding->block.size;
-                descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, size);
+                descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, binding->block.size);
                 descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
             }
         }
@@ -220,27 +220,42 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
     vk.device->updateDescriptorSets(descSets, nullptr);
 
-    std::vector<std::pair<vk::Format, uint32_t>> vertexAttrs;
-    size_t offset = 0;
-    for (size_t i = 0; i < pipeline.shaders[0].inputCount; ++i) {
-        auto const input = pipeline.shaders[0].inputsReflect[i];
+    size_t vertexAttrOffset = 0;
+    Shader& vertexShader = pipeline.shaders.front();
+    std::vector<std::pair<vk::Format, uint32_t>> vertexAttrPairs;
+    for (size_t layout = 0; layout < vertexShader.inputCount; ++layout) {
+        auto const input = vertexShader.inputsReflect[layout];
         uint32_t compCount = input->numeric.vector.component_count;
-        uint32_t elemSize = input->numeric.scalar.width;
+        uint32_t elemSize = input->numeric.scalar.width; // Units are bits not bytes
+        std::string name = input->name;
+        if (name.find("in") == std::string::npos)
+            throw std::runtime_error("Input variables must be prefixed with \"in\"");
+        name = name.substr(2);
+        for (auto& c: name) c = static_cast<char>(std::toupper(c));
+        vk::Format format{};
+        // vec3 and vec4 have identical alignment so we can treat them as same Vulkan type
+        // TODO is this really okay?
         if ((compCount == 3 || compCount == 4) && elemSize == sizeof(float) * 8) {
-            vertexAttrs.emplace_back(vk::Format::eR32G32B32A32Sfloat, offset);
-            offset += sizeof(vec4f);
+            format = vk::Format::eR32G32B32A32Sfloat;
         } else if (compCount == 2 && elemSize == sizeof(float) * 8) {
-            vertexAttrs.emplace_back(vk::Format::eR32G32Sfloat, offset);
-            offset += sizeof(vec2f);
+            format = vk::Format::eR32G32Sfloat;
         }
+        size_t size = sizeof(float) * compCount;
+
+        vertexAttrPairs.emplace_back(format, vertexAttrOffset);
+        auto [it, wasAdded] = vertexShader.vertAttrs.emplace(layout, VertexAttr{name, format, size, vertexAttrOffset});
+        vertexAttrOffset += size;
+        assert(wasAdded);
     }
+    vertexShader.vertAttrStride = vertexAttrOffset;
+
     pipeline.value = vk::su::createGraphicsPipeline(
             *vk.device,
             *vk.pipelineCache,
-            {pipeline.shaders[0].module, nullptr},
+            {vertexShader.module, nullptr},
             {pipeline.shaders[1].module, nullptr},
-            sizeof(FlatVertexData),
-            vertexAttrs,
+            vertexShader.vertAttrStride,
+            vertexAttrPairs,
             vk::FrontFace::eClockwise,
             true,
             *pipeline.layout,
@@ -381,21 +396,25 @@ vk::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource
     vk::su::BufferData bufData{*vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eIndexBuffer};
     auto dataStart = reinterpret_cast<std::byte*>(buf.data.data());
     auto data = reinterpret_cast<T*>(dataStart + view.byteOffset + acc.byteOffset);
-    auto devData = static_cast<T*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength));
-//    vk::su::copyToDevice(*vk.device, bufData.deviceMemory, data, acc.count);
-    for (size_t i = 0; i < acc.count; ++i) {
-        devData[i] = data[i];
-    }
-    vk.device->unmapMemory(bufData.deviceMemory);
+//    auto devData = static_cast<T*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength));
+    vk::su::copyToDevice(*vk.device, bufData.deviceMemory, data, acc.count);
+//    for (size_t i = 0; i < acc.count; ++i) {
+//        devData[i] = data[i];
+//    }
+//    vk.device->unmapMemory(bufData.deviceMemory);
     return bufData;
 }
 
-void fillAttributeBuffer(
+void tryFillAttributeBuffer(
         VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, vk::su::BufferData& bufData, std::string const& attrName,
         size_t modelStride, vk::DeviceSize shaderStride, vk::DeviceSize offset
 ) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
-    size_t attrIdx = primitive.attributes.at(attrName);
+    // Check if this model has a corresponding attribute by name
+    auto it = primitive.attributes.find(attrName);
+    if (it == primitive.attributes.end()) return;
+
+    size_t attrIdx = it->second;
     tinygltf::Accessor& acc = model->accessors.at(attrIdx);
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
     tinygltf::Buffer& buf = model->buffers.at(view.buffer);
@@ -416,8 +435,8 @@ void renderOpaque(App& app) {
                                            0.0f, 1.0f));
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
-    for (auto& [handle, shader]: vk.modelPipelines) {
-        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *shader.value);
+    for (auto& [handle, pipeline]: vk.modelPipelines) {
+        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.value);
         auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
         auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
         for (auto [ent, pos, look, player]: playerIt) {
@@ -426,7 +445,7 @@ void renderOpaque(App& app) {
             SharedUboData sharedUbo{
                     .view = toShader(calcView(pos, look)),
                     .proj = toShader(calcProj(vk.surfData->extent)),
-                    .clip = toShader(getClip())
+                    .clip = toShader(ClipMat)
             };
             vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
         }
@@ -457,12 +476,13 @@ void renderOpaque(App& app) {
                 model = assetIt->second;
                 assert(model);
 
-                size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at("POSITION")].count;
-                vk::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * sizeof(FlatVertexData), vk::BufferUsageFlagBits::eVertexBuffer};
-                fillAttributeBuffer(vk, model, vertBufData, "POSITION", sizeof(vec3f), sizeof(FlatVertexData), offsetof(FlatVertexData, pos));
-//                fillAttributeBuffer<vec3>(vk, model, vertBufData, "POSITION", sizeof(VertexData), offsetof(VertexData, pos));
-//                fillAttributeBuffer<vec3>(vk, model, vertBufData, "NORMAL", sizeof(VertexData), offsetof(VertexData, norm));
-//                fillAttributeBuffer<vec2>(vk, model, vertBufData, "UV", sizeof(VertexData), offsetof(VertexData, uv0));
+                Shader const& vertShader = pipeline.shaders.front();
+                size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count;
+                vk::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
+                                               vk::BufferUsageFlagBits::eVertexBuffer};
+                for (auto& [layout, attr]: vertShader.vertAttrs) {
+                    tryFillAttributeBuffer(vk, model, vertBufData, attr.name, attr.size, vertShader.vertAttrStride, attr.offset);
+                }
                 auto [addedIt, wasBufAdded] = vk.modelBufData.emplace(modelHandle.value, ModelBuffers{
                         createIndexBufferData<uint16_t>(vk, model),
                         vertBufData
@@ -477,7 +497,7 @@ void renderOpaque(App& app) {
                 vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
                 vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 uint32_t off = drawIdx * vk.dynUboData.block_size();
-                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *shader.layout, 0, *vk.descSet, off);
+                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, *vk.descSet, off);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
                 vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
             }
