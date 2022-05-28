@@ -58,6 +58,7 @@ struct VertexAttr {
 struct Shader {
     vk::ShaderModule module;
     std::unordered_map<uint32_t, VertexAttr> vertAttrs;
+    std::unordered_map<uint32_t, vk::su::BufferData> uniforms;
     size_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
@@ -82,7 +83,6 @@ struct VulkanContext {
     std::optional<vk::su::SwapChainData> swapChainData;
     std::optional<vk::RenderPass> renderPass;
     std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::su::BufferData> sharedUboBuf, dynUboBuf;
     std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::PipelineCache> pipelineCache;
     std::optional<vk::DescriptorPool> descriptorPool;
@@ -90,6 +90,7 @@ struct VulkanContext {
     std::optional<vk::Fence> drawFence;
     std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
     std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
+    std::unordered_map<asset_handle_t, vk::su::TextureData> textures;
     aligned_vector<DynamicUboData> dynUboData;
     SharedUboData sharedUboData;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;

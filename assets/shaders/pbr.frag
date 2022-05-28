@@ -13,7 +13,7 @@ layout (binding = 0) uniform SharedUbo {
     mat4 model;
     mat4 view;
     vec3 camPos;
-} ubo;
+} sharedUbo;
 
 layout (binding = 1) uniform DynamicUbo {
     vec4 lightDir;
@@ -23,7 +23,7 @@ layout (binding = 1) uniform DynamicUbo {
     float scaleIBLAmbient;
     float debugViewInputs;
     float debugViewEquation;
-} uboParams;
+} dynamicUbo;
 
 layout (set = 0, binding = 2) uniform samplerCube samplerIrradiance;
 layout (set = 0, binding = 3) uniform samplerCube prefilteredMap;
@@ -92,9 +92,9 @@ vec3 Uncharted2Tonemap(vec3 color)
 
 vec4 tonemap(vec4 color)
 {
-    vec3 outcol = Uncharted2Tonemap(color.rgb * uboParams.exposure);
+    vec3 outcol = Uncharted2Tonemap(color.rgb * dynamicUbo.exposure);
     outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));
-    return vec4(pow(outcol, vec3(1.0f / uboParams.gamma)), color.a);
+    return vec4(pow(outcol, vec3(1.0f / dynamicUbo.gamma)), color.a);
 }
 
 vec4 SRGBtoLINEAR(vec4 srgbIn)
@@ -137,7 +137,7 @@ vec3 getNormal()
 // See our README.md on Environment Maps [3] for additional discussion.
 vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
-    float lod = (pbrInputs.perceptualRoughness * uboParams.prefilteredCubeMipLevels);
+    float lod = (pbrInputs.perceptualRoughness * dynamicUbo.prefilteredCubeMipLevels);
     // retrieve a scale and bias to F0. See [1], Figure 3
     vec3 brdf = (texture(samplerBRDFLUT, vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
     vec3 diffuseLight = SRGBtoLINEAR(tonemap(texture(samplerIrradiance, n))).rgb;
@@ -149,8 +149,8 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 
     // For presentation, this allows us to disable IBL terms
     // For presentation, this allows us to disable IBL terms
-    diffuse *= uboParams.scaleIBLAmbient;
-    specular *= uboParams.scaleIBLAmbient;
+    diffuse *= dynamicUbo.scaleIBLAmbient;
+    specular *= dynamicUbo.scaleIBLAmbient;
 
     return diffuse + specular;
 }
@@ -297,8 +297,8 @@ void main()
     vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
     vec3 n = (material.normalTextureSet > -1) ? getNormal() : normalize(inNorm);
-    vec3 v = normalize(ubo.camPos - inWorldPos);// Vector from surface point to camera
-    vec3 l = normalize(uboParams.lightDir.xyz);// Vector from surface point to light
+    vec3 v = normalize(sharedUbo.camPos - inWorldPos);// Vector from surface point to camera
+    vec3 l = normalize(dynamicUbo.lightDir.xyz);// Vector from surface point to light
     vec3 h = normalize(l+v);// Half vector between both l and v
     vec3 reflection = -normalize(reflect(v, n));
     reflection.y *= -1.0f;
@@ -356,8 +356,8 @@ void main()
     outColor = vec4(color, baseColor.a);
 
     // Shader inputs debug visualization
-    if (uboParams.debugViewInputs > 0.0) {
-        int index = int(uboParams.debugViewInputs);
+    if (dynamicUbo.debugViewInputs > 0.0) {
+        int index = int(dynamicUbo.debugViewInputs);
         switch (index) {
             case 1:
             outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1) : vec4(1.0f);
@@ -383,8 +383,8 @@ void main()
 
     // PBR equation debug visualization
     // "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-    if (uboParams.debugViewEquation > 0.0) {
-        int index = int(uboParams.debugViewEquation);
+    if (dynamicUbo.debugViewEquation > 0.0) {
+        int index = int(dynamicUbo.debugViewEquation);
         switch (index) {
             case 1:
             outColor.rgb = diffuseContrib;

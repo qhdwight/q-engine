@@ -5,8 +5,8 @@
 
 layout (location = 0) in vec3 inPosition;
 layout (location = 1) in vec3 inNormal;
-layout (location = 2) in vec2 inUV0;
-layout (location = 3) in vec2 inUV1;
+layout (location = 2) in vec2 inTexCoord_0;
+layout (location = 3) in vec2 inTexCoord_1;
 layout (location = 4) in vec4 inJoint0;
 layout (location = 5) in vec4 inWeight0;
 
@@ -28,8 +28,8 @@ layout (binding = 1) uniform DynamicUbo
 
 layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNorm;
-layout (location = 2) out vec2 outUV0;
-layout (location = 3) out vec2 outUV1;
+layout (location = 2) out vec2 outTexCoord_0;
+layout (location = 3) out vec2 outTexCoord_1;
 
 out gl_PerVertex
 {
@@ -40,8 +40,8 @@ void main()
 {
     vec4 locPos = dynamicUbo.model * vec4(inPosition, 1.0);
     outNorm = normalize(transpose(inverse(mat3(dynamicUbo.model))) * inNormal);
-    outUV0 = inUV0;
-    outUV1 = inUV1;
+    outTexCoord_0 = inTexCoord_0;
+    outTexCoord_1 = inTexCoord_1;
     mat4 vpc = sharedUbo.clip * sharedUbo.proj * sharedUbo.view;
     gl_Position =  vpc * locPos;
 }

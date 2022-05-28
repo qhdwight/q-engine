@@ -8,82 +8,13 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 
-#include "math.hpp"
 #include "shaders.hpp"
+#include "shader_math.hpp"
 
 using namespace entt::literals;
 
 #define PositionAttr "POSITION"
 #define NormalAttr "NORMAL"
-
-// Vulkan clip space has inverted y and half z
-constexpr mat4 ClipMat = {
-        vec4{1.0, 0.0, 0.0, 0.0},
-        vec4{0.0, -1.0, 0.0, 0.0},
-        vec4{0.0, 0.0, 0.5, 0.0},
-        vec4{0.0, 0.0, 0.5, 1.0},
-};
-
-/** @brief We do all of our calculations in doubles, but current GPUs work best with float */
-constexpr mat4f toShader(mat4 const& m) {
-    return {
-            std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
-            std::array<float, 4>{static_cast<float>(m[1][0]), static_cast<float>(m[1][1]), static_cast<float>(m[1][2]), static_cast<float>(m[1][3])},
-            std::array<float, 4>{static_cast<float>(m[2][0]), static_cast<float>(m[2][1]), static_cast<float>(m[2][2]), static_cast<float>(m[2][3])},
-            std::array<float, 4>{static_cast<float>(m[3][0]), static_cast<float>(m[3][1]), static_cast<float>(m[3][2]), static_cast<float>(m[3][3])},
-    };
-}
-
-mat4 calcView(Position const& eye, Look const& look) {
-    // Calculations from GLM
-    vec3 center = eye + rotate(fromEuler(look), edyn::vector3_y);
-    vec3 up = rotate(fromEuler(look), edyn::vector3_z);
-
-    vec3 f = normalize(center - eye);
-    vec3 s = normalize(cross(f, up));
-    vec3 u = cross(s, f);
-
-    mat4 view{};
-    view[0][0] = +s.x;
-    view[1][0] = +s.y;
-    view[2][0] = +s.z;
-    view[0][1] = +u.x;
-    view[1][1] = +u.y;
-    view[2][1] = +u.z;
-    view[0][2] = -f.x;
-    view[1][2] = -f.y;
-    view[2][2] = -f.z;
-    view[3][0] = -dot(s, eye);
-    view[3][1] = -dot(u, eye);
-    view[3][2] = +dot(f, eye);
-    view[3][3] = 1.0;
-    return view;
-}
-
-mat4 calcProj(vk::Extent2D const& extent) {
-    // Calculations from GLM
-    double rad = edyn::to_radians(45.0);
-    double h = std::cos(0.5 * rad) / std::sin(0.5 * rad);
-    double w = h * static_cast<double>(extent.height) / static_cast<double>(extent.width);
-    double zNear = 0.1, zFar = 100.0;
-    mat4 proj{};
-    proj[0][0] = w;
-    proj[1][1] = h;
-    proj[2][2] = zFar / (zNear - zFar);
-    proj[2][3] = -1.0;
-    proj[3][2] = -(zFar * zNear) / (zFar - zNear);
-    return proj;
-}
-
-mat4 translate(mat4 m, vec3 v) {
-    m[3] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
-    return m;
-}
-
-mat4 calcModel(Position const& pos) {
-    mat4 model = matrix4x4_identity;
-    return translate(model, pos);
-}
 
 void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
@@ -156,16 +87,14 @@ void createSwapChain(VulkanContext& vk) {
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
     pipeline.shaders.clear();
-    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "flat.vert");
-    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "flat.frag");
+    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "pbr.vert");
+    createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "pbr.frag");
 
     auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.dynUboData.resize(uboAlignment, 16);
-    vk.dynUboBuf.emplace(*vk.physDev, *vk.device, vk.dynUboData.mem_size(), vk::BufferUsageFlagBits::eUniformBuffer);
-    vk.sharedUboBuf.emplace(*vk.physDev, *vk.device, sizeof(vk.sharedUboData), vk::BufferUsageFlagBits::eUniformBuffer);
 
-    int uniform = 0;
-    int dynamicUniform = 0;
+    // TODO: use unordered_map but have to make custom hash function
+    std::map<std::pair<vk::ShaderStageFlags, vk::DescriptorType>, uint32_t> countsMap;
     for (Shader& shader: pipeline.shaders) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
@@ -181,17 +110,25 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
         for (size_t bind = 0; bind < shader.bindCount; ++bind) {
-            std::string_view name(shader.bindingsReflect[bind]->name);
-            if (name.find("dynamic") == std::string::npos) uniform++;
-            else dynamicUniform++;
+            SpvReflectDescriptorBinding* binding = shader.bindingsReflect[bind];
+            auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
+            if (descType == vk::DescriptorType::eUniformBuffer && std::string_view(binding->name).find("dynamic") == std::string::npos) {
+                // nothing in the shader marks a uniform as dynamic, so we have to infer it from the name
+                descType = vk::DescriptorType::eUniformBufferDynamic;
+                binding->descriptor_type = static_cast<SpvReflectDescriptorType>(descType);
+            }
+            countsMap[{static_cast<vk::ShaderStageFlagBits>(shader.reflect.shader_stage), descType}]++;
         }
     }
 
-    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(
-            *vk.device,
-            {{vk::DescriptorType::eUniformBuffer,        uniform,        vk::ShaderStageFlagBits::eVertex},
-             {vk::DescriptorType::eUniformBufferDynamic, dynamicUniform, vk::ShaderStageFlagBits::eVertex}}
-    );
+    std::vector<std::tuple<vk::DescriptorType, uint32_t, vk::ShaderStageFlags>> countsVec;
+    size_t total = 0;
+    for (auto& [pair, count]: countsMap) {
+        total += count;
+        countsVec.emplace_back(pair.second, count, pair.first);
+    }
+    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(*vk.device, countsVec);
+
     vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
 
@@ -200,25 +137,61 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
     vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
 
-    std::vector<vk::DescriptorBufferInfo> descBufInfos; // Extends lifetime until we update descriptor sets
-    std::vector<vk::WriteDescriptorSet> descSets;
-    descBufInfos.reserve(uniform + dynamicUniform);
-    descSets.reserve(uniform + dynamicUniform);
-    for (Shader const& shader: pipeline.shaders) {
-        for (size_t i = 0; i < shader.bindCount; ++i) {
-            auto const binding = shader.bindingsReflect[i];
-            std::string_view name(binding->name);
-            if (name.find("dynamic") == std::string::npos) {
-                descBufInfos.emplace_back(vk.sharedUboBuf->buffer, 0, VK_WHOLE_SIZE);
-                descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
-            } else {
-                descBufInfos.emplace_back(vk.dynUboBuf->buffer, 0, binding->block.size);
-                descSets.emplace_back(*vk.descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
+    std::vector<vk::DescriptorBufferInfo> descBufInfos;
+    std::vector<vk::WriteDescriptorSet> writeDescSets;
+    std::vector<vk::CopyDescriptorSet> copyDescSets;
+    std::vector<vk::DescriptorImageInfo> descImgInfos;
+    descBufInfos.reserve(total);
+    writeDescSets.reserve(total);
+    copyDescSets.reserve(total);
+    descImgInfos.reserve(total);
+    for (Shader& shader: pipeline.shaders) {
+        for (uint32_t bind = 0; bind < shader.bindCount; ++bind) {
+            SpvReflectDescriptorBinding const* binding = shader.bindingsReflect[bind];
+            auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
+            switch (descType) {
+                case vk::DescriptorType::eUniformBufferDynamic: {
+                    auto [it, wasAdded] = shader.uniforms.emplace(bind, vk::su::BufferData{*vk.physDev, *vk.device, vk.dynUboData.mem_size(),
+                                                                                           vk::BufferUsageFlagBits::eUniformBuffer});
+                    assert(wasAdded);
+                    descBufInfos.emplace_back(it->second.buffer, 0, binding->block.size);
+                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0, 1,
+                                               vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
+                    break;
+                }
+                case vk::DescriptorType::eUniformBuffer: {
+                    auto [it, wasAdded] = shader.uniforms.emplace(bind, vk::su::BufferData{*vk.physDev, *vk.device, sizeof(vk.sharedUboData),
+                                                                                           vk::BufferUsageFlagBits::eUniformBuffer});
+                    assert(wasAdded);
+                    descBufInfos.emplace_back(it->second.buffer, 0, VK_WHOLE_SIZE);
+                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0, 1,
+                                               vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+                    break;
+                }
+                case vk::DescriptorType::eCombinedImageSampler: {
+                    vk::su::TextureData texData{*vk.physDev, *vk.device};
+                    // Upload image to the GPU
+                    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+                    texData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
+                    vk.cmdBuf->end();
+                    vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+                    vk.device->waitIdle();
+
+                    auto [it, wasAdded] = vk.textures.emplace(bind, std::move(texData));
+                    assert(wasAdded);
+                    descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0,
+                                               vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
+                    break;
+                }
+                default: {
+                    throw std::runtime_error("Unsupported uniform descriptor type: " + vk::to_string(descType));
+                }
             }
         }
     }
 
-    vk.device->updateDescriptorSets(descSets, nullptr);
+    vk.device->updateDescriptorSets(writeDescSets, copyDescSets);
 
     size_t vertexAttrOffset = 0;
     Shader& vertexShader = pipeline.shaders.front();
@@ -230,6 +203,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         std::string name = input->name;
         if (name.find("in") == std::string::npos)
             throw std::runtime_error("Input variables must be prefixed with \"in\"");
+
         name = name.substr(2);
         for (auto& c: name) c = static_cast<char>(std::toupper(c));
         vk::Format format{};
@@ -244,8 +218,8 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
         vertexAttrPairs.emplace_back(format, vertexAttrOffset);
         auto [it, wasAdded] = vertexShader.vertAttrs.emplace(layout, VertexAttr{name, format, size, vertexAttrOffset});
-        vertexAttrOffset += size;
         assert(wasAdded);
+        vertexAttrOffset += size;
     }
     vertexShader.vertAttrStride = vertexAttrOffset;
 
@@ -436,6 +410,7 @@ void renderOpaque(App& app) {
     vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
     for (auto& [handle, pipeline]: vk.modelPipelines) {
+        Shader const& vertShader = pipeline.shaders[0];
         vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.value);
         auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
         auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
@@ -447,7 +422,7 @@ void renderOpaque(App& app) {
                     .proj = toShader(calcProj(vk.surfData->extent)),
                     .clip = toShader(ClipMat)
             };
-            vk::su::copyToDevice(*vk.device, vk.sharedUboBuf->deviceMemory, sharedUbo);
+            vk::su::copyToDevice(*vk.device, vertShader.uniforms.find(0)->second.deviceMemory, sharedUbo);
         }
 
         size_t drawIdx;
@@ -455,13 +430,13 @@ void renderOpaque(App& app) {
         // We store data per model in a dynamic UBO to save memory
         // This way we only have one upload
         drawIdx = 0;
-        for (auto [ent, pos, orien, hModel]: modelView.each()) {
+        for (auto [ent, pos, orien, modelHandle]: modelView.each()) {
             vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
         }
 
-        void* devUboPtr = vk.device->mapMemory(vk.dynUboBuf->deviceMemory, 0, vk.dynUboData.mem_size());
+        void* devUboPtr = vk.device->mapMemory(vertShader.uniforms.find(1)->second.deviceMemory, 0, vk.dynUboData.mem_size());
         memcpy(devUboPtr, vk.dynUboData.data(), vk.dynUboData.mem_size());
-        vk.device->unmapMemory(vk.dynUboBuf->deviceMemory);
+        vk.device->unmapMemory(vertShader.uniforms.find(1)->second.deviceMemory);
 
         // TODO: is this same order?
         drawIdx = 0;
@@ -476,7 +451,6 @@ void renderOpaque(App& app) {
                 model = assetIt->second;
                 assert(model);
 
-                Shader const& vertShader = pipeline.shaders.front();
                 size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count;
                 vk::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
                                                vk::BufferUsageFlagBits::eVertexBuffer};

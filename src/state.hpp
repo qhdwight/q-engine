@@ -36,6 +36,9 @@ struct ModelHandle : Handle {
 struct ShaderHandle : Handle {
 };
 
+struct TexHandle : Handle {
+};
+
 struct Look : vec3 {
 };
 
