@@ -551,7 +551,7 @@ namespace vk {
 
         void setImageLayout(
                 vk::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, vk::ImageLayout oldImageLayout,
-                vk::ImageLayout newImageLayout) {
+                vk::ImageLayout newImageLayout, uint32_t levelCount, uint32_t layerCount) {
             vk::AccessFlags sourceAccessMask;
             switch (oldImageLayout) {
                 case vk::ImageLayout::eTransferDstOptimal:
@@ -646,7 +646,7 @@ namespace vk {
                 aspectMask = vk::ImageAspectFlagBits::eColor;
             }
 
-            vk::ImageSubresourceRange imageSubresourceRange(aspectMask, 0, 1, 0, 1);
+            vk::ImageSubresourceRange imageSubresourceRange(aspectMask, 0, levelCount, 0, layerCount);
             vk::ImageMemoryBarrier imageMemoryBarrier(sourceAccessMask,
                                                       destinationAccessMask,
                                                       oldImageLayout,

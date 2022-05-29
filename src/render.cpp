@@ -229,7 +229,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                         case SpvDimCube: {
                             CubeMapData cubeData{*vk.physDev, *vk.device};
                             vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            cubeData.setImage(*vk.device, *vk.cmdBuf, CheckerboardImageGenerator());
+                            cubeData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
                             vk.cmdBuf->end();
                             vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
                             vk.device->waitIdle();
