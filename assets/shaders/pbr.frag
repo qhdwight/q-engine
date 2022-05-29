@@ -23,7 +23,7 @@ layout (set = 0, binding = 1) uniform Scene {
     float scaleIBLAmbient;
     float debugViewInputs;
     float debugViewEquation;
-} model;
+} scene;
 
 layout (set = 2, binding = 1) uniform Material {
     vec4 baseColorFactor;
@@ -62,7 +62,7 @@ struct PBRInfo
     float NdotH;// cos angle between normal and half vector
     float LdotH;// cos angle between light direction and half vector
     float VdotH;// cos angle between view direction and half vector
-    float perceptualRoughness;// roughness value, as authored by the model creator (input to shader)
+    float perceptualRoughness;// roughness value, as authored by the scene creator (input to shader)
     float metalness;// metallic value at the surface
     vec3 reflectance0;// full reflectance color (normal incidence angle)
     vec3 reflectance90;// reflectance color at grazing angle
@@ -93,9 +93,9 @@ vec3 Uncharted2Tonemap(vec3 color)
 
 vec4 tonemap(vec4 color)
 {
-    vec3 outcol = Uncharted2Tonemap(color.rgb * model.exposure);
+    vec3 outcol = Uncharted2Tonemap(color.rgb * scene.exposure);
     outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));
-    return vec4(pow(outcol, vec3(1.0f / model.gamma)), color.a);
+    return vec4(pow(outcol, vec3(1.0f / scene.gamma)), color.a);
 }
 
 vec4 SRGBtoLINEAR(vec4 srgbIn)
@@ -138,7 +138,7 @@ vec3 getNormal()
 // See our README.md on Environment Maps [3] for additional discussion.
 vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
-    float lod = (pbrInputs.perceptualRoughness * model.prefilteredCubeMipLevels);
+    float lod = (pbrInputs.perceptualRoughness * scene.prefilteredCubeMipLevels);
     // retrieve a scale and bias to F0. See [1], Figure 3
     vec3 brdf = (texture(samplerBRDFLUT, vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
     vec3 diffuseLight = SRGBtoLINEAR(tonemap(texture(samplerIrradiance, n))).rgb;
@@ -150,8 +150,8 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 
     // For presentation, this allows us to disable IBL terms
     // For presentation, this allows us to disable IBL terms
-    diffuse *= model.scaleIBLAmbient;
-    specular *= model.scaleIBLAmbient;
+    diffuse *= scene.scaleIBLAmbient;
+    specular *= scene.scaleIBLAmbient;
 
     return diffuse + specular;
 }
@@ -164,7 +164,7 @@ vec3 diffuse(PBRInfo pbrInputs)
     return pbrInputs.diffuseColor / M_PI;
 }
 
-// The following equation models the Fresnel reflectance term of the spec equation (aka F())
+// The following equation scenes the Fresnel reflectance term of the spec equation (aka F())
 // Implementation of fresnel from [4], Equation 15
 vec3 specularReflection(PBRInfo pbrInputs)
 {
@@ -186,7 +186,7 @@ float geometricOcclusion(PBRInfo pbrInputs)
     return attenuationL * attenuationV;
 }
 
-// The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
+// The following equation(s) scene the distribution of microfacet normals across the area being drawn (aka D())
 // Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
 // Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
 float microfacetDistribution(PBRInfo pbrInputs)
@@ -299,7 +299,7 @@ void main()
 
     vec3 n = (material.normalTextureSet > -1) ? getNormal() : normalize(inNorm);
     vec3 v = normalize(camera.pos - inWorldPos);// Vector from surface point to camera
-    vec3 l = normalize(model.lightDir.xyz);// Vector from surface point to light
+    vec3 l = normalize(scene.lightDir.xyz);// Vector from surface point to light
     vec3 h = normalize(l+v);// Half vector between both l and v
     vec3 reflection = -normalize(reflect(v, n));
     reflection.y *= -1.0f;
@@ -325,7 +325,7 @@ void main()
     specularColor
     );
 
-    // Calculate the shading terms for the microfacet specular shading model
+    // Calculate the shading terms for the microfacet specular shading scene
     vec3 F = specularReflection(pbrInputs);
     float G = geometricOcclusion(pbrInputs);
     float D = microfacetDistribution(pbrInputs);
@@ -357,8 +357,8 @@ void main()
     outColor = vec4(color, baseColor.a);
 
     // Shader inputs debug visualization
-    if (model.debugViewInputs > 0.0) {
-        int index = int(model.debugViewInputs);
+    if (scene.debugViewInputs > 0.0) {
+        int index = int(scene.debugViewInputs);
         switch (index) {
             case 1:
             outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1) : vec4(1.0f);
@@ -384,8 +384,8 @@ void main()
 
     // PBR equation debug visualization
     // "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-    if (model.debugViewEquation > 0.0) {
-        int index = int(model.debugViewEquation);
+    if (scene.debugViewEquation > 0.0) {
+        int index = int(scene.debugViewEquation);
         switch (index) {
             case 1:
             outColor.rgb = diffuseContrib;

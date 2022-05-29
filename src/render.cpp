@@ -103,9 +103,9 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
     vk.materialUpload.resize(uboAlignment, 1);
     vk.materialUpload[0] = MaterialUpload{
-            .baseColorFactor = {1.0f, 0.0f, 0.0f, 0.0f},
+            .baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f},
             .emissiveFactor = {0.0f, 0.0f, 0.0f, 0.0f},
-            .diffuseFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+            .diffuseFactor = {1.0f, 1.0f, 1.0f, 1.0f},
             .specularFactor = {0.0f, 0.0f, 0.0f, 0.0f},
             .workflow = static_cast<float>(PBRWorkflows::MetallicRoughness),
             .baseColorTextureSet = 0,
@@ -203,7 +203,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                     break;
                 }
                 case vk::DescriptorType::eUniformBuffer: {
-                    vk::DeviceSize size = name == "model" ? sizeof(vk.modelUpload) : sizeof(vk.materialUpload);
+                    vk::DeviceSize size = name == "camera" ? sizeof(vk.cameraUpload) : sizeof(vk.sceneUpload);
                     auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
                                                                                         vk::BufferUsageFlagBits::eUniformBuffer});
                     descBufInfos.emplace_back(it->second.buffer, 0, VK_WHOLE_SIZE);
@@ -230,7 +230,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                         case SpvDimCube: {
                             CubeMapData cubeData{*vk.physDev, *vk.device};
                             vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            cubeData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
+                            cubeData.setImage(*vk.device, *vk.cmdBuf, SkyboxImageGenerator());
                             vk.cmdBuf->end();
                             vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
                             vk.device->waitIdle();
@@ -483,7 +483,8 @@ void renderOpaque(App& app) {
             CameraUpload camera{
                     .view = toShader(calcView(pos, look)),
                     .proj = toShader(calcProj(vk.surfData->extent)),
-                    .clip = toShader(ClipMat)
+                    .clip = toShader(ClipMat),
+                    .camPos = toShader(pos)
             };
             vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 0})->second.deviceMemory, camera);
         }
@@ -549,12 +550,10 @@ void renderOpaque(App& app) {
             if (rawModelBuffers) {
                 vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
                 vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
-                std::array<uint32_t, 3> dynamicOffsets{
-                        drawIdx * vk.modelUpload.block_size(),
+                std::array<uint32_t, 2> dynamicOffsets{
                         drawIdx * vk.modelUpload.block_size(),
                         0 * vk.materialUpload.block_size()
                 };
-                // TODO bind all at once
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
                 vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);

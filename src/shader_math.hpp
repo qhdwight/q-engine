@@ -25,6 +25,10 @@ constexpr mat4f toShader(mat4 const& m) {
     };
 }
 
+constexpr vec3f toShader(vec3 const& v) {
+    return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)};
+}
+
 mat4 calcView(Position const& eye, Look const& look) {
     // Calculations from GLM
     vec3 center = eye + rotate(fromEuler(look), edyn::vector3_y);

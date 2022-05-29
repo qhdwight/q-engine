@@ -60,7 +60,7 @@ struct CubeMapData {
             vk::ImageUsageFlags usageFlags = {},
             vk::FormatFeatureFlags formatFeatureFlags = {},
             bool anisotropyEnable = false
-    ) : format(vk::Format::eR16G16B16A16Sfloat), dim(dim) {
+    ) : format(vk::Format::eR8G8B8A8Unorm), dim(dim) {
         vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(format);
 
         formatFeatureFlags |= vk::FormatFeatureFlagBits::eSampledImage;
@@ -147,27 +147,20 @@ struct CubeMapData {
     vk::Sampler sampler;
 };
 
-//struct CheckerboardImageGenerator {
-//private:
-//    std::array<uint8_t, 3> const& m_rgb0;
-//    std::array<uint8_t, 3> const& m_rgb1;
-//
-//public:
-//    explicit CheckerboardImageGenerator(std::array<uint8_t, 3> const& rgb0 = {{0, 0, 0}}, std::array<uint8_t, 3> const& rgb1 = {{255, 255, 255}})
-//            : m_rgb0(rgb0), m_rgb1(rgb1) {
-//    }
-//
-//    void operator()(void* data, vk::Extent3D& extent) const {
-//        auto* pImageMemory = static_cast<uint8_t*>( data );
+struct SkyboxImageGenerator {
+    void operator()(void* data, vk::Extent2D& extent) const {
+        auto* pImageMemory = static_cast<uint8_t*>(data);
+        memset(data, 255, extent.width * extent.height * 4 * 6);
 //        for (uint32_t row = 0; row < extent.height; row++) {
 //            for (uint32_t col = 0; col < extent.width; col++) {
-//                std::array<uint8_t, 3> const& rgb = (((row & 0x10) == 0) ^ ((col & 0x10) == 0)) ? m_rgb1 : m_rgb0;
-//                pImageMemory[0] = rgb[0];
-//                pImageMemory[1] = rgb[1];
-//                pImageMemory[2] = rgb[2];
-//                pImageMemory[3] = 255;
-//                pImageMemory += 4;
+//                for (uint32_t layer = 0; layer < 6; ++layer) {
+//                    pImageMemory[0] = 255;
+//                    pImageMemory[1] = 255;
+//                    pImageMemory[2] = 255;
+//                    pImageMemory[3] = 255;
+//                    pImageMemory += 8;
+//                }
 //            }
 //        }
-//    }
-//};
+    }
+};
