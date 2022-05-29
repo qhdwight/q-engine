@@ -10,21 +10,21 @@ layout (location = 3) in vec2 inTexCoord_1;
 layout (location = 4) in vec4 inJoint0;
 layout (location = 5) in vec4 inWeight0;
 
-layout (binding = 0) uniform SharedUbo
+layout (set = 0, binding = 0) uniform Camera
 {
     mat4 view;
     mat4 proj;
     mat4 clip;
-    vec3 camPos;
-} sharedUbo;
+    vec3 pos;
+} camera;
 
-layout (binding = 1) uniform DynamicUbo
+layout (set = 2, binding = 0) uniform Model
 {
-    mat4 model;
+    mat4 transform;
 //    mat4 matrix;
 //    mat4 jointMatrix[MAX_NUM_JOINTS];
 //    float jointCount;
-} dynamicUbo;
+} model;
 
 layout (location = 0) out vec3 outWorldPos;
 layout (location = 1) out vec3 outNorm;
@@ -38,10 +38,10 @@ out gl_PerVertex
 
 void main()
 {
-    vec4 locPos = dynamicUbo.model * vec4(inPosition, 1.0);
-    outNorm = normalize(transpose(inverse(mat3(dynamicUbo.model))) * inNormal);
+    vec4 locPos = model.transform * vec4(inPosition, 1.0);
+    outNorm = normalize(transpose(inverse(mat3(model.transform))) * inNormal);
     outTexCoord_0 = inTexCoord_0;
     outTexCoord_1 = inTexCoord_1;
-    mat4 vpc = sharedUbo.clip * sharedUbo.proj * sharedUbo.view;
+    mat4 vpc = camera.clip * camera.proj * camera.view;
     gl_Position =  vpc * locPos;
 }

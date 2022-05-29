@@ -3,7 +3,6 @@
 #include <limits>
 #include <concepts>
 
-#include <edyn/math/math.hpp>
 #include <edyn/math/vector3.hpp>
 #include <edyn/math/quaternion.hpp>
 

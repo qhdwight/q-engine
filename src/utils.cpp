@@ -481,7 +481,7 @@ namespace vk {
 #elif defined( VK_USE_PLATFORM_WAYLAND_KHR )
             extensions.push_back( VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_WIN32_KHR )
-            extensions.push_back( VK_KHR_WIN32_SURFACE_EXTENSION_NAME );
+            extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined( VK_USE_PLATFORM_XCB_KHR )
             extensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 #elif defined( VK_USE_PLATFORM_XLIB_KHR )
@@ -936,9 +936,8 @@ namespace vk {
             vk::MemoryPropertyFlags requirements;
             if (needsStaging) {
                 assert((formatProperties.optimalTilingFeatures & formatFeatureFlags) == formatFeatureFlags);
-                stagingBufferData =
-                        std::unique_ptr<BufferData>(
-                                new BufferData(physicalDevice, device, extent.width * extent.height * 4, vk::BufferUsageFlagBits::eTransferSrc));
+                stagingBufferData = std::unique_ptr<BufferData>(
+                        new BufferData(physicalDevice, device, extent.width * extent.height * 4, vk::BufferUsageFlagBits::eTransferSrc));
                 imageTiling = vk::ImageTiling::eOptimal;
                 usageFlags |= vk::ImageUsageFlagBits::eTransferDst;
                 initialLayout = vk::ImageLayout::eUndefined;

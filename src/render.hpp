@@ -2,6 +2,7 @@
 
 #include <array>
 #include <optional>
+#include <unordered_map>
 
 #include <spirv_reflect.h>
 #include <vulkan/vulkan.hpp>
@@ -11,8 +12,15 @@
 #include "utils.hpp"
 #include "state.hpp"
 #include "plugin.hpp"
+#include "cubemap.hpp"
 #include "matrix4x4.hpp"
 #include "aligned_vector.hpp"
+
+const std::vector<std::string_view> DynamicName{"model", "material"};
+
+using vec2f = std::array<float, 2>;
+using vec3f = std::array<float, 3>;
+using vec4f = std::array<float, 4>;
 
 class VulkanRenderPlugin : Plugin {
 public:
@@ -31,17 +39,41 @@ struct mat4f {
     std::array<std::array<float, 4>, 4> col;
 };
 
-struct SharedUboData {
+struct CameraUpload {
     mat4f view, proj, clip;
+    vec3f camPos;
 };
 
-struct DynamicUboData {
-    mat4f model;
+struct ModelUpload {
+    mat4f matrix;
 };
 
-using vec2f = std::array<float, 2>;
-using vec3f = std::array<float, 3>;
-using vec4f = std::array<float, 4>;
+struct SceneUpload {
+    vec4f lightDir;
+    float exposure;
+    float gamma;
+    float prefilteredCubeMipLevels;
+    float scaleIBLAmbient;
+    float debugViewInputs;
+    float debugViewEquation;
+};
+
+struct MaterialUpload {
+    vec4f baseColorFactor;
+    vec4f emissiveFactor;
+    vec4f diffuseFactor;
+    vec4f specularFactor;
+    float workflow;
+    int baseColorTextureSet;
+    int physicalDescriptorTextureSet;
+    int normalTextureSet;
+    int occlusionTextureSet;
+    int emissiveTextureSet;
+    float metallicFactor;
+    float roughnessFactor;
+    float alphaMask;
+    float alphaMaskCutoff;
+};
 
 struct ModelBuffers {
     vk::su::BufferData indexBufData;
@@ -58,7 +90,6 @@ struct VertexAttr {
 struct Shader {
     vk::ShaderModule module;
     std::unordered_map<uint32_t, VertexAttr> vertAttrs;
-    std::unordered_map<uint32_t, vk::su::BufferData> uniforms;
     size_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
@@ -71,6 +102,8 @@ struct Pipeline {
     std::vector<Shader> shaders;
     std::optional<vk::PipelineLayout> layout;
     std::optional<vk::Pipeline> value;
+    std::vector<vk::DescriptorSet> descSets;
+    std::map<std::pair<uint32_t, uint32_t>, vk::su::BufferData> uniforms;
 };
 
 struct VulkanContext {
@@ -83,7 +116,6 @@ struct VulkanContext {
     std::optional<vk::su::SwapChainData> swapChainData;
     std::optional<vk::RenderPass> renderPass;
     std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::DescriptorSet> descSet;
     std::optional<vk::PipelineCache> pipelineCache;
     std::optional<vk::DescriptorPool> descriptorPool;
     std::optional<vk::Semaphore> imgAcqSem;
@@ -91,8 +123,11 @@ struct VulkanContext {
     std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
     std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
     std::unordered_map<asset_handle_t, vk::su::TextureData> textures;
-    aligned_vector<DynamicUboData> dynUboData;
-    SharedUboData sharedUboData;
+    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
+    aligned_vector<ModelUpload> modelUpload;
+    aligned_vector<MaterialUpload> materialUpload;
+    CameraUpload cameraUpload;
+    SceneUpload sceneUpload;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;
     ImGui_ImplVulkanH_Window imGuiWindow;
 };

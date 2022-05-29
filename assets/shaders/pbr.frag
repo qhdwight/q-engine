@@ -5,17 +5,17 @@
 
 layout (location = 0) in vec3 inWorldPos;
 layout (location = 1) in vec3 inNorm;
-layout (location = 2) in vec2 inUV0;
-layout (location = 3) in vec2 inUV1;
+layout (location = 2) in vec2 inTexCoord_0;
+layout (location = 3) in vec2 inTexCoord_1;
 
-layout (binding = 0) uniform SharedUbo {
+layout (set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 model;
     mat4 view;
-    vec3 camPos;
-} sharedUbo;
+    vec3 pos;
+} camera;
 
-layout (binding = 1) uniform DynamicUbo {
+layout (set = 0, binding = 1) uniform Scene {
     vec4 lightDir;
     float exposure;
     float gamma;
@@ -23,19 +23,9 @@ layout (binding = 1) uniform DynamicUbo {
     float scaleIBLAmbient;
     float debugViewInputs;
     float debugViewEquation;
-} dynamicUbo;
+} model;
 
-layout (set = 0, binding = 2) uniform samplerCube samplerIrradiance;
-layout (set = 0, binding = 3) uniform samplerCube prefilteredMap;
-layout (set = 0, binding = 4) uniform sampler2D samplerBRDFLUT;
-
-layout (set = 1, binding = 0) uniform sampler2D colorMap;
-layout (set = 1, binding = 1) uniform sampler2D physicalDescriptorMap;
-layout (set = 1, binding = 2) uniform sampler2D normalMap;
-layout (set = 1, binding = 3) uniform sampler2D aoMap;
-layout (set = 1, binding = 4) uniform sampler2D emissiveMap;
-
-layout (push_constant) uniform Material {
+layout (set = 2, binding = 1) uniform Material {
     vec4 baseColorFactor;
     vec4 emissiveFactor;
     vec4 diffuseFactor;
@@ -51,6 +41,17 @@ layout (push_constant) uniform Material {
     float alphaMask;
     float alphaMaskCutoff;
 } material;
+
+layout (set = 0, binding = 2) uniform samplerCube samplerIrradiance;
+layout (set = 0, binding = 3) uniform samplerCube prefilteredMap;
+layout (set = 0, binding = 4) uniform sampler2D samplerBRDFLUT;
+
+// Material bindings
+layout (set = 1, binding = 0) uniform sampler2D colorMap;
+layout (set = 1, binding = 1) uniform sampler2D physicalDescriptorMap;
+layout (set = 1, binding = 2) uniform sampler2D normalMap;
+layout (set = 1, binding = 3) uniform sampler2D aoMap;
+layout (set = 1, binding = 4) uniform sampler2D emissiveMap;
 
 layout (location = 0) out vec4 outColor;
 
@@ -92,9 +93,9 @@ vec3 Uncharted2Tonemap(vec3 color)
 
 vec4 tonemap(vec4 color)
 {
-    vec3 outcol = Uncharted2Tonemap(color.rgb * dynamicUbo.exposure);
+    vec3 outcol = Uncharted2Tonemap(color.rgb * model.exposure);
     outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));
-    return vec4(pow(outcol, vec3(1.0f / dynamicUbo.gamma)), color.a);
+    return vec4(pow(outcol, vec3(1.0f / model.gamma)), color.a);
 }
 
 vec4 SRGBtoLINEAR(vec4 srgbIn)
@@ -107,7 +108,7 @@ vec4 SRGBtoLINEAR(vec4 srgbIn)
     vec3 linOut = mix(srgbIn.xyz/vec3(12.92), pow((srgbIn.xyz+vec3(0.055))/vec3(1.055), vec3(2.4)), bLess);
     #endif//SRGB_FAST_APPROXIMATION
     return vec4(linOut, srgbIn.w);;
-    #else//MANUAL_SRGB
+#else//MANUAL_SRGB
     return srgbIn;
     #endif//MANUAL_SRGB
 }
@@ -117,12 +118,12 @@ vec4 SRGBtoLINEAR(vec4 srgbIn)
 vec3 getNormal()
 {
     // Perturb normal, see http://www.thetenthplanet.de/archives/1180
-    vec3 tangentNormal = texture(normalMap, material.normalTextureSet == 0 ? inUV0 : inUV1).xyz * 2.0 - 1.0;
+    vec3 tangentNormal = texture(normalMap, material.normalTextureSet == 0 ? inTexCoord_0 : inTexCoord_1).xyz * 2.0 - 1.0;
 
     vec3 q1 = dFdx(inWorldPos);
     vec3 q2 = dFdy(inWorldPos);
-    vec2 st1 = dFdx(inUV0);
-    vec2 st2 = dFdy(inUV0);
+    vec2 st1 = dFdx(inTexCoord_0);
+    vec2 st2 = dFdy(inTexCoord_0);
 
     vec3 N = normalize(inNorm);
     vec3 T = normalize(q1 * st2.t - q2 * st1.t);
@@ -137,7 +138,7 @@ vec3 getNormal()
 // See our README.md on Environment Maps [3] for additional discussion.
 vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
-    float lod = (pbrInputs.perceptualRoughness * dynamicUbo.prefilteredCubeMipLevels);
+    float lod = (pbrInputs.perceptualRoughness * model.prefilteredCubeMipLevels);
     // retrieve a scale and bias to F0. See [1], Figure 3
     vec3 brdf = (texture(samplerBRDFLUT, vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
     vec3 diffuseLight = SRGBtoLINEAR(tonemap(texture(samplerIrradiance, n))).rgb;
@@ -149,8 +150,8 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 
     // For presentation, this allows us to disable IBL terms
     // For presentation, this allows us to disable IBL terms
-    diffuse *= dynamicUbo.scaleIBLAmbient;
-    specular *= dynamicUbo.scaleIBLAmbient;
+    diffuse *= model.scaleIBLAmbient;
+    specular *= model.scaleIBLAmbient;
 
     return diffuse + specular;
 }
@@ -220,7 +221,7 @@ void main()
 
     if (material.alphaMask == 1.0f) {
         if (material.baseColorTextureSet > -1) {
-            baseColor = SRGBtoLINEAR(texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
+            baseColor = SRGBtoLINEAR(texture(colorMap, material.baseColorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1)) * material.baseColorFactor;
         } else {
             baseColor = material.baseColorFactor;
         }
@@ -238,7 +239,7 @@ void main()
         if (material.physicalDescriptorTextureSet > -1) {
             // Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
             // This layout intentionally reserves the 'r' channel for (optional) occlusion map data
-            vec4 mrSample = texture(physicalDescriptorMap, material.physicalDescriptorTextureSet == 0 ? inUV0 : inUV1);
+            vec4 mrSample = texture(physicalDescriptorMap, material.physicalDescriptorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1);
             perceptualRoughness = mrSample.g * perceptualRoughness;
             metallic = mrSample.b * metallic;
         } else {
@@ -250,7 +251,7 @@ void main()
 
         // The albedo may be defined from a base texture or a flat color
         if (material.baseColorTextureSet > -1) {
-            baseColor = SRGBtoLINEAR(texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1)) * material.baseColorFactor;
+            baseColor = SRGBtoLINEAR(texture(colorMap, material.baseColorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1)) * material.baseColorFactor;
         } else {
             baseColor = material.baseColorFactor;
         }
@@ -259,15 +260,15 @@ void main()
     if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSINESS) {
         // Values from specular glossiness workflow are converted to metallic roughness
         if (material.physicalDescriptorTextureSet > -1) {
-            perceptualRoughness = 1.0 - texture(physicalDescriptorMap, material.physicalDescriptorTextureSet == 0 ? inUV0 : inUV1).a;
+            perceptualRoughness = 1.0 - texture(physicalDescriptorMap, material.physicalDescriptorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1).a;
         } else {
             perceptualRoughness = 0.0;
         }
 
         const float epsilon = 1e-6;
 
-        vec4 diffuse = SRGBtoLINEAR(texture(colorMap, inUV0));
-        vec3 specular = SRGBtoLINEAR(texture(physicalDescriptorMap, inUV0)).rgb;
+        vec4 diffuse = SRGBtoLINEAR(texture(colorMap, inTexCoord_0));
+        vec3 specular = SRGBtoLINEAR(texture(physicalDescriptorMap, inTexCoord_0)).rgb;
 
         float maxSpecular = max(max(specular.r, specular.g), specular.b);
 
@@ -297,8 +298,8 @@ void main()
     vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
     vec3 n = (material.normalTextureSet > -1) ? getNormal() : normalize(inNorm);
-    vec3 v = normalize(sharedUbo.camPos - inWorldPos);// Vector from surface point to camera
-    vec3 l = normalize(dynamicUbo.lightDir.xyz);// Vector from surface point to light
+    vec3 v = normalize(camera.pos - inWorldPos);// Vector from surface point to camera
+    vec3 l = normalize(model.lightDir.xyz);// Vector from surface point to light
     vec3 h = normalize(l+v);// Half vector between both l and v
     vec3 reflection = -normalize(reflect(v, n));
     reflection.y *= -1.0f;
@@ -343,39 +344,39 @@ void main()
     const float u_OcclusionStrength = 1.0f;
     // Apply optional PBR terms for additional (optional) shading
     if (material.occlusionTextureSet > -1) {
-        float ao = texture(aoMap, (material.occlusionTextureSet == 0 ? inUV0 : inUV1)).r;
+        float ao = texture(aoMap, (material.occlusionTextureSet == 0 ? inTexCoord_0 : inTexCoord_1)).r;
         color = mix(color, color * ao, u_OcclusionStrength);
     }
 
     const float u_EmissiveFactor = 1.0f;
     if (material.emissiveTextureSet > -1) {
-        vec3 emissive = SRGBtoLINEAR(texture(emissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1)).rgb * u_EmissiveFactor;
+        vec3 emissive = SRGBtoLINEAR(texture(emissiveMap, material.emissiveTextureSet == 0 ? inTexCoord_0 : inTexCoord_1)).rgb * u_EmissiveFactor;
         color += emissive;
     }
 
     outColor = vec4(color, baseColor.a);
 
     // Shader inputs debug visualization
-    if (dynamicUbo.debugViewInputs > 0.0) {
-        int index = int(dynamicUbo.debugViewInputs);
+    if (model.debugViewInputs > 0.0) {
+        int index = int(model.debugViewInputs);
         switch (index) {
             case 1:
-            outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1) : vec4(1.0f);
+            outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inTexCoord_0 : inTexCoord_1) : vec4(1.0f);
             break;
             case 2:
-            outColor.rgb = (material.normalTextureSet > -1) ? texture(normalMap, material.normalTextureSet == 0 ? inUV0 : inUV1).rgb : normalize(inNorm);
+            outColor.rgb = (material.normalTextureSet > -1) ? texture(normalMap, material.normalTextureSet == 0 ? inTexCoord_0 : inTexCoord_1).rgb : normalize(inNorm);
             break;
             case 3:
-            outColor.rgb = (material.occlusionTextureSet > -1) ? texture(aoMap, material.occlusionTextureSet == 0 ? inUV0 : inUV1).rrr : vec3(0.0f);
+            outColor.rgb = (material.occlusionTextureSet > -1) ? texture(aoMap, material.occlusionTextureSet == 0 ? inTexCoord_0 : inTexCoord_1).rrr : vec3(0.0f);
             break;
             case 4:
-            outColor.rgb = (material.emissiveTextureSet > -1) ? texture(emissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1).rgb : vec3(0.0f);
+            outColor.rgb = (material.emissiveTextureSet > -1) ? texture(emissiveMap, material.emissiveTextureSet == 0 ? inTexCoord_0 : inTexCoord_1).rgb : vec3(0.0f);
             break;
             case 5:
-            outColor.rgb = texture(physicalDescriptorMap, inUV0).bbb;
+            outColor.rgb = texture(physicalDescriptorMap, inTexCoord_0).bbb;
             break;
             case 6:
-            outColor.rgb = texture(physicalDescriptorMap, inUV0).ggg;
+            outColor.rgb = texture(physicalDescriptorMap, inTexCoord_0).ggg;
             break;
         }
         outColor = SRGBtoLINEAR(outColor);
@@ -383,8 +384,8 @@ void main()
 
     // PBR equation debug visualization
     // "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-    if (dynamicUbo.debugViewEquation > 0.0) {
-        int index = int(dynamicUbo.debugViewEquation);
+    if (model.debugViewEquation > 0.0) {
+        int index = int(model.debugViewEquation);
         switch (index) {
             case 1:
             outColor.rgb = diffuseContrib;

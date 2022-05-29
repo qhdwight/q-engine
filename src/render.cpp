@@ -14,7 +14,6 @@
 using namespace entt::literals;
 
 #define PositionAttr "POSITION"
-#define NormalAttr "NORMAL"
 
 void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
@@ -84,6 +83,15 @@ void createSwapChain(VulkanContext& vk) {
     vk.framebufs = vk::su::createFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
 }
 
+//bool ends_with(std::string_view value, std::string_view ending) {
+//    if (ending.size() > value.size()) return false;
+//    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+//}
+
+enum class PBRWorkflows {
+    MetallicRoughness = 0, SpecularGlossiness = 1
+};
+
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
     pipeline.shaders.clear();
@@ -91,10 +99,29 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "pbr.frag");
 
     auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
-    vk.dynUboData.resize(uboAlignment, 16);
+    vk.modelUpload.resize(uboAlignment, 16);
 
-    // TODO: use unordered_map but have to make custom hash function
-    std::map<std::pair<vk::ShaderStageFlags, vk::DescriptorType>, uint32_t> countsMap;
+    vk.materialUpload.resize(uboAlignment, 1);
+    vk.materialUpload[0] = MaterialUpload{
+            .baseColorFactor = {1.0f, 0.0f, 0.0f, 0.0f},
+            .emissiveFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+            .diffuseFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+            .specularFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+            .workflow = static_cast<float>(PBRWorkflows::MetallicRoughness),
+            .baseColorTextureSet = 0,
+            .physicalDescriptorTextureSet = 1,
+            .normalTextureSet = 2,
+            .occlusionTextureSet = 3,
+            .emissiveTextureSet = 4,
+            .metallicFactor = 0.0f,
+            .roughnessFactor = 0.2f,
+            .alphaMask = 0.0f,
+            .alphaMaskCutoff = 0.0f
+    };
+
+    size_t totalUniformCount = 0;
+    // set -> ((stage, descType) -> count)
+    std::vector<std::vector<vk::DescriptorSetLayoutBinding>> setBindings(3);
     for (Shader& shader: pipeline.shaders) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
@@ -109,79 +136,114 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         result = spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, shader.inputsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
+        auto shaderStage = static_cast<vk::ShaderStageFlagBits>(shader.reflect.shader_stage);
+//        std::vector<std::unordered_map<vk::DescriptorType, uint32_t>> setTypeCounts(3);
         for (size_t bind = 0; bind < shader.bindCount; ++bind) {
             SpvReflectDescriptorBinding* binding = shader.bindingsReflect[bind];
             auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
-            if (descType == vk::DescriptorType::eUniformBuffer && std::string_view(binding->name).find("dynamic") == std::string::npos) {
+            std::string_view name(binding->name);
+            if (descType == vk::DescriptorType::eUniformBuffer && std::find(DynamicName.begin(), DynamicName.end(), name) != DynamicName.end()) {
                 // nothing in the shader marks a uniform as dynamic, so we have to infer it from the name
                 descType = vk::DescriptorType::eUniformBufferDynamic;
                 binding->descriptor_type = static_cast<SpvReflectDescriptorType>(descType);
             }
-            countsMap[{static_cast<vk::ShaderStageFlagBits>(shader.reflect.shader_stage), descType}]++;
+            totalUniformCount++;
+            auto& bindings = setBindings[binding->set];
+            auto it = std::find_if(bindings.begin(), bindings.end(), [binding](vk::DescriptorSetLayoutBinding& bind) {
+                return bind.binding == binding->binding;
+            });
+            if (it == bindings.end()) {
+                bindings.emplace_back(binding->binding, descType, 1, shaderStage, nullptr);
+            } else {
+                it->stageFlags |= shaderStage;
+            }
+//            setTypeCounts[binding->set][descType]++;
         }
+//        for (size_t set = 0; set < setTypeCounts.size(); ++set) {
+//            for (auto& [descType, count]: setTypeCounts[set])
+//                setBindings[set].push_back(vk::DescriptorSetLayoutBinding{binding->binding, descType, 1, shaderStage});
+//        }
     }
 
-    std::vector<std::tuple<vk::DescriptorType, uint32_t, vk::ShaderStageFlags>> countsVec;
-    size_t total = 0;
-    for (auto& [pair, count]: countsMap) {
-        total += count;
-        countsVec.emplace_back(pair.second, count, pair.first);
-    }
-    vk::DescriptorSetLayout descSetLayout = vk::su::createDescriptorSetLayout(*vk.device, countsVec);
+    std::vector<vk::DescriptorSetLayout> descSetLayouts;
+    descSetLayouts.reserve(setBindings.size());
+    for (auto& bindings: setBindings)
+        descSetLayouts.push_back(vk.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo{{}, bindings}));
 
     vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayout, pushConstRange};
-
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayouts, {}};
     pipeline.layout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
 
-    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayout);
-    vk.descSet = vk.device->allocateDescriptorSets(descSetAllocInfo).front();
-
+    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayouts);
+    pipeline.descSets = vk.device->allocateDescriptorSets(descSetAllocInfo);
     std::vector<vk::DescriptorBufferInfo> descBufInfos;
     std::vector<vk::WriteDescriptorSet> writeDescSets;
     std::vector<vk::CopyDescriptorSet> copyDescSets;
     std::vector<vk::DescriptorImageInfo> descImgInfos;
-    descBufInfos.reserve(total);
-    writeDescSets.reserve(total);
-    copyDescSets.reserve(total);
-    descImgInfos.reserve(total);
+    descBufInfos.reserve(totalUniformCount);
+    writeDescSets.reserve(totalUniformCount);
+    copyDescSets.reserve(totalUniformCount);
+    descImgInfos.reserve(totalUniformCount);
     for (Shader& shader: pipeline.shaders) {
         for (uint32_t bind = 0; bind < shader.bindCount; ++bind) {
             SpvReflectDescriptorBinding const* binding = shader.bindingsReflect[bind];
             auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
+            vk::DescriptorSet& descSet = pipeline.descSets[binding->set];
+            std::string_view name(binding->name);
+            std::pair<uint32_t, uint32_t> bindId{binding->set, binding->binding};
             switch (descType) {
                 case vk::DescriptorType::eUniformBufferDynamic: {
-                    auto [it, wasAdded] = shader.uniforms.emplace(bind, vk::su::BufferData{*vk.physDev, *vk.device, vk.dynUboData.mem_size(),
-                                                                                           vk::BufferUsageFlagBits::eUniformBuffer});
-                    assert(wasAdded);
+                    vk::DeviceSize size = name == "model" ? vk.modelUpload.mem_size() : vk.materialUpload.mem_size();
+                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
+                                                                                        vk::BufferUsageFlagBits::eUniformBuffer});
                     descBufInfos.emplace_back(it->second.buffer, 0, binding->block.size);
-                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0, 1,
+                    writeDescSets.emplace_back(descSet, binding->binding, 0, 1,
                                                vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
                     break;
                 }
                 case vk::DescriptorType::eUniformBuffer: {
-                    auto [it, wasAdded] = shader.uniforms.emplace(bind, vk::su::BufferData{*vk.physDev, *vk.device, sizeof(vk.sharedUboData),
-                                                                                           vk::BufferUsageFlagBits::eUniformBuffer});
-                    assert(wasAdded);
+                    vk::DeviceSize size = name == "model" ? sizeof(vk.modelUpload) : sizeof(vk.materialUpload);
+                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
+                                                                                        vk::BufferUsageFlagBits::eUniformBuffer});
                     descBufInfos.emplace_back(it->second.buffer, 0, VK_WHOLE_SIZE);
-                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0, 1,
-                                               vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+                    writeDescSets.emplace_back(descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
                     break;
                 }
                 case vk::DescriptorType::eCombinedImageSampler: {
-                    vk::su::TextureData texData{*vk.physDev, *vk.device};
-                    // Upload image to the GPU
-                    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                    texData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
-                    vk.cmdBuf->end();
-                    vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
-                    vk.device->waitIdle();
+                    switch (binding->image.dim) {
+                        case SpvDim2D: {
+                            vk::su::TextureData texData{*vk.physDev, *vk.device};
+                            // Upload image to the GPU
+                            vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+                            texData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
+                            vk.cmdBuf->end();
+                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+                            vk.device->waitIdle();
 
-                    auto [it, wasAdded] = vk.textures.emplace(bind, std::move(texData));
-                    assert(wasAdded);
-                    descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
-                    writeDescSets.emplace_back(*vk.descSet, binding->binding, 0,
-                                               vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
+                            auto [it, _] = vk.textures.emplace(binding->set + binding->binding * 1024, std::move(texData));
+                            descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            writeDescSets.emplace_back(descSet, binding->binding, 0,
+                                                       vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
+                            break;
+                        }
+                        case SpvDimCube: {
+                            CubeMapData cubeData{*vk.physDev, *vk.device};
+                            vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+                            cubeData.setImage(*vk.device, *vk.cmdBuf, CheckerboardImageGenerator());
+                            vk.cmdBuf->end();
+                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+                            vk.device->waitIdle();
+
+                            auto [it, _] = vk.cubeMaps.emplace(binding->set + binding->binding * 1024, std::move(cubeData));
+                            descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            writeDescSets.emplace_back(descSet, binding->binding, 0,
+                                                       vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
+                            break;
+                        }
+                        default: {
+                            throw std::runtime_error("Unsupported image dimension type: " + std::to_string(binding->image.dim));
+                        }
+                    }
                     break;
                 }
                 default: {
@@ -417,13 +479,25 @@ void renderOpaque(App& app) {
         for (auto [ent, pos, look, player]: playerIt) {
             if (player.id != renderCtx.playerId) continue;
 
-            SharedUboData sharedUbo{
+            CameraUpload camera{
                     .view = toShader(calcView(pos, look)),
                     .proj = toShader(calcProj(vk.surfData->extent)),
                     .clip = toShader(ClipMat)
             };
-            vk::su::copyToDevice(*vk.device, vertShader.uniforms.find(0)->second.deviceMemory, sharedUbo);
+            vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 0})->second.deviceMemory, camera);
         }
+
+        SceneUpload scene{
+                .lightDir = {0.0f, 0.0f, -1.0f, 0.0f},
+                .exposure = 4.5f,
+                .gamma = 2.2f,
+                .prefilteredCubeMipLevels = 0.0f,
+                .scaleIBLAmbient = 1.0f,
+                .debugViewInputs = 0,
+                .debugViewEquation = 0
+        };
+
+        vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 1})->second.deviceMemory, scene);
 
         size_t drawIdx;
         auto modelView = app.renderWorld.view<const Position, const Orientation, const ModelHandle>();
@@ -431,12 +505,16 @@ void renderOpaque(App& app) {
         // This way we only have one upload
         drawIdx = 0;
         for (auto [ent, pos, orien, modelHandle]: modelView.each()) {
-            vk.dynUboData[drawIdx++] = {toShader(calcModel(pos))};
+            vk.modelUpload[drawIdx++] = {toShader(calcModel(pos))};
         }
 
-        void* devUboPtr = vk.device->mapMemory(vertShader.uniforms.find(1)->second.deviceMemory, 0, vk.dynUboData.mem_size());
-        memcpy(devUboPtr, vk.dynUboData.data(), vk.dynUboData.mem_size());
-        vk.device->unmapMemory(vertShader.uniforms.find(1)->second.deviceMemory);
+        void* mappedModelPtr = vk.device->mapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory, 0, vk.modelUpload.mem_size());
+        memcpy(mappedModelPtr, vk.modelUpload.data(), vk.modelUpload.mem_size());
+        vk.device->unmapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory);
+
+        void* mappedMaterialPtr = vk.device->mapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory, 0, vk.materialUpload.mem_size());
+        memcpy(mappedMaterialPtr, vk.materialUpload.data(), vk.materialUpload.mem_size());
+        vk.device->unmapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory);
 
         // TODO: is this same order?
         drawIdx = 0;
@@ -470,8 +548,13 @@ void renderOpaque(App& app) {
             if (rawModelBuffers) {
                 vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
                 vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
-                uint32_t off = drawIdx * vk.dynUboData.block_size();
-                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, *vk.descSet, off);
+                std::array<uint32_t, 3> dynamicOffsets{
+                        drawIdx * vk.modelUpload.block_size(),
+                        drawIdx * vk.modelUpload.block_size(),
+                        drawIdx * vk.materialUpload.block_size()
+                };
+                // TODO bind all at once
+                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
                 vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
             }
@@ -539,9 +622,7 @@ void VulkanRenderPlugin::execute(App& app) {
     if (!pVk) return;
 
     VulkanContext& vk = *pVk;
-    if (!vk.inst) {
-        init(vk);
-    }
+    if (!vk.inst) init(vk);
 
     // Acquire next image and signal the semaphore
     vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout, *vk.imgAcqSem, nullptr);
@@ -597,7 +678,7 @@ void VulkanRenderPlugin::execute(App& app) {
             case vk::Result::eSuboptimalKHR:
                 break;
             default:
-                throw std::runtime_error("Bad present KHR result");
+                throw std::runtime_error("Bad present KHR result: " + vk::to_string(result));
         }
     } catch (vk::OutOfDateKHRError const&) {
         recreatePipeline(vk);
