@@ -194,9 +194,10 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
             switch (descType) {
                 case vk::DescriptorType::eUniformBufferDynamic: {
                     vk::DeviceSize size = name == "model" ? vk.modelUpload.mem_size() : vk.materialUpload.mem_size();
+                    vk::DeviceSize stride = name == "model" ? vk.modelUpload.block_size() : vk.materialUpload.block_size();
                     auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
                                                                                         vk::BufferUsageFlagBits::eUniformBuffer});
-                    descBufInfos.emplace_back(it->second.buffer, 0, binding->block.size);
+                    descBufInfos.emplace_back(it->second.buffer, 0, stride);
                     writeDescSets.emplace_back(descSet, binding->binding, 0, 1,
                                                vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
                     break;
@@ -551,7 +552,7 @@ void renderOpaque(App& app) {
                 std::array<uint32_t, 3> dynamicOffsets{
                         drawIdx * vk.modelUpload.block_size(),
                         drawIdx * vk.modelUpload.block_size(),
-                        drawIdx * vk.materialUpload.block_size()
+                        0 * vk.materialUpload.block_size()
                 };
                 // TODO bind all at once
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
