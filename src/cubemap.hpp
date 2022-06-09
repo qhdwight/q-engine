@@ -14,7 +14,8 @@ struct CubeMapImageData {
             vk::MemoryPropertyFlags memoryProperties,
             vk::ImageAspectFlags aspectMask
     ) : format(format) {
-        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
+//        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
+        uint32_t numMips = 1;
         vk::ImageCreateInfo imageCreateInfo(
                 vk::ImageCreateFlagBits::eCubeCompatible,
                 vk::ImageType::e2D,
@@ -62,16 +63,15 @@ struct CubeMapData {
             bool anisotropyEnable = false
     ) : format(vk::Format::eR8G8B8A8Unorm), dim(dim) {
         vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(format);
-
         formatFeatureFlags |= vk::FormatFeatureFlagBits::eSampledImage;
         vk::ImageTiling imageTiling;
         vk::ImageLayout initialLayout;
         vk::MemoryPropertyFlags requirements;
         assert((formatProperties.optimalTilingFeatures & formatFeatureFlags) == formatFeatureFlags);
-        stagingBufferData = std::make_unique<vk::su::BufferData>
-                (physicalDevice, device, dim * dim * 4 * 6, vk::BufferUsageFlagBits::eTransferSrc);
+        stagingBufferData = std::make_unique<vk::su::BufferData>(physicalDevice, device, dim * dim * 4, vk::BufferUsageFlagBits::eTransferSrc);
         imageTiling = vk::ImageTiling::eOptimal;
         usageFlags |= vk::ImageUsageFlagBits::eTransferDst;
+        usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
         initialLayout = vk::ImageLayout::eUndefined;
         imageData = std::make_unique<CubeMapImageData>(
                 physicalDevice,
@@ -114,15 +114,15 @@ struct CubeMapData {
 
     template<typename ImageGenerator>
     void setImage(vk::Device const& device, vk::CommandBuffer const& commandBuffer, ImageGenerator const& imageGenerator) {
-        void* data = device.mapMemory(stagingBufferData->deviceMemory, 0,
-                                      device.getBufferMemoryRequirements(stagingBufferData->buffer).size);
+        vk::DeviceSize bufferSize = device.getBufferMemoryRequirements(stagingBufferData->buffer).size;
+        void* data = device.mapMemory(stagingBufferData->deviceMemory, 0, bufferSize);
         vk::Extent2D extent(dim, dim);
         imageGenerator(data, extent);
         device.unmapMemory(stagingBufferData->deviceMemory);
-
         // Since we're going to blit to the texture image, set its layout to eTransferDstOptimal
-        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format, vk::ImageLayout::eUndefined,
-                               vk::ImageLayout::eTransferDstOptimal);
+        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+                               vk::ImageLayout::eUndefined, /*  ==>  */ vk::ImageLayout::eTransferDstOptimal,
+                               1, 6);
         std::array<vk::BufferImageCopy, 6> copyRegions;
         for (size_t i = 0; i < 6; ++i) {
             copyRegions[i] = vk::BufferImageCopy(
@@ -134,10 +134,29 @@ struct CubeMapData {
             );
         }
         commandBuffer.copyBufferToImage(stagingBufferData->buffer, imageData->image, vk::ImageLayout::eTransferDstOptimal, copyRegions);
-        // Set the layout for the texture image from eTransferDstOptimal to SHADER_READ_ONLY
-        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
-        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format, vk::ImageLayout::eTransferDstOptimal,
-                               vk::ImageLayout::eShaderReadOnlyOptimal, numMips, 6);
+
+//        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+//                               vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eTransferSrcOptimal);
+//        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
+//        auto width = static_cast<int32_t>(extent.width);
+//        auto height = static_cast<int32_t>(extent.height);
+//        for (uint32_t mipLevel = 0; mipLevel < numMips; ++mipLevel) {
+//            vk::ImageBlit imageBlit(
+//                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel),
+//                    {vk::Offset3D(0, 0, 1), vk::Offset3D(width, height, 1)},
+//                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel + 1),
+//                    {vk::Offset3D(0, 0, 1), vk::Offset3D(width / 2, height / 2, 1)}
+//            );
+//            commandBuffer.blitImage(imageData->image, vk::ImageLayout::eTransferSrcOptimal,
+//                                    imageData->image, vk::ImageLayout::eTransferDstOptimal,
+//                                    imageBlit, vk::Filter::eLinear);
+//            width /= 2;
+//            height /= 2;
+//        }
+
+        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+                               vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
+                               1, 6);
     }
 
     vk::Format format;
@@ -149,8 +168,8 @@ struct CubeMapData {
 
 struct SkyboxImageGenerator {
     void operator()(void* data, vk::Extent2D& extent) const {
-        auto* pImageMemory = static_cast<uint8_t*>(data);
-        memset(data, 255, extent.width * extent.height * 4 * 6);
+        auto* imageMemory = static_cast<uint8_t*>(data);
+        memset(imageMemory, 255, extent.width * extent.height * 4);
 //        for (uint32_t row = 0; row < extent.height; row++) {
 //            for (uint32_t col = 0; col < extent.width; col++) {
 //                for (uint32_t layer = 0; layer < 6; ++layer) {

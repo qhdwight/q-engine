@@ -293,7 +293,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
             {pipeline.shaders[1].module, nullptr},
             vertexShader.vertAttrStride,
             vertexAttrPairs,
-            vk::FrontFace::eClockwise,
+            vk::FrontFace::eCounterClockwise,
             true,
             *pipeline.layout,
             *vk.renderPass
@@ -551,8 +551,8 @@ void renderOpaque(App& app) {
                 vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
                 vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 std::array<uint32_t, 2> dynamicOffsets{
-                        drawIdx * vk.modelUpload.block_size(),
-                        0 * vk.materialUpload.block_size()
+                        static_cast<uint32_t>(drawIdx * vk.modelUpload.block_size()),
+                        static_cast<uint32_t>(0 * vk.materialUpload.block_size())
                 };
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;

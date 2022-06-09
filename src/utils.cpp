@@ -946,31 +946,35 @@ namespace vk {
                 initialLayout = vk::ImageLayout::ePreinitialized;
                 requirements = vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible;
             }
-            imageData = std::unique_ptr<ImageData>(new ImageData(physicalDevice,
-                                                                 device,
-                                                                 format,
-                                                                 extent,
-                                                                 imageTiling,
-                                                                 usageFlags | vk::ImageUsageFlagBits::eSampled,
-                                                                 initialLayout,
-                                                                 requirements,
-                                                                 vk::ImageAspectFlagBits::eColor));
+            imageData = std::make_unique<ImageData>(
+                    physicalDevice,
+                    device,
+                    format,
+                    extent,
+                    imageTiling,
+                    usageFlags | vk::ImageUsageFlagBits::eSampled,
+                    initialLayout,
+                    requirements,
+                    vk::ImageAspectFlagBits::eColor
+            );
 
-            sampler = device.createSampler(vk::SamplerCreateInfo(vk::SamplerCreateFlags(),
-                                                                 vk::Filter::eLinear,
-                                                                 vk::Filter::eLinear,
-                                                                 vk::SamplerMipmapMode::eLinear,
-                                                                 vk::SamplerAddressMode::eRepeat,
-                                                                 vk::SamplerAddressMode::eRepeat,
-                                                                 vk::SamplerAddressMode::eRepeat,
-                                                                 0.0f,
-                                                                 anisotropyEnable,
-                                                                 16.0f,
-                                                                 false,
-                                                                 vk::CompareOp::eNever,
-                                                                 0.0f,
-                                                                 0.0f,
-                                                                 vk::BorderColor::eFloatOpaqueBlack));
+            sampler = device.createSampler(vk::SamplerCreateInfo(
+                    vk::SamplerCreateFlags(),
+                    vk::Filter::eLinear,
+                    vk::Filter::eLinear,
+                    vk::SamplerMipmapMode::eLinear,
+                    vk::SamplerAddressMode::eRepeat,
+                    vk::SamplerAddressMode::eRepeat,
+                    vk::SamplerAddressMode::eRepeat,
+                    0.0f,
+                    anisotropyEnable,
+                    16.0f,
+                    false,
+                    vk::CompareOp::eNever,
+                    0.0f,
+                    0.0f,
+                    vk::BorderColor::eFloatOpaqueBlack
+            ));
         }
 
         UUID::UUID(uint8_t const data[VK_UUID_SIZE]) {

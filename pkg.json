@@ -74,8 +74,8 @@
     ]
   },
   "edyn": {
-    "uri": "https://github.com/qhdwight/edyn",
-    "reference": "refs/heads/custom",
+    "uri": "https://github.com/xissburg/edyn",
+    "reference": "refs/heads/master",
     "includes": [
       "include/edyn"
     ],

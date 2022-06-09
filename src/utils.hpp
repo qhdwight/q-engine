@@ -319,7 +319,7 @@ namespace vk {
 
         struct UUID {
         public:
-            UUID(uint8_t const data[VK_UUID_SIZE]);
+            explicit UUID(uint8_t const data[VK_UUID_SIZE]);
 
             uint8_t m_data[VK_UUID_SIZE];
         };
