@@ -72,7 +72,8 @@ namespace vk {
 
         void setImageLayout(
                 vk::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, vk::ImageLayout oldImageLayout,
-                vk::ImageLayout newImageLayout, uint32_t levelCount = 1, uint32_t layerCount = 1);
+                vk::ImageLayout newImageLayout,
+                uint32_t levelCount = 1, uint32_t layerCount = 1, uint32_t baseArrayLevel = 0, uint32_t baseMipLevel = 0);
 
         struct WindowData {
             WindowData(GLFWwindow* wnd, std::string const& name, vk::Extent2D const& extent);

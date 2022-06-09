@@ -14,8 +14,8 @@ struct CubeMapImageData {
             vk::MemoryPropertyFlags memoryProperties,
             vk::ImageAspectFlags aspectMask
     ) : format(format) {
-//        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
-        uint32_t numMips = 1;
+        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
+//        uint32_t numMips = 1;
         vk::ImageCreateInfo imageCreateInfo(
                 vk::ImageCreateFlagBits::eCubeCompatible,
                 vk::ImageType::e2D,
@@ -119,44 +119,57 @@ struct CubeMapData {
         vk::Extent2D extent(dim, dim);
         imageGenerator(data, extent);
         device.unmapMemory(stagingBufferData->deviceMemory);
-        // Since we're going to blit to the texture image, set its layout to eTransferDstOptimal
+
+        // All images at all mip levels and layers start with destination optimal layout
+        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
         vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
                                vk::ImageLayout::eUndefined, /*  ==>  */ vk::ImageLayout::eTransferDstOptimal,
-                               1, 6);
+                               numMips, 6);
+        // Copy from staging buffer to the zeroth mip level of the image
+        // We will then use blit to generate the rest of the mip levels
         std::array<vk::BufferImageCopy, 6> copyRegions;
-        for (size_t i = 0; i < 6; ++i) {
-            copyRegions[i] = vk::BufferImageCopy(
+        for (size_t face = 0; face < 6; ++face) {
+            copyRegions[face] = vk::BufferImageCopy(
                     0,
                     dim, dim,
-                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, i, 1),
+                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, face, 1),
                     vk::Offset3D(0, 0, 0),
                     vk::Extent3D(extent, 1)
             );
         }
         commandBuffer.copyBufferToImage(stagingBufferData->buffer, imageData->image, vk::ImageLayout::eTransferDstOptimal, copyRegions);
 
-//        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-//                               vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eTransferSrcOptimal);
-//        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
-//        auto width = static_cast<int32_t>(extent.width);
-//        auto height = static_cast<int32_t>(extent.height);
-//        for (uint32_t mipLevel = 0; mipLevel < numMips; ++mipLevel) {
-//            vk::ImageBlit imageBlit(
-//                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel),
-//                    {vk::Offset3D(0, 0, 1), vk::Offset3D(width, height, 1)},
-//                    vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel + 1),
-//                    {vk::Offset3D(0, 0, 1), vk::Offset3D(width / 2, height / 2, 1)}
-//            );
-//            commandBuffer.blitImage(imageData->image, vk::ImageLayout::eTransferSrcOptimal,
-//                                    imageData->image, vk::ImageLayout::eTransferDstOptimal,
-//                                    imageBlit, vk::Filter::eLinear);
-//            width /= 2;
-//            height /= 2;
-//        }
+        auto width = static_cast<int32_t>(extent.width);
+        auto height = static_cast<int32_t>(extent.height);
+        for (uint32_t face = 0; face < 6; ++face) {
+            for (uint32_t mipLevel = 1; mipLevel < numMips; ++mipLevel) {
+                // Blit the previous mip level (source) to the next mip level (destination)
+                vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+                                       vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eTransferSrcOptimal,
+                                       1, 1, face, mipLevel - 1);
 
-        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-                               vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
-                               1, 6);
+                vk::ImageBlit imageBlit(
+                        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel - 1, face, 1),
+                        {vk::Offset3D(0, 0, 0), vk::Offset3D(width, height, 1)},
+                        vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel, face, 1),
+                        {vk::Offset3D(0, 0, 0), vk::Offset3D(std::max(1, width / 2), std::max(1, width / 2), 1)}
+                );
+                commandBuffer.blitImage(imageData->image, vk::ImageLayout::eTransferSrcOptimal,
+                                        imageData->image, vk::ImageLayout::eTransferDstOptimal,
+                                        imageBlit, vk::Filter::eLinear);
+                width = std::max(1, width / 2);
+                height = std::max(1, width / 2);
+
+                vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+                                       vk::ImageLayout::eTransferSrcOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
+                                       1, 1, face, mipLevel - 1);
+            }
+
+            // Make sure to update the layout of the last mip level to read only
+            vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
+                                   vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
+                                   1, 1, face, numMips - 1);
+        }
     }
 
     vk::Format format;

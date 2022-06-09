@@ -551,11 +551,14 @@ namespace vk {
 
         void setImageLayout(
                 vk::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, vk::ImageLayout oldImageLayout,
-                vk::ImageLayout newImageLayout, uint32_t levelCount, uint32_t layerCount) {
+                vk::ImageLayout newImageLayout, uint32_t levelCount, uint32_t layerCount, uint32_t baseArrayLayer, uint32_t baseMipLevel) {
             vk::AccessFlags sourceAccessMask;
             switch (oldImageLayout) {
                 case vk::ImageLayout::eTransferDstOptimal:
                     sourceAccessMask = vk::AccessFlagBits::eTransferWrite;
+                    break;
+                case vk::ImageLayout::eTransferSrcOptimal:
+                    sourceAccessMask = vk::AccessFlagBits::eTransferRead;
                     break;
                 case vk::ImageLayout::ePreinitialized:
                     sourceAccessMask = vk::AccessFlagBits::eHostWrite;
@@ -575,6 +578,7 @@ namespace vk {
                     sourceStage = vk::PipelineStageFlagBits::eHost;
                     break;
                 case vk::ImageLayout::eTransferDstOptimal:
+                case vk::ImageLayout::eTransferSrcOptimal:
                     sourceStage = vk::PipelineStageFlagBits::eTransfer;
                     break;
                 case vk::ImageLayout::eUndefined:
@@ -646,7 +650,7 @@ namespace vk {
                 aspectMask = vk::ImageAspectFlagBits::eColor;
             }
 
-            vk::ImageSubresourceRange imageSubresourceRange(aspectMask, 0, levelCount, 0, layerCount);
+            vk::ImageSubresourceRange imageSubresourceRange(aspectMask, baseMipLevel, levelCount, baseArrayLayer, layerCount);
             vk::ImageMemoryBarrier imageMemoryBarrier(sourceAccessMask,
                                                       destinationAccessMask,
                                                       oldImageLayout,
