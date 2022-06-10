@@ -6,8 +6,12 @@
 #include <optional>
 #include <unordered_map>
 
-#include <entt/entt.hpp>
-#include <edyn/edyn.hpp>
+#include <entt/resource/cache.hpp>
+#include <entt/entity/registry.hpp>
+#include <edyn/comp/linvel.hpp>
+#include <edyn/math/vector2.hpp>
+#include <edyn/comp/position.hpp>
+#include <edyn/comp/orientation.hpp>
 
 #include "assets.hpp"
 

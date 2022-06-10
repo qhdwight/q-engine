@@ -1,7 +1,5 @@
 #pragma once
 
-#include <edyn/edyn.hpp>
-
 #include "state.hpp"
 #include "plugin.hpp"
 

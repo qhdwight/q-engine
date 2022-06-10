@@ -2,19 +2,21 @@
 
 #include <iostream>
 
+#include <edyn/edyn.hpp>
+
 void PhysicsPlugin::build(App& app) {
     edyn::init();
+    std::cout << "[Edyn]" << " 1.1.0 initialized" << std::endl;
     edyn::attach(app.logicWorld);
+    std::cout << "[Edyn]" << " Attached" << std::endl;
 
-    std::cout << "[Edyn]" << " physics attached" << std::endl;
-
-    auto floor_def = edyn::rigidbody_def();
-    floor_def.kind = edyn::rigidbody_kind::rb_static;
-//    floor_def.material->restitution = 1;
-    floor_def.material->friction = 0.5;
+    auto floorDef = edyn::rigidbody_def();
+    floorDef.kind = edyn::rigidbody_kind::rb_static;
+//    floorDef.material->restitution = 1;
+    floorDef.material->friction = 0.5;
     // Plane at the origin with normal pointing up.
-    floor_def.shape = edyn::plane_shape{{0, 0, 1}, 0};
-    edyn::make_rigidbody(app.logicWorld, floor_def);
+    floorDef.shape = edyn::plane_shape{{0, 0, 1}, 0};
+    edyn::make_rigidbody(app.logicWorld, floorDef);
 }
 
 void PhysicsPlugin::execute(App& app) {

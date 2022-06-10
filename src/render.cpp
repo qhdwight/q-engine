@@ -9,6 +9,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "shaders.hpp"
+#include "inspector.hpp"
 #include "shader_math.hpp"
 
 using namespace entt::literals;
@@ -17,8 +18,12 @@ using namespace entt::literals;
 
 void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFlagBits shaderStage, std::filesystem::path const& path) {
     std::ifstream shaderFile;
-    shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     shaderFile.open(path);
+
+    if (!shaderFile) {
+        throw std::runtime_error("Failed to open shader file");
+    }
+
     std::stringstream strStream;
     strStream << shaderFile.rdbuf();
     std::string code = strStream.str();
@@ -490,7 +495,7 @@ void renderOpaque(App& app) {
         }
 
         SceneUpload scene{
-                .lightDir = {0.0f, 0.0f, -1.0f, 0.0f},
+                .lightDir = {1.0f, 1.0f, -1.0f, 0.0f},
                 .exposure = 4.5f,
                 .gamma = 2.2f,
                 .prefilteredCubeMipLevels = 0.0f,
@@ -565,8 +570,8 @@ void renderOpaque(App& app) {
 
 void renderImGuiOverlay(App& app) {
     auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
-                                    ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     static bool open = true;
     static int corner = 0;
     if (corner != -1) {
@@ -580,10 +585,10 @@ void renderImGuiOverlay(App& app) {
         window_pos_pivot.x = (corner & 1) ? 1.0f : 0.0f;
         window_pos_pivot.y = (corner & 2) ? 1.0f : 0.0f;
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-        window_flags |= ImGuiWindowFlags_NoMove;
+        windowFlags |= ImGuiWindowFlags_NoMove;
     }
     ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-    if (ImGui::Begin("Diagnostics", &open, window_flags)) {
+    if (ImGui::Begin("Diagnostics", &open, windowFlags)) {
         double avgFrameTime = diagnostics.getAvgFrameTime();
         ImGui::Text("%.3f ms/frame (%.1f FPS)", avgFrameTime / 10000000.0f, 1000000000.0f / avgFrameTime);
         if (ImGui::BeginPopupContextWindow()) {
@@ -607,6 +612,7 @@ void renderImGui(App& app) {
 //    ImGui::ShowDemoWindow();
 //    auto it = world->view<UI>().each();
 //    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
+    renderImGuiInspector(app);
     renderImGuiOverlay(app);
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));

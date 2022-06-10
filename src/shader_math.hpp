@@ -1,8 +1,9 @@
 #pragma once
 
 #include <array>
-
 #include <memory>
+
+#include <edyn/math/math.hpp>
 #include <edyn/math/vector3.hpp>
 
 #include "math.hpp"

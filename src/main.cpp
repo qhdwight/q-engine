@@ -2,7 +2,7 @@
 #include <optional>
 #include <iostream>
 
-#include <entt/entt.hpp>
+#include <edyn/util/rigidbody.hpp>
 
 #include "state.hpp"
 #include "input.hpp"
