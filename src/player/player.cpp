@@ -4,7 +4,7 @@
 
 #include <edyn/edyn.hpp>
 
-#include "math.hpp"
+#include "../math.hpp"
 
 constexpr scalar Tau = std::numbers::pi * 2.0;
 constexpr scalar XLookCap = Tau / 4.0;

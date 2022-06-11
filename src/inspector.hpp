@@ -1,5 +1,5 @@
 #pragma once
 
-#include "render.hpp"
+#include "graphics/render.hpp"
 
 void renderImGuiInspector(App& app);

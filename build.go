@@ -92,7 +92,7 @@ target_compile_definitions(Edyn PUBLIC EDYN_DOUBLE_PRECISION)
 target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CPP14)
 
 set(CMAKE_BUILD_TYPE Debug)
-file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "*.cpp")
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "*.cpp")
 `))
 	for pkgName, pkg := range packages {
 		for _, source := range pkg.Source {

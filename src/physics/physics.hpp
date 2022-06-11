@@ -1,7 +1,7 @@
 #pragma once
 
-#include "state.hpp"
-#include "plugin.hpp"
+#include "../state.hpp"
+#include "../plugin.hpp"
 
 class PhysicsPlugin : Plugin {
 public:

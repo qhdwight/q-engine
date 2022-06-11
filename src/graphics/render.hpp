@@ -10,11 +10,11 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "utils.hpp"
-#include "state.hpp"
-#include "plugin.hpp"
+#include "../state.hpp"
+#include "../plugin.hpp"
 #include "cubemap.hpp"
-#include "matrix4x4.hpp"
-#include "aligned_vector.hpp"
+#include "../matrix4x4.hpp"
+#include "../aligned_vector.hpp"
 
 const std::vector<std::string_view> DynamicName{"model", "material"};
 

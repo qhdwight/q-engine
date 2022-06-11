@@ -9,7 +9,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "shaders.hpp"
-#include "inspector.hpp"
+#include "../inspector.hpp"
 #include "shader_math.hpp"
 
 using namespace entt::literals;
@@ -512,7 +512,7 @@ void renderOpaque(App& app) {
             auto modelBufIt = vk.modelBufData.find(modelHandle.value);
             // Check if we need to create a vertex buffer for this model
             if (modelBufIt == vk.modelBufData.end()) {
-                auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Human.glb");
+                auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Cube.glb");
                 assert(wasAssetAdded);
                 model = assetIt->second;
                 assert(model);

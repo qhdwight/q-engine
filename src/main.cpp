@@ -6,9 +6,9 @@
 
 #include "state.hpp"
 #include "input.hpp"
-#include "player.hpp"
-#include "physics.hpp"
-#include "render.hpp"
+#include "player/player.hpp"
+#include "physics/physics.hpp"
+#include "graphics/render.hpp"
 
 using namespace entt::literals;
 

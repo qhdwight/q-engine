@@ -6,7 +6,7 @@
 #include <edyn/math/math.hpp>
 #include <edyn/math/vector3.hpp>
 
-#include "math.hpp"
+#include "../math.hpp"
 
 // Vulkan clip space has inverted y and half z
 constexpr mat4 ClipMat = {

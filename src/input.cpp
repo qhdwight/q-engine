@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "state.hpp"
-#include "render.hpp"
+#include "graphics/render.hpp"
 
 void input(App& app) {
     // TODO:arch restructure so it is graphics API agnostic
