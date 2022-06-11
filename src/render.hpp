@@ -39,6 +39,10 @@ struct mat4f {
     std::array<std::array<float, 4>, 4> col;
 };
 
+enum class PBRWorkflows {
+    MetallicRoughness = 0, SpecularGlossiness = 1
+};
+
 struct CameraUpload {
     mat4f view, proj, clip;
     vec3f camPos;
@@ -58,7 +62,7 @@ struct SceneUpload {
     float debugViewEquation;
 };
 
-struct MaterialUpload {
+struct Material {
     vec4f baseColorFactor;
     vec4f emissiveFactor;
     vec4f diffuseFactor;
@@ -125,7 +129,7 @@ struct VulkanContext {
     std::unordered_map<asset_handle_t, vk::su::TextureData> textures;
     std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
     aligned_vector<ModelUpload> modelUpload;
-    aligned_vector<MaterialUpload> materialUpload;
+    aligned_vector<Material> materialUpload;
     CameraUpload cameraUpload;
     SceneUpload sceneUpload;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;

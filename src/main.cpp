@@ -46,6 +46,23 @@ int main() {
             app.logicWorld.emplace<ModelHandle>(cubeEnt, "Cube"_hs);
             app.logicWorld.emplace<Position>(cubeEnt);
             app.logicWorld.emplace<Orientation>(cubeEnt, 1.0, 0.0, 0.0, 0.0);
+            Material material{
+                    .baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f},
+                    .emissiveFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+                    .diffuseFactor = {1.0f, 1.0f, 1.0f, 1.0f},
+                    .specularFactor = {0.0f, 0.0f, 0.0f, 0.0f},
+                    .workflow = static_cast<float>(PBRWorkflows::MetallicRoughness),
+                    .baseColorTextureSet = 0,
+                    .physicalDescriptorTextureSet = 1,
+                    .normalTextureSet = 2,
+                    .occlusionTextureSet = 3,
+                    .emissiveTextureSet = 4,
+                    .metallicFactor = 0.0f,
+                    .roughnessFactor = 0.2f,
+                    .alphaMask = 0.0f,
+                    .alphaMaskCutoff = 0.0f
+            };
+            app.logicWorld.emplace<Material>(cubeEnt, material);
         }
 
 //        reg.emplace<PhysicsResource>(worldEnt);
@@ -61,7 +78,9 @@ int main() {
             app.logicWorld.emplace_or_replace<Timestamp>(playerEnt, ns, deltaNs);
             auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
             diagnostics.addFrameTime(deltaNs);
-            for (auto [ent, pos, orien, hModel]: app.logicWorld.view<Position, Orientation, ModelHandle>().each()) {
+
+            auto modelView = app.logicWorld.view<Position, Orientation, Material, ModelHandle>();
+            for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
                 scalar add = std::cos(static_cast<double>(ns) / 1e9);
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
@@ -79,12 +98,13 @@ int main() {
                 app.renderWorld.emplace<Look>(ent, look);
                 app.renderWorld.emplace<Player>(ent, player);
             }
-            for (auto [ent, pos, orien, modelHandle]: app.logicWorld.view<const Position, const Orientation, const ModelHandle>().each()) {
+            for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
                 auto actualEnt = app.renderWorld.create(ent);
                 assert(actualEnt == ent);
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Orientation>(ent, orien);
                 app.renderWorld.emplace<ModelHandle>(ent, modelHandle);
+                app.renderWorld.emplace<Material>(ent, material);
                 app.renderWorld.emplace<ShaderHandle>(ent, "Flat"_hs);
             }
             render.execute(app);

@@ -93,10 +93,6 @@ void createSwapChain(VulkanContext& vk) {
 //    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 //}
 
-enum class PBRWorkflows {
-    MetallicRoughness = 0, SpecularGlossiness = 1
-};
-
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
     pipeline.shaders.clear();
@@ -105,24 +101,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
     auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.modelUpload.resize(uboAlignment, 16);
-
-    vk.materialUpload.resize(uboAlignment, 1);
-    vk.materialUpload[0] = MaterialUpload{
-            .baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f},
-            .emissiveFactor = {0.0f, 0.0f, 0.0f, 0.0f},
-            .diffuseFactor = {1.0f, 1.0f, 1.0f, 1.0f},
-            .specularFactor = {0.0f, 0.0f, 0.0f, 0.0f},
-            .workflow = static_cast<float>(PBRWorkflows::MetallicRoughness),
-            .baseColorTextureSet = 0,
-            .physicalDescriptorTextureSet = 1,
-            .normalTextureSet = 2,
-            .occlusionTextureSet = 3,
-            .emissiveTextureSet = 4,
-            .metallicFactor = 0.0f,
-            .roughnessFactor = 0.2f,
-            .alphaMask = 0.0f,
-            .alphaMaskCutoff = 0.0f
-    };
+    vk.materialUpload.resize(uboAlignment, 16);
 
     size_t totalUniformCount = 0;
     // set -> ((stage, descType) -> count)
@@ -131,13 +110,13 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding*)));
+        shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding * )));
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, shader.bindingsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
         spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable*)));
+        shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable * )));
         result = spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, shader.inputsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
@@ -221,7 +200,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                             vk::su::TextureData texData{*vk.physDev, *vk.device};
                             // Upload image to the GPU
                             vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            texData.setImage(*vk.device, *vk.cmdBuf, vk::su::CheckerboardImageGenerator());
+                            texData.setImage(*vk.device, *vk.cmdBuf, vk::su::MonochromeImageGenerator({255, 255, 255}));
                             vk.cmdBuf->end();
                             vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
                             vk.device->waitIdle();
@@ -374,8 +353,8 @@ void init(VulkanContext& vk) {
     std::cout << "[Vulkan]" << " Chose physical device: " << props.deviceName
               << std::endl;
     uint32_t apiVer = props.apiVersion;
-    std::cout << "[Vulkan]" << " Device API version: " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.'
-              << VK_VERSION_PATCH(apiVer)
+    std::cout << "[Vulkan]" << " " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.' << VK_VERSION_PATCH(apiVer)
+              << " device API version"
               << std::endl;
 
     // Creates window as well
@@ -507,31 +486,33 @@ void renderOpaque(App& app) {
         vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 1})->second.deviceMemory, scene);
 
         size_t drawIdx;
-        auto modelView = app.renderWorld.view<const Position, const Orientation, const ModelHandle>();
+        auto modelView = app.renderWorld.view<const Position, const Orientation, const Material, const ModelHandle>();
         // We store data per model in a dynamic UBO to save memory
         // This way we only have one upload
         drawIdx = 0;
-        for (auto [ent, pos, orien, modelHandle]: modelView.each()) {
-            vk.modelUpload[drawIdx++] = {toShader(calcModel(pos))};
+        for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
+            vk.modelUpload[drawIdx] = {toShader(calcModel(pos))};
+            vk.materialUpload[drawIdx] = material;
+            drawIdx++;
         }
 
-        void* mappedModelPtr = vk.device->mapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory, 0, vk.modelUpload.mem_size());
-        memcpy(mappedModelPtr, vk.modelUpload.data(), vk.modelUpload.mem_size());
+        void* mappedModelData = vk.device->mapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory, 0, vk.modelUpload.mem_size());
+        memcpy(mappedModelData, vk.modelUpload.data(), vk.modelUpload.mem_size());
         vk.device->unmapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory);
 
-        void* mappedMaterialPtr = vk.device->mapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory, 0, vk.materialUpload.mem_size());
-        memcpy(mappedMaterialPtr, vk.materialUpload.data(), vk.materialUpload.mem_size());
+        void* mappedMaterialData = vk.device->mapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory, 0, vk.materialUpload.mem_size());
+        memcpy(mappedMaterialData, vk.materialUpload.data(), vk.materialUpload.mem_size());
         vk.device->unmapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory);
 
         // TODO: is this same order?
         drawIdx = 0;
-        for (auto [ent, pos, orien, modelHandle]: modelView.each()) {
+        for (auto [ent, pos, orien, _, modelHandle]: modelView.each()) {
             entt::resource<Model> model;
             ModelBuffers* rawModelBuffers;
             auto modelBufIt = vk.modelBufData.find(modelHandle.value);
             // Check if we need to create a vertex buffer for this model
             if (modelBufIt == vk.modelBufData.end()) {
-                auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Cube.glb");
+                auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Human.glb");
                 assert(wasAssetAdded);
                 model = assetIt->second;
                 assert(model);
@@ -557,7 +538,7 @@ void renderOpaque(App& app) {
                 vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 std::array<uint32_t, 2> dynamicOffsets{
                         static_cast<uint32_t>(drawIdx * vk.modelUpload.block_size()),
-                        static_cast<uint32_t>(0 * vk.materialUpload.block_size())
+                        static_cast<uint32_t>(drawIdx * vk.materialUpload.block_size())
                 };
                 vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;

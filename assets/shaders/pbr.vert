@@ -38,10 +38,11 @@ out gl_PerVertex
 
 void main()
 {
-    vec4 locPos = model.transform * vec4(inPosition, 1.0);
+    mat4 vpc = camera.clip * camera.proj * camera.view;
+    vec4 worldPos = model.transform * vec4(inPosition, 1.0);
+    gl_Position =  vpc * worldPos;
+    outWorldPos = worldPos.xyz;
     outNorm = normalize(transpose(inverse(mat3(model.transform))) * inNormal);
     outTexCoord_0 = inTexCoord_0;
     outTexCoord_1 = inTexCoord_1;
-    mat4 vpc = camera.clip * camera.proj * camera.view;
-    gl_Position =  vpc * locPos;
 }
