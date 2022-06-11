@@ -175,7 +175,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     for (auto& bindings: setBindings)
         descSetLayouts.push_back(vk.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo{{}, bindings}));
 
-    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
+//    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayouts, {}};
     pipeline.layout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
 

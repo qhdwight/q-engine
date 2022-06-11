@@ -89,7 +89,7 @@ struct VertexAttr {
 
 struct Shader {
     vk::ShaderModule module;
-    std::unordered_map<uint32_t, VertexAttr> vertAttrs;
+    std::unordered_map<uint32_t, VertexAttr> vertAttrs{};
     size_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
