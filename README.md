@@ -6,7 +6,7 @@
 - IMGUI support
 - C++ package manager written in Go
 
-![demo](demo.png)
+![simple scene](https://user-images.githubusercontent.com/20666629/173171647-eb79af3e-2bbd-4219-8c88-c3b7631c83d5.png)
 
 ### Developing & Building
 
