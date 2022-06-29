@@ -10,7 +10,8 @@ ModelLoader::result_type ModelLoader::operator()(std::string const& name) {
     auto model = std::make_shared<tinygltf::Model>();
     std::string err;
     std::string warn;
-    std::filesystem::path path = std::filesystem::current_path() / "assets" / name;
+    std::string bruh("assets");
+    std::filesystem::path path = std::filesystem::current_path() / bruh / name;
     loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
     return model;
 }

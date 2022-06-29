@@ -1,130 +1,76 @@
 #pragma once
 
-#include "utils.hpp"
+#include "utils_raii.hpp"
 
-struct CubeMapImageData {
-    CubeMapImageData(
-            vk::PhysicalDevice const& physicalDevice,
-            vk::Device const& device,
-            vk::Format format,
-            uint32_t dim,
-            vk::ImageTiling tiling,
-            vk::ImageUsageFlags usage,
-            vk::ImageLayout initialLayout,
-            vk::MemoryPropertyFlags memoryProperties,
-            vk::ImageAspectFlags aspectMask
-    ) : format(format) {
-        auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
-//        uint32_t numMips = 1;
-        vk::ImageCreateInfo imageCreateInfo(
-                vk::ImageCreateFlagBits::eCubeCompatible,
-                vk::ImageType::e2D,
-                format,
-                vk::Extent3D(dim, dim, 1),
-                numMips,
-                6,
-                vk::SampleCountFlagBits::e1,
-                tiling,
-                usage | vk::ImageUsageFlagBits::eSampled,
-                vk::SharingMode::eExclusive,
-                {},
-                initialLayout
-        );
-        image = device.createImage(imageCreateInfo);
-
-        deviceMemory = vk::su::allocateDeviceMemory(device, physicalDevice.getMemoryProperties(), device.getImageMemoryRequirements(image),
-                                                    memoryProperties);
-
-        device.bindImageMemory(image, deviceMemory, 0);
-
-        vk::ImageViewCreateInfo imageViewCreateInfo({}, image, vk::ImageViewType::eCube, format, {}, {aspectMask, 0, numMips, 0, 6});
-        imageView = device.createImageView(imageViewCreateInfo);
+struct CubeMapImageData : public vk::raii::su::ImageData {
+    CubeMapImageData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, vk::Format format, vk::Extent2D const& extent)
+            : ImageData(physicalDevice,
+                        device,
+                        format,
+                        extent,
+                        vk::ImageTiling::eOptimal,
+                        vk::ImageUsageFlagBits::eSampled,
+                        vk::ImageLayout::eUndefined,
+                        vk::MemoryPropertyFlagBits::eDeviceLocal,
+                        vk::ImageAspectFlagBits::eColor,
+                        vk::ImageCreateFlagBits::eCubeCompatible) {
     }
-
-    void clear(vk::Device const& device) const {
-        device.destroyImageView(imageView);
-        device.freeMemory(deviceMemory);
-        device.destroyImage(image);
-    }
-
-    vk::Format format;
-    vk::Image image;
-    vk::DeviceMemory deviceMemory;
-    vk::ImageView imageView;
 };
 
 struct CubeMapData {
-    CubeMapData(
-            vk::PhysicalDevice const& physicalDevice,
-            vk::Device const& device,
-            uint32_t dim = 256,
-            vk::ImageUsageFlags usageFlags = {},
-            vk::FormatFeatureFlags formatFeatureFlags = {},
-            bool anisotropyEnable = false
-    ) : format(vk::Format::eR8G8B8A8Unorm), dim(dim) {
+    CubeMapData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, uint32_t dim = 256)
+            : format(vk::Format::eR8G8B8A8Unorm),
+              dim(dim),
+              sampler(device, {
+                      {},
+                      vk::Filter::eLinear,
+                      vk::Filter::eLinear,
+                      vk::SamplerMipmapMode::eLinear,
+                      vk::SamplerAddressMode::eClampToEdge,
+                      vk::SamplerAddressMode::eClampToEdge,
+                      vk::SamplerAddressMode::eClampToEdge,
+                      0.0f,
+                      false,
+                      16.0f,
+                      false,
+                      vk::CompareOp::eNever,
+                      0.0f,
+                      static_cast<float>(floor(log2(dim)) + 1.0),
+                      vk::BorderColor::eFloatOpaqueBlack
+              }) {
         vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(format);
-        formatFeatureFlags |= vk::FormatFeatureFlagBits::eSampledImage;
         vk::ImageTiling imageTiling;
         vk::ImageLayout initialLayout;
-        vk::MemoryPropertyFlags requirements;
-        assert((formatProperties.optimalTilingFeatures & formatFeatureFlags) == formatFeatureFlags);
-        stagingBufferData = std::make_unique<vk::su::BufferData>(physicalDevice, device, dim * dim * 4, vk::BufferUsageFlagBits::eTransferSrc);
+        stagingBufferData = std::make_unique<vk::raii::su::BufferData>(physicalDevice, device, dim * dim * 4, vk::BufferUsageFlagBits::eTransferSrc);
         imageTiling = vk::ImageTiling::eOptimal;
-        usageFlags |= vk::ImageUsageFlagBits::eTransferDst;
-        usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
         initialLayout = vk::ImageLayout::eUndefined;
-        imageData = std::make_unique<CubeMapImageData>(
+        imageData = std::make_unique<vk::raii::su::ImageData>(
                 physicalDevice,
                 device,
                 format,
-                dim,
-                imageTiling,
-                usageFlags | vk::ImageUsageFlagBits::eSampled,
-                initialLayout,
-                requirements,
-                vk::ImageAspectFlagBits::eColor
+                vk::Extent2D(dim, dim),
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageLayout::eUndefined,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                vk::ImageAspectFlagBits::eColor,
+                vk::ImageCreateFlagBits::eCubeCompatible
         );
-
-        sampler = device.createSampler(vk::SamplerCreateInfo(
-                vk::SamplerCreateFlags(),
-                vk::Filter::eLinear,
-                vk::Filter::eLinear,
-                vk::SamplerMipmapMode::eLinear,
-                vk::SamplerAddressMode::eClampToEdge,
-                vk::SamplerAddressMode::eClampToEdge,
-                vk::SamplerAddressMode::eClampToEdge,
-                0.0f,
-                anisotropyEnable,
-                16.0f,
-                false,
-                vk::CompareOp::eNever,
-                0.0f,
-                static_cast<float>(floor(log2(dim)) + 1.0),
-                vk::BorderColor::eFloatOpaqueBlack
-        ));
-    }
-
-    void clear(vk::Device const& device) const {
-        if (stagingBufferData) {
-            stagingBufferData->clear(device);
-        }
-        imageData->clear(device);
-        device.destroySampler(sampler);
     }
 
     template<typename ImageGenerator>
-    void setImage(vk::Device const& device, vk::CommandBuffer const& commandBuffer, ImageGenerator const& imageGenerator) {
-        vk::DeviceSize bufferSize = device.getBufferMemoryRequirements(stagingBufferData->buffer).size;
-        void* data = device.mapMemory(stagingBufferData->deviceMemory, 0, bufferSize);
+    void setImage(vk::raii::Device const& device, vk::raii::CommandBuffer const& commandBuffer, ImageGenerator const& imageGenerator) {
+        vk::DeviceSize bufferSize = stagingBufferData->buffer->getMemoryRequirements().size;
+        void* data = stagingBufferData->deviceMemory->mapMemory(0, bufferSize);
         vk::Extent2D extent(dim, dim);
         imageGenerator(data, extent);
-        device.unmapMemory(stagingBufferData->deviceMemory);
+        stagingBufferData->deviceMemory->unmapMemory();
 
         // All images at all mip levels and layers start with destination optimal layout
         auto numMips = static_cast<uint32_t>(floor(log2(dim))) + 1;
-        vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-                               vk::ImageLayout::eUndefined, /*  ==>  */ vk::ImageLayout::eTransferDstOptimal,
-                               numMips, 6);
+        vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format,
+                                     vk::ImageLayout::eUndefined, /*  ==>  */ vk::ImageLayout::eTransferDstOptimal,
+                                     numMips, 6);
         // Copy from staging buffer to the zeroth mip level of the image
         // We will then use blit to generate the rest of the mip levels
         std::array<vk::BufferImageCopy, 6> copyRegions;
@@ -137,16 +83,16 @@ struct CubeMapData {
                     vk::Extent3D(extent, 1)
             );
         }
-        commandBuffer.copyBufferToImage(stagingBufferData->buffer, imageData->image, vk::ImageLayout::eTransferDstOptimal, copyRegions);
+        commandBuffer.copyBufferToImage(**stagingBufferData->buffer, **imageData->image, vk::ImageLayout::eTransferDstOptimal, copyRegions);
 
         auto width = static_cast<int32_t>(extent.width);
         auto height = static_cast<int32_t>(extent.height);
         for (uint32_t face = 0; face < 6; ++face) {
             for (uint32_t mipLevel = 1; mipLevel < numMips; ++mipLevel) {
                 // Blit the previous mip level (source) to the next mip level (destination)
-                vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-                                       vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eTransferSrcOptimal,
-                                       1, 1, face, mipLevel - 1);
+                vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format,
+                                             vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eTransferSrcOptimal,
+                                             1, 1, face, mipLevel - 1);
 
                 vk::ImageBlit imageBlit(
                         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel - 1, face, 1),
@@ -154,29 +100,29 @@ struct CubeMapData {
                         vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel, face, 1),
                         {vk::Offset3D(0, 0, 0), vk::Offset3D(std::max(1, width / 2), std::max(1, width / 2), 1)}
                 );
-                commandBuffer.blitImage(imageData->image, vk::ImageLayout::eTransferSrcOptimal,
-                                        imageData->image, vk::ImageLayout::eTransferDstOptimal,
+                commandBuffer.blitImage(**imageData->image, vk::ImageLayout::eTransferSrcOptimal,
+                                        **imageData->image, vk::ImageLayout::eTransferDstOptimal,
                                         imageBlit, vk::Filter::eLinear);
                 width = std::max(1, width / 2);
                 height = std::max(1, width / 2);
 
-                vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-                                       vk::ImageLayout::eTransferSrcOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
-                                       1, 1, face, mipLevel - 1);
+                vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format,
+                                             vk::ImageLayout::eTransferSrcOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
+                                             1, 1, face, mipLevel - 1);
             }
 
             // Make sure to update the layout of the last mip level to read only
-            vk::su::setImageLayout(commandBuffer, imageData->image, imageData->format,
-                                   vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
-                                   1, 1, face, numMips - 1);
+            vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format,
+                                         vk::ImageLayout::eTransferDstOptimal, /*  ==>  */ vk::ImageLayout::eShaderReadOnlyOptimal,
+                                         1, 1, face, numMips - 1);
         }
     }
 
     vk::Format format;
     uint32_t dim;
-    std::unique_ptr<vk::su::BufferData> stagingBufferData;
-    std::unique_ptr<CubeMapImageData> imageData;
-    vk::Sampler sampler;
+    std::unique_ptr<vk::raii::su::BufferData> stagingBufferData = nullptr;
+    std::unique_ptr<vk::raii::su::ImageData> imageData = nullptr;
+    vk::raii::Sampler sampler;
 };
 
 struct SkyboxImageGenerator {

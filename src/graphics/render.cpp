@@ -56,36 +56,38 @@ void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFl
     std::vector<unsigned int> shaderSPV;
     glslang::GlslangToSpv(*program.getIntermediate(stage), shaderSPV);
 
-    Shader shaderExt{vk.device->createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV))};
+
+    Shader shaderExt{vk::raii::ShaderModule(*vk.device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV))};
     SpvReflectResult result = spvReflectCreateShaderModule(shaderSPV.size() * sizeof(unsigned int), shaderSPV.data(), &shaderExt.reflect);
     if (result != SPV_REFLECT_RESULT_SUCCESS) {
         throw std::runtime_error("Failed to reflect shader module");
     }
 
-    pipeline.shaders.push_back(shaderExt);
+    pipeline.shaders.push_back(std::move(shaderExt));
 }
 
 void createSwapChain(VulkanContext& vk) {
-    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
-    vk.swapChainData = vk::su::SwapChainData(
+    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
+    vk.swapChainData = vk::raii::su::SwapChainData(
             *vk.physDev,
             *vk.device,
-            vk.surfData->surface,
+            *vk.surfData->surface,
             vk.surfData->extent,
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             {},
             graphicsFamilyIdx,
             presentFamilyIdx
     );
-    vk::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
+    vk::raii::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
 
-    vk.renderPass = vk::su::createRenderPass(
+    vk.renderPass = vk::raii::su::makeRenderPass(
             *vk.device,
-            vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(vk.surfData->surface)).format,
+            vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
             depthBufData.format
     );
 
-    vk.framebufs = vk::su::createFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, depthBufData.imageView, vk.surfData->extent);
+    vk.framebufs = vk::raii::su::makeFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, &*depthBufData.imageView,
+                                                  vk.surfData->extent);
 }
 
 //bool ends_with(std::string_view value, std::string_view ending) {
@@ -110,13 +112,13 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding * )));
+        shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding*)));
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, shader.bindingsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
         spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, nullptr);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable * )));
+        shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable*)));
         result = spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, shader.inputsReflect);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
@@ -149,17 +151,20 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 //        }
     }
 
-    std::vector<vk::DescriptorSetLayout> descSetLayouts;
-    descSetLayouts.reserve(setBindings.size());
+    pipeline.descSetLayouts.clear();
+    pipeline.descSetLayouts.reserve(setBindings.size());
     for (auto& bindings: setBindings)
-        descSetLayouts.push_back(vk.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo{{}, bindings}));
+        pipeline.descSetLayouts.emplace_back(*vk.device, vk::DescriptorSetLayoutCreateInfo{{}, bindings});
+
+    std::vector<vk::DescriptorSetLayout> proxyDescSetLayouts;
+    proxyDescSetLayouts.reserve(setBindings.size());
+    for (auto& descSetLayout: pipeline.descSetLayouts) proxyDescSetLayouts.push_back(*descSetLayout);
 
 //    vk::PushConstantRange pushConstRange{vk::ShaderStageFlagBits::eVertex, 0, sizeof(mat4)};
-    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, descSetLayouts, {}};
-    pipeline.layout = vk.device->createPipelineLayout(pipelineLayoutCreateInfo);
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{{}, proxyDescSetLayouts, {}};
+    pipeline.layout = vk::raii::PipelineLayout{*vk.device, pipelineLayoutCreateInfo};
 
-    vk::DescriptorSetAllocateInfo descSetAllocInfo(*vk.descriptorPool, descSetLayouts);
-    pipeline.descSets = vk.device->allocateDescriptorSets(descSetAllocInfo);
+    pipeline.descSets = vk::raii::DescriptorSets{*vk.device, {**vk.descriptorPool, proxyDescSetLayouts}};
     std::vector<vk::DescriptorBufferInfo> descBufInfos;
     std::vector<vk::WriteDescriptorSet> writeDescSets;
     std::vector<vk::CopyDescriptorSet> copyDescSets;
@@ -172,42 +177,42 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         for (uint32_t bind = 0; bind < shader.bindCount; ++bind) {
             SpvReflectDescriptorBinding const* binding = shader.bindingsReflect[bind];
             auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
-            vk::DescriptorSet& descSet = pipeline.descSets[binding->set];
+            vk::raii::DescriptorSet& descSet = pipeline.descSets[binding->set];
             std::string_view name(binding->name);
             std::pair<uint32_t, uint32_t> bindId{binding->set, binding->binding};
             switch (descType) {
                 case vk::DescriptorType::eUniformBufferDynamic: {
                     vk::DeviceSize size = name == "model" ? vk.modelUpload.mem_size() : vk.materialUpload.mem_size();
                     vk::DeviceSize stride = name == "model" ? vk.modelUpload.block_size() : vk.materialUpload.block_size();
-                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
-                                                                                        vk::BufferUsageFlagBits::eUniformBuffer});
-                    descBufInfos.emplace_back(it->second.buffer, 0, stride);
-                    writeDescSets.emplace_back(descSet, binding->binding, 0, 1,
+                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::raii::su::BufferData{*vk.physDev, *vk.device, size,
+                                                                                              vk::BufferUsageFlagBits::eUniformBuffer});
+                    descBufInfos.emplace_back(**it->second.buffer, 0, stride);
+                    writeDescSets.emplace_back(*descSet, binding->binding, 0, 1,
                                                vk::DescriptorType::eUniformBufferDynamic, nullptr, &descBufInfos.back());
                     break;
                 }
                 case vk::DescriptorType::eUniformBuffer: {
                     vk::DeviceSize size = name == "camera" ? sizeof(vk.cameraUpload) : sizeof(vk.sceneUpload);
-                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::su::BufferData{*vk.physDev, *vk.device, size,
-                                                                                        vk::BufferUsageFlagBits::eUniformBuffer});
-                    descBufInfos.emplace_back(it->second.buffer, 0, VK_WHOLE_SIZE);
-                    writeDescSets.emplace_back(descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
+                    auto [it, _] = pipeline.uniforms.emplace(bindId, vk::raii::su::BufferData{*vk.physDev, *vk.device, size,
+                                                                                              vk::BufferUsageFlagBits::eUniformBuffer});
+                    descBufInfos.emplace_back(**it->second.buffer, 0, VK_WHOLE_SIZE);
+                    writeDescSets.emplace_back(*descSet, binding->binding, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &descBufInfos.back());
                     break;
                 }
                 case vk::DescriptorType::eCombinedImageSampler: {
                     switch (binding->image.dim) {
                         case SpvDim2D: {
-                            vk::su::TextureData texData{*vk.physDev, *vk.device};
+                            vk::raii::su::TextureData texData{*vk.physDev, *vk.device};
                             // Upload image to the GPU
                             vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            texData.setImage(*vk.device, *vk.cmdBuf, vk::su::MonochromeImageGenerator({255, 255, 255}));
+                            texData.setImage(*vk.cmdBuf, vk::su::MonochromeImageGenerator({255, 255, 255}));
                             vk.cmdBuf->end();
-                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, **vk.cmdBuf), {});
                             vk.device->waitIdle();
 
                             auto [it, _] = vk.textures.emplace(binding->set + binding->binding * 1024, std::move(texData));
-                            descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
-                            writeDescSets.emplace_back(descSet, binding->binding, 0,
+                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            writeDescSets.emplace_back(*descSet, binding->binding, 0,
                                                        vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
                             break;
                         }
@@ -216,12 +221,12 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                             vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
                             cubeData.setImage(*vk.device, *vk.cmdBuf, SkyboxImageGenerator());
                             vk.cmdBuf->end();
-                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
+                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, **vk.cmdBuf), {});
                             vk.device->waitIdle();
 
                             auto [it, _] = vk.cubeMaps.emplace(binding->set + binding->binding * 1024, std::move(cubeData));
-                            descImgInfos.emplace_back(it->second.sampler, it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
-                            writeDescSets.emplace_back(descSet, binding->binding, 0,
+                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            writeDescSets.emplace_back(*descSet, binding->binding, 0,
                                                        vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
                             break;
                         }
@@ -270,11 +275,13 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     }
     vertexShader.vertAttrStride = vertexAttrOffset;
 
-    pipeline.value = vk::su::createGraphicsPipeline(
+    pipeline.value = vk::raii::su::makeGraphicsPipeline(
             *vk.device,
             *vk.pipelineCache,
-            {vertexShader.module, nullptr},
-            {pipeline.shaders[1].module, nullptr},
+            vertexShader.module,
+            nullptr,
+            pipeline.shaders[1].module,
+            nullptr,
             vertexShader.vertAttrStride,
             vertexAttrPairs,
             vk::FrontFace::eCounterClockwise,
@@ -289,7 +296,6 @@ void recreatePipeline(VulkanContext& vk) {
     int width, height;
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
     vk.surfData->extent = vk::Extent2D(width, height);
-    vk.swapChainData->clear(*vk.device);
     // Force recreation of pipelines, as they depend on the swap chain
     for (auto& [modelHandle, pipeline]: vk.modelPipelines) {
         pipeline.value.reset();
@@ -305,13 +311,13 @@ void setupImgui(VulkanContext& vk) {
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForVulkan(vk.surfData->window.handle, true);
     ImGui_ImplVulkan_InitInfo init_info{
-            .Instance = static_cast<VkInstance>(vk.inst),
-            .PhysicalDevice = static_cast<VkPhysicalDevice>(*vk.physDev),
-            .Device = static_cast<VkDevice>(*vk.device),
+            .Instance = static_cast<VkInstance>(**vk.inst),
+            .PhysicalDevice = static_cast<VkPhysicalDevice>(**vk.physDev),
+            .Device = static_cast<VkDevice>(**vk.device),
             .QueueFamily = vk.graphicsFamilyIdx,
-            .Queue = static_cast<VkQueue>(*vk.graphicsQueue),
-            .PipelineCache = static_cast<VkPipelineCache>(*vk.pipelineCache),
-            .DescriptorPool = static_cast<VkDescriptorPool>(*vk.descriptorPool),
+            .Queue = static_cast<VkQueue>(**vk.graphicsQueue),
+            .PipelineCache = static_cast<VkPipelineCache>(**vk.pipelineCache),
+            .DescriptorPool = static_cast<VkDescriptorPool>(**vk.descriptorPool),
             .Subpass = 0,
             .MinImageCount = 2,
             .ImageCount = 2,
@@ -319,35 +325,33 @@ void setupImgui(VulkanContext& vk) {
             .Allocator = nullptr,
             .CheckVkResultFn = nullptr
     };
-    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.renderPass));
+    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(**vk.renderPass));
     std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
-    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-    ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*vk.cmdBuf));
-    vk.cmdBuf->end();
-    vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, *vk.cmdBuf), {});
-    vk.device->waitIdle();
+    vk::raii::su::oneTimeSubmit(*vk.cmdBuf, *vk.graphicsQueue, [](vk::raii::CommandBuffer const& cmdBuf) {
+        ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*cmdBuf));
+    });
 
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 void init(VulkanContext& vk) {
     std::string const appName = "Game Engine", engineName = "QEngine";
-    vk.inst = vk::su::createInstance(appName, engineName, {}, vk::su::getInstanceExtensions());
+    vk.inst = vk::raii::su::makeInstance(vk.ctx, appName, engineName, {}, vk::su::getInstanceExtensions());
     std::cout << "[Vulkan] Instance created" << std::endl;
 
 #if !defined(NDEBUG)
-    auto result = vk.inst.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+    auto result = (**vk.inst).createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
     if (!result) {
         throw std::runtime_error("Failed to create debug messenger!");
     }
 #endif
 
-    std::vector<vk::PhysicalDevice> const& physDevs = vk.inst.enumeratePhysicalDevices();
+    auto physDevs = vk::raii::PhysicalDevices{*vk.inst};
     if (physDevs.empty()) {
         throw std::runtime_error("No physical vk.devices found");
     }
-    vk.physDev = physDevs.front();
+    vk.physDev = std::move(physDevs.front());
 
     vk::PhysicalDeviceProperties const& props = vk.physDev->getProperties();
     std::cout << "[Vulkan]" << " Chose physical device: " << props.deviceName
@@ -358,33 +362,32 @@ void init(VulkanContext& vk) {
               << std::endl;
 
     // Creates window as well
-    vk.surfData.emplace(vk.inst, "Game Engine", vk::Extent2D(640, 480));
+    vk.surfData.emplace(*vk.inst, "Game Engine", vk::Extent2D(640, 480));
     float xScale, yScale;
     glfwGetWindowContentScale(vk.surfData->window.handle, &xScale, &yScale);
     vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
                                        static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.height) * yScale));
 
-    std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, vk.surfData->surface);
+    std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
 
     std::vector<std::string> extensions = vk::su::getDeviceExtensions();
 //#if !defined(NDEBUG)
 //    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 //#endif
-    vk.device = vk::su::createDevice(*vk.physDev, vk.graphicsFamilyIdx, extensions);
+    vk.device = vk::raii::su::makeDevice(*vk.physDev, vk.graphicsFamilyIdx, extensions);
 
-    vk::CommandPool cmdPool = vk::su::createCommandPool(*vk.device, vk.graphicsFamilyIdx);
-    auto cmdBufs = vk.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(cmdPool, vk::CommandBufferLevel::ePrimary, 16));
-    vk.cmdBuf = cmdBufs[0];
+    vk::raii::CommandPool cmdPool = vk::raii::CommandPool(*vk.device, vk.graphicsFamilyIdx);
+    vk.cmdBuf = vk::raii::su::makeCommandBuffer(*vk.device, cmdPool);
 
-    vk.graphicsQueue = vk.device->getQueue(vk.graphicsFamilyIdx, 0);
-    vk.presentQueue = vk.device->getQueue(vk.presentFamilyIdx, 0);
+    vk.graphicsQueue = vk::raii::Queue(*vk.device, vk.graphicsFamilyIdx, 0);
+    vk.presentQueue = vk::raii::Queue(*vk.device, vk.presentFamilyIdx, 0);
 
-    vk.drawFence = vk.device->createFence(vk::FenceCreateInfo());
-    vk.imgAcqSem = vk.device->createSemaphore(vk::SemaphoreCreateInfo());
+    vk.drawFence = vk::raii::Fence(*vk.device, vk::FenceCreateInfo());
+    vk.imgAcqSem = vk::raii::Semaphore(*vk.device, vk::SemaphoreCreateInfo());
 
-    vk.pipelineCache = vk.device->createPipelineCache(vk::PipelineCacheCreateInfo());
+    vk.pipelineCache = vk::raii::PipelineCache(*vk.device, vk::PipelineCacheCreateInfo());
 
-    vk.descriptorPool = vk::su::createDescriptorPool(
+    vk.descriptorPool = vk::raii::su::makeDescriptorPool(
             *vk.device, {
                     {vk::DescriptorType::eSampler,              64},
                     {vk::DescriptorType::eCombinedImageSampler, 64},
@@ -408,17 +411,17 @@ void init(VulkanContext& vk) {
 }
 
 template<typename T>
-vk::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
+vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
     tinygltf::Accessor& acc = model->accessors.at(primitive.indices);
     assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
     tinygltf::Buffer& buf = model->buffers.at(view.buffer);
-    vk::su::BufferData bufData{*vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eIndexBuffer};
+    vk::raii::su::BufferData bufData{*vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eIndexBuffer};
     auto dataStart = reinterpret_cast<std::byte*>(buf.data.data());
     auto data = reinterpret_cast<T*>(dataStart + view.byteOffset + acc.byteOffset);
 //    auto devData = static_cast<T*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength));
-    vk::su::copyToDevice(*vk.device, bufData.deviceMemory, data, acc.count);
+    vk::raii::su::copyToDevice(*bufData.deviceMemory, data, acc.count);
 //    for (size_t i = 0; i < acc.count; ++i) {
 //        devData[i] = data[i];
 //    }
@@ -427,7 +430,7 @@ vk::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource
 }
 
 void tryFillAttributeBuffer(
-        VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, vk::su::BufferData& bufData, std::string const& attrName,
+        VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, vk::raii::su::BufferData& bufData, std::string const& attrName,
         size_t modelStride, vk::DeviceSize shaderStride, vk::DeviceSize offset
 ) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
@@ -440,13 +443,13 @@ void tryFillAttributeBuffer(
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
     tinygltf::Buffer& buf = model->buffers.at(view.buffer);
     auto modelData = reinterpret_cast<std::byte*>(buf.data.data()) + view.byteOffset + acc.byteOffset;
-    auto devData = static_cast<std::byte*>(vk.device->mapMemory(bufData.deviceMemory, 0, view.byteLength)) + offset;
+    auto devData = static_cast<std::byte*>(bufData.deviceMemory->mapMemory(0, view.byteLength)) + offset;
     for (size_t i = 0; i < acc.count; i++) {
         std::memcpy(devData, modelData, modelStride);
         modelData += modelStride;
         devData += shaderStride;
     }
-    vk.device->unmapMemory(bufData.deviceMemory);
+    bufData.deviceMemory->unmapMemory();
 }
 
 void renderOpaque(App& app) {
@@ -458,7 +461,7 @@ void renderOpaque(App& app) {
 
     for (auto& [handle, pipeline]: vk.modelPipelines) {
         Shader const& vertShader = pipeline.shaders[0];
-        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.value);
+        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, **pipeline.value);
         auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
         auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
         for (auto [ent, pos, look, player]: playerIt) {
@@ -470,7 +473,7 @@ void renderOpaque(App& app) {
                     .clip = toShader(ClipMat),
                     .camPos = toShader(pos)
             };
-            vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 0})->second.deviceMemory, camera);
+            vk::raii::su::copyToDevice(*pipeline.uniforms.find({0, 0})->second.deviceMemory, camera);
         }
 
         SceneUpload scene{
@@ -483,7 +486,7 @@ void renderOpaque(App& app) {
                 .debugViewEquation = 0
         };
 
-        vk::su::copyToDevice(*vk.device, pipeline.uniforms.find({0, 1})->second.deviceMemory, scene);
+        vk::raii::su::copyToDevice(*pipeline.uniforms.find({0, 1})->second.deviceMemory, scene);
 
         size_t drawIdx;
         auto modelView = app.renderWorld.view<const Position, const Orientation, const Material, const ModelHandle>();
@@ -496,13 +499,13 @@ void renderOpaque(App& app) {
             drawIdx++;
         }
 
-        void* mappedModelData = vk.device->mapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory, 0, vk.modelUpload.mem_size());
+        void* mappedModelData = pipeline.uniforms.find({2, 0})->second.deviceMemory->mapMemory(0, vk.modelUpload.mem_size());
         memcpy(mappedModelData, vk.modelUpload.data(), vk.modelUpload.mem_size());
-        vk.device->unmapMemory(pipeline.uniforms.find({2, 0})->second.deviceMemory);
+        pipeline.uniforms.find({2, 0})->second.deviceMemory->unmapMemory();
 
-        void* mappedMaterialData = vk.device->mapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory, 0, vk.materialUpload.mem_size());
+        void* mappedMaterialData = pipeline.uniforms.find({2, 1})->second.deviceMemory->mapMemory(0, vk.materialUpload.mem_size());
         memcpy(mappedMaterialData, vk.materialUpload.data(), vk.materialUpload.mem_size());
-        vk.device->unmapMemory(pipeline.uniforms.find({2, 1})->second.deviceMemory);
+        pipeline.uniforms.find({2, 1})->second.deviceMemory->unmapMemory();
 
         // TODO: is this same order?
         drawIdx = 0;
@@ -518,14 +521,14 @@ void renderOpaque(App& app) {
                 assert(model);
 
                 size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count;
-                vk::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
-                                               vk::BufferUsageFlagBits::eVertexBuffer};
+                vk::raii::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
+                                                     vk::BufferUsageFlagBits::eVertexBuffer};
                 for (auto& [layout, attr]: vertShader.vertAttrs) {
                     tryFillAttributeBuffer(vk, model, vertBufData, attr.name, attr.size, vertShader.vertAttrStride, attr.offset);
                 }
                 auto [addedIt, wasBufAdded] = vk.modelBufData.emplace(modelHandle.value, ModelBuffers{
                         createIndexBufferData<uint16_t>(vk, model),
-                        vertBufData
+                        std::move(vertBufData)
                 });
                 assert(wasBufAdded);
                 rawModelBuffers = &addedIt->second;
@@ -534,13 +537,13 @@ void renderOpaque(App& app) {
                 rawModelBuffers = &modelBufIt->second;
             }
             if (rawModelBuffers) {
-                vk.cmdBuf->bindVertexBuffers(0, rawModelBuffers->vertBufData.buffer, {0});
-                vk.cmdBuf->bindIndexBuffer(rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
+                vk.cmdBuf->bindVertexBuffers(0, **rawModelBuffers->vertBufData.buffer, {0});
+                vk.cmdBuf->bindIndexBuffer(**rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 std::array<uint32_t, 2> dynamicOffsets{
                         static_cast<uint32_t>(drawIdx * vk.modelUpload.block_size()),
                         static_cast<uint32_t>(drawIdx * vk.materialUpload.block_size())
                 };
-                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0u, pipeline.descSets, dynamicOffsets);
+//                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **pipeline.layout, 0u, *pipeline.descSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
                 vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
             }
@@ -596,7 +599,7 @@ void renderImGui(App& app) {
     renderImGuiInspector(app);
     renderImGuiOverlay(app);
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBuf));
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(**vk.cmdBuf));
 }
 
 void VulkanRenderPlugin::build(App& app) {
@@ -612,16 +615,16 @@ void VulkanRenderPlugin::execute(App& app) {
     if (!vk.inst) init(vk);
 
     // Acquire next image and signal the semaphore
-    vk::ResultValue<uint32_t> curBuf = vk.device->acquireNextImageKHR(vk.swapChainData->swapChain, vk::su::FenceTimeout, *vk.imgAcqSem, nullptr);
+    auto [acqResult, curBuf] = vk.swapChainData->swapChain->acquireNextImage(vk::su::FenceTimeout, **vk.imgAcqSem, nullptr);
 
-    if (curBuf.result == vk::Result::eSuboptimalKHR) {
+    if (acqResult == vk::Result::eSuboptimalKHR) {
         recreatePipeline(vk);
         return;
     }
-    if (curBuf.result != vk::Result::eSuccess) {
+    if (acqResult != vk::Result::eSuccess) {
         throw std::runtime_error("Invalid acquire next image KHR result");
     }
-    if (vk.framebufs.size() <= curBuf.value) {
+    if (vk.framebufs.size() <= curBuf) {
         throw std::runtime_error("Invalid framebuffer size");
     }
 
@@ -637,8 +640,8 @@ void VulkanRenderPlugin::execute(App& app) {
     vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
     std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
     vk::RenderPassBeginInfo renderPassBeginInfo(
-            *vk.renderPass,
-            vk.framebufs[curBuf.value],
+            **vk.renderPass,
+            *vk.framebufs[curBuf],
             vk::Rect2D({}, vk.surfData->extent),
             clearVals
     );
@@ -650,16 +653,16 @@ void VulkanRenderPlugin::execute(App& app) {
 
     vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
     // Fences need to be manually reset
-    vk.device->resetFences(*vk.drawFence);
+    vk.device->resetFences(**vk.drawFence);
     // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
-    vk.graphicsQueue->submit(vk::SubmitInfo(*vk.imgAcqSem, waitDestStageMask, *vk.cmdBuf), *vk.drawFence);
+    vk.graphicsQueue->submit(vk::SubmitInfo(**vk.imgAcqSem, waitDestStageMask, **vk.cmdBuf), **vk.drawFence);
 
     // Wait for the draw fence to be signaled
-    while (vk::Result::eTimeout == vk.device->waitForFences(*vk.drawFence, VK_TRUE, vk::su::FenceTimeout));
+    while (vk::Result::eTimeout == vk.device->waitForFences(**vk.drawFence, VK_TRUE, vk::su::FenceTimeout));
 
     try {
         // Present frame to display
-        vk::Result result = vk.presentQueue->presentKHR(vk::PresentInfoKHR({}, vk.swapChainData->swapChain, curBuf.value));
+        vk::Result result = vk.presentQueue->presentKHR({nullptr, **vk.swapChainData->swapChain, curBuf});
         switch (result) {
             case vk::Result::eSuccess:
             case vk::Result::eSuboptimalKHR:

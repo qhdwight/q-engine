@@ -6,15 +6,16 @@
 
 #include <spirv_reflect.h>
 #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
 #include <edyn/math/matrix3x3.hpp>
 #include <backends/imgui_impl_vulkan.h>
 
-#include "utils.hpp"
 #include "../state.hpp"
 #include "../plugin.hpp"
-#include "cubemap.hpp"
 #include "../matrix4x4.hpp"
 #include "../aligned_vector.hpp"
+#include "utils_raii.hpp"
+#include "cubemap.hpp"
 
 const std::vector<std::string_view> DynamicName{"model", "material"};
 
@@ -80,8 +81,8 @@ struct Material {
 };
 
 struct ModelBuffers {
-    vk::su::BufferData indexBufData;
-    vk::su::BufferData vertBufData;
+    vk::raii::su::BufferData indexBufData;
+    vk::raii::su::BufferData vertBufData;
 };
 
 struct VertexAttr {
@@ -92,7 +93,7 @@ struct VertexAttr {
 };
 
 struct Shader {
-    vk::ShaderModule module;
+    vk::raii::ShaderModule module;
     std::unordered_map<uint32_t, VertexAttr> vertAttrs{};
     size_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
@@ -104,29 +105,31 @@ struct Shader {
 
 struct Pipeline {
     std::vector<Shader> shaders;
-    std::optional<vk::PipelineLayout> layout;
-    std::optional<vk::Pipeline> value;
-    std::vector<vk::DescriptorSet> descSets;
-    std::map<std::pair<uint32_t, uint32_t>, vk::su::BufferData> uniforms;
+    std::optional<vk::raii::PipelineLayout> layout;
+    std::optional<vk::raii::Pipeline> value;
+    std::vector<vk::raii::DescriptorSetLayout> descSetLayouts;
+    std::vector<vk::raii::DescriptorSet> descSets;
+    std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
 };
 
 struct VulkanContext {
-    vk::Instance inst;
-    std::optional<vk::PhysicalDevice> physDev;
-    std::optional<vk::Device> device;
-    std::optional<vk::su::SurfaceData> surfData;
-    std::optional<vk::CommandBuffer> cmdBuf;
-    std::optional<vk::Queue> graphicsQueue, presentQueue;
-    std::optional<vk::su::SwapChainData> swapChainData;
-    std::optional<vk::RenderPass> renderPass;
-    std::vector<vk::Framebuffer> framebufs;
-    std::optional<vk::PipelineCache> pipelineCache;
-    std::optional<vk::DescriptorPool> descriptorPool;
-    std::optional<vk::Semaphore> imgAcqSem;
-    std::optional<vk::Fence> drawFence;
+    vk::raii::Context ctx;
+    std::optional<vk::raii::Instance> inst;
+    std::optional<vk::raii::PhysicalDevice> physDev;
+    std::optional<vk::raii::Device> device;
+    std::optional<vk::raii::su::SurfaceData> surfData;
+    std::optional<vk::raii::CommandBuffer> cmdBuf;
+    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
+    std::optional<vk::raii::su::SwapChainData> swapChainData;
+    std::optional<vk::raii::RenderPass> renderPass;
+    std::vector<vk::raii::Framebuffer> framebufs;
+    std::optional<vk::raii::PipelineCache> pipelineCache;
+    std::optional<vk::raii::DescriptorPool> descriptorPool;
+    std::optional<vk::raii::Semaphore> imgAcqSem;
+    std::optional<vk::raii::Fence> drawFence;
     std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
     std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    std::unordered_map<asset_handle_t, vk::su::TextureData> textures;
+    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
     std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
     aligned_vector<ModelUpload> modelUpload;
     aligned_vector<Material> materialUpload;
