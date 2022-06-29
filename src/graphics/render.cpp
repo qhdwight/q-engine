@@ -101,11 +101,11 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eVertex, shadersPath / "pbr.vert");
     createShaderModule(vk, pipeline, vk::ShaderStageFlagBits::eFragment, shadersPath / "pbr.frag");
 
-    auto uboAlignment = static_cast<size_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
+    auto uboAlignment = static_cast<uint32_t>(vk.physDev->getProperties().limits.minUniformBufferOffsetAlignment);
     vk.modelUpload.resize(uboAlignment, 16);
     vk.materialUpload.resize(uboAlignment, 16);
 
-    size_t totalUniformCount = 0;
+    uint32_t totalUniformCount = 0;
     // set -> ((stage, descType) -> count)
     std::vector<std::vector<vk::DescriptorSetLayoutBinding>> setBindings(3);
     for (Shader& shader: pipeline.shaders) {
@@ -124,7 +124,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
         auto shaderStage = static_cast<vk::ShaderStageFlagBits>(shader.reflect.shader_stage);
 //        std::vector<std::unordered_map<vk::DescriptorType, uint32_t>> setTypeCounts(3);
-        for (size_t bind = 0; bind < shader.bindCount; ++bind) {
+        for (uint32_t bind = 0; bind < shader.bindCount; ++bind) {
             SpvReflectDescriptorBinding* binding = shader.bindingsReflect[bind];
             auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
             std::string_view name(binding->name);
@@ -245,10 +245,10 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
     vk.device->updateDescriptorSets(writeDescSets, copyDescSets);
 
-    size_t vertexAttrOffset = 0;
+    uint32_t vertexAttrOffset = 0;
     Shader& vertexShader = pipeline.shaders.front();
     std::vector<std::pair<vk::Format, uint32_t>> vertexAttrPairs;
-    for (size_t layout = 0; layout < vertexShader.inputCount; ++layout) {
+    for (uint32_t layout = 0; layout < vertexShader.inputCount; ++layout) {
         auto const input = vertexShader.inputsReflect[layout];
         uint32_t compCount = input->numeric.vector.component_count;
         uint32_t elemSize = input->numeric.scalar.width; // Units are bits not bytes
@@ -266,7 +266,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
         } else if (compCount == 2 && elemSize == sizeof(float) * 8) {
             format = vk::Format::eR32G32Sfloat;
         }
-        size_t size = sizeof(float) * compCount;
+        uint32_t size = sizeof(float) * compCount;
 
         vertexAttrPairs.emplace_back(format, vertexAttrOffset);
         auto [it, wasAdded] = vertexShader.vertAttrs.emplace(layout, VertexAttr{name, format, size, vertexAttrOffset});
@@ -428,20 +428,20 @@ vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::re
 
 void tryFillAttributeBuffer(
         VulkanContext const& vk, entt::resource<tinygltf::Model> const& model, vk::raii::su::BufferData& bufData, std::string const& attrName,
-        size_t modelStride, vk::DeviceSize shaderStride, vk::DeviceSize offset
+        uint32_t modelStride, vk::DeviceSize shaderStride, vk::DeviceSize offset
 ) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
     // Check if this model has a corresponding attribute by name
     auto it = primitive.attributes.find(attrName);
     if (it == primitive.attributes.end()) return;
 
-    size_t attrIdx = it->second;
+    uint32_t attrIdx = it->second;
     tinygltf::Accessor& acc = model->accessors.at(attrIdx);
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
     tinygltf::Buffer& buf = model->buffers.at(view.buffer);
     auto modelData = reinterpret_cast<std::byte*>(buf.data.data()) + view.byteOffset + acc.byteOffset;
     auto devData = static_cast<std::byte*>(bufData.deviceMemory->mapMemory(0, view.byteLength)) + offset;
-    for (size_t i = 0; i < acc.count; i++) {
+    for (uint32_t i = 0; i < acc.count; i++) {
         std::memcpy(devData, modelData, modelStride);
         modelData += modelStride;
         devData += shaderStride;
@@ -485,7 +485,7 @@ void renderOpaque(App& app) {
 
         vk::raii::su::copyToDevice(*pipeline.uniforms.find({0, 1})->second.deviceMemory, scene);
 
-        size_t drawIdx;
+        uint32_t drawIdx;
         auto modelView = app.renderWorld.view<const Position, const Orientation, const Material, const ModelHandle>();
         // We store data per model in a dynamic UBO to save memory
         // This way we only have one upload
@@ -517,7 +517,7 @@ void renderOpaque(App& app) {
                 model = assetIt->second;
                 assert(model);
 
-                size_t vertCount = model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count;
+                auto vertCount = static_cast<uint32_t>(model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count);
                 vk::raii::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
                                                      vk::BufferUsageFlagBits::eVertexBuffer};
                 for (auto& [layout, attr]: vertShader.vertAttrs) {
@@ -546,7 +546,7 @@ void renderOpaque(App& app) {
                 for (auto& descSet: pipeline.descSets) proxyDescSets.push_back(*descSet);
 
                 vk.cmdBufs->front().bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **pipeline.layout, 0u, proxyDescSets, dynamicOffsets);
-                uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
+                auto indexCount = static_cast<uint32_t>(model->accessors[model->meshes.front().primitives.front().indices].count);
                 vk.cmdBufs->front().drawIndexed(indexCount, 1, 0, 0, 0);
             }
             drawIdx++;

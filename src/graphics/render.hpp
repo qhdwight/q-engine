@@ -88,14 +88,14 @@ struct ModelBuffers {
 struct VertexAttr {
     std::string name;
     vk::Format format;
-    size_t size;
-    size_t offset;
+    uint32_t size;
+    uint32_t offset;
 };
 
 struct Shader {
     vk::raii::ShaderModule module;
     std::unordered_map<uint32_t, VertexAttr> vertAttrs{};
-    size_t vertAttrStride{};
+    uint32_t vertAttrStride{};
     SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
     SpvReflectDescriptorBinding** bindingsReflect = nullptr;

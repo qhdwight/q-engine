@@ -58,7 +58,7 @@ struct CubeMapData {
         // Copy from staging buffer to the zeroth mip level of the image
         // We will then use blit to generate the rest of the mip levels
         std::array<vk::BufferImageCopy, 6> copyRegions;
-        for (size_t face = 0; face < 6; ++face) {
+        for (uint32_t face = 0; face < 6; ++face) {
             copyRegions[face] = vk::BufferImageCopy(
                     0,
                     dim, dim,
