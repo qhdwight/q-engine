@@ -105,8 +105,8 @@ struct Shader {
 
 struct Pipeline {
     std::vector<Shader> shaders;
-    std::optional<vk::raii::PipelineLayout> layout;
     std::optional<vk::raii::Pipeline> value;
+    std::optional<vk::raii::PipelineLayout> layout;
     std::vector<vk::raii::DescriptorSetLayout> descSetLayouts;
     std::vector<vk::raii::DescriptorSet> descSets;
     std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
@@ -114,30 +114,31 @@ struct Pipeline {
 
 struct VulkanContext {
     vk::raii::Context ctx;
-    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
     std::optional<vk::raii::Instance> inst;
+    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
     std::optional<vk::raii::PhysicalDevice> physDev;
-    std::optional<vk::raii::Device> device;
     std::optional<vk::raii::su::SurfaceData> surfData;
+    std::optional<vk::raii::Device> device;
+    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
     std::optional<vk::raii::CommandPool> cmdPool;
     std::optional<vk::raii::CommandBuffers> cmdBufs;
-    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
-    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
     std::optional<vk::raii::su::SwapChainData> swapChainData;
-    std::optional<vk::raii::RenderPass> renderPass;
+    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
     std::vector<vk::raii::Framebuffer> framebufs;
-    std::optional<vk::raii::PipelineCache> pipelineCache;
+    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
+    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
+    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
+    aligned_vector<Material> materialUpload;
+    aligned_vector<ModelUpload> modelUpload;
+    std::optional<vk::raii::RenderPass> renderPass;
     std::optional<vk::raii::DescriptorPool> descriptorPool;
+    std::optional<vk::raii::PipelineCache> pipelineCache;
+    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
     std::optional<vk::raii::Semaphore> imgAcqSem;
     std::optional<vk::raii::Fence> drawFence;
-    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
-    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
-    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
-    aligned_vector<ModelUpload> modelUpload;
-    aligned_vector<Material> materialUpload;
+
+    ImGui_ImplVulkanH_Window imGuiWindow;
     CameraUpload cameraUpload;
     SceneUpload sceneUpload;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;
-    ImGui_ImplVulkanH_Window imGuiWindow;
 };

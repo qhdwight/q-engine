@@ -24,12 +24,8 @@ struct CubeMapData {
                       vk::BorderColor::eFloatOpaqueBlack
               }) {
         vk::FormatProperties formatProperties = physicalDevice.getFormatProperties(format);
-        vk::ImageTiling imageTiling;
-        vk::ImageLayout initialLayout;
-        stagingBufferData = std::make_unique<vk::raii::su::BufferData>(physicalDevice, device, dim * dim * 4, vk::BufferUsageFlagBits::eTransferSrc);
-        imageTiling = vk::ImageTiling::eOptimal;
-        initialLayout = vk::ImageLayout::eUndefined;
-        imageData = std::make_unique<vk::raii::su::ImageData>(
+        stagingBufferData = vk::raii::su::BufferData(physicalDevice, device, dim * dim * 4, vk::BufferUsageFlagBits::eTransferSrc);
+        imageData = vk::raii::su::ImageData(
                 physicalDevice,
                 device,
                 format,
@@ -108,8 +104,8 @@ struct CubeMapData {
 
     vk::Format format;
     uint32_t dim;
-    std::unique_ptr<vk::raii::su::BufferData> stagingBufferData = nullptr;
-    std::unique_ptr<vk::raii::su::ImageData> imageData = nullptr;
+    std::optional<vk::raii::su::BufferData> stagingBufferData;
+    std::optional<vk::raii::su::ImageData> imageData;
     vk::raii::Sampler sampler;
 };
 

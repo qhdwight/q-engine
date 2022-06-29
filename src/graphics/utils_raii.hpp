@@ -115,9 +115,7 @@ namespace vk::raii::su {
             vk::raii::su::BufferData stagingBuffer(physicalDevice, device, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
             copyToDevice(stagingBuffer.deviceMemory, data.data(), data.size(), elementSize);
 
-            vk::raii::su::oneTimeSubmit(device,
-                                        commandPool,
-                                        queue,
+            vk::raii::su::oneTimeSubmit(device, commandPool, queue,
                                         [&](vk::raii::CommandBuffer const& commandBuffer) {
                                             commandBuffer.copyBuffer(**stagingBuffer.buffer, **this->buffer, vk::BufferCopy(0, 0, dataSize));
                                         });
@@ -201,10 +199,8 @@ namespace vk::raii::su {
 
             if (needsStaging) {
                 // Since we're going to blit to the texture image, set its layout to eTransferDstOptimal
-                vk::raii::su::setImageLayout(
-                        commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::eUndefined,
-                        vk::ImageLayout::eTransferDstOptimal
-                );
+                vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::eUndefined,
+                                             vk::ImageLayout::eTransferDstOptimal);
                 vk::BufferImageCopy copyRegion(
                         0,
                         extent.width,
@@ -213,17 +209,14 @@ namespace vk::raii::su {
                         vk::Offset3D(0, 0, 0),
                         vk::Extent3D(extent, 1)
                 );
-                commandBuffer.copyBufferToImage(**stagingBufferData->buffer, **imageData->image, vk::ImageLayout::eTransferDstOptimal,
-                                                copyRegion);
+                commandBuffer.copyBufferToImage(**stagingBufferData->buffer, **imageData->image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
                 // Set the layout for the texture image from eTransferDstOptimal to eShaderReadOnlyOptimal
-                vk::raii::su::setImageLayout(
-                        commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::eTransferDstOptimal,
-                        vk::ImageLayout::eShaderReadOnlyOptimal);
+                vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::eTransferDstOptimal,
+                                             vk::ImageLayout::eShaderReadOnlyOptimal);
             } else {
                 // If we can use the linear tiled image as a texture, just do it
-                vk::raii::su::setImageLayout(
-                        commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::ePreinitialized,
-                        vk::ImageLayout::eShaderReadOnlyOptimal);
+                vk::raii::su::setImageLayout(commandBuffer, **imageData->image, imageData->format, vk::ImageLayout::ePreinitialized,
+                                             vk::ImageLayout::eShaderReadOnlyOptimal);
             }
         }
 
