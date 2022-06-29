@@ -83,7 +83,7 @@ vk::raii::su::SwapChainData::SwapChainData(vk::raii::PhysicalDevice const& physi
 vk::raii::su::TextureData::TextureData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, vk::Extent2D const& extent_,
                                        vk::ImageUsageFlags usageFlags, vk::FormatFeatureFlags formatFeatureFlags, bool anisotropyEnable,
                                        bool forceStaging)
-        : format(vk::Format::eR8G8B8A8Unorm),
+        : format(vk::Format::eR8G8B8A8Srgb),
           extent(extent_),
           sampler(device,
                   {{},
@@ -136,7 +136,8 @@ vk::raii::su::TextureData::TextureData(vk::raii::PhysicalDevice const& physicalD
 vk::raii::su::ImageData::ImageData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, vk::Format format_,
                                    vk::Extent2D const& extent, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageLayout initialLayout,
                                    vk::MemoryPropertyFlags memoryProperties, vk::ImageAspectFlags aspectMask, vk::ImageCreateFlags imageFlags,
-                                   uint32_t arrayLayers)
+                                   vk::ImageViewType viewType,
+                                   uint32_t mipLevel, uint32_t layerCount)
         : format(format_),
           image(vk::raii::Image(
                         device,
@@ -144,9 +145,8 @@ vk::raii::su::ImageData::ImageData(vk::raii::PhysicalDevice const& physicalDevic
                          vk::ImageType::e2D,
                          format,
                          vk::Extent3D(extent, 1),
-                         static_cast<uint32_t>(floor(log2(std::max(extent.width, extent.height)))) +
-                         1,
-                         arrayLayers,
+                         mipLevel,
+                         layerCount,
                          vk::SampleCountFlagBits::e1,
                          tiling,
                          usage | vk::ImageUsageFlagBits::eSampled,
@@ -159,8 +159,8 @@ vk::raii::su::ImageData::ImageData(vk::raii::PhysicalDevice const& physicalDevic
           deviceMemory(vk::raii::su::allocateDeviceMemory(
                   device, physicalDevice.getMemoryProperties(), image->getMemoryRequirements(), memoryProperties)) {
     image->bindMemory(**deviceMemory, 0);
-    imageView = vk::raii::ImageView(device, vk::ImageViewCreateInfo({}, **image, vk::ImageViewType::e2D, format, {},
-                                                                    {aspectMask, 0, 1, 0, 1}));
+    imageView = vk::raii::ImageView(device, vk::ImageViewCreateInfo({}, **image, viewType, format, {},
+                                                                    {aspectMask, 0, layerCount, 0, layerCount}));
 }
 
 vk::raii::su::BufferData::BufferData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, vk::DeviceSize size,
@@ -177,12 +177,15 @@ vk::raii::su::BufferData::BufferData(vk::raii::PhysicalDevice const& physicalDev
 }
 
 void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, vk::Image image, vk::Format format, vk::ImageLayout oldImageLayout,
-                                  vk::ImageLayout newImageLayout, uint32_t levelCount, uint32_t layerCount, uint32_t baseArrayLevel,
-                                  uint32_t baseMipLevel) {
+                                  vk::ImageLayout newImageLayout,
+                                  uint32_t levelCount, uint32_t layerCount, uint32_t baseArrayLevel, uint32_t baseMipLevel) {
     vk::AccessFlags sourceAccessMask;
     switch (oldImageLayout) {
         case vk::ImageLayout::eTransferDstOptimal:
             sourceAccessMask = vk::AccessFlagBits::eTransferWrite;
+            break;
+        case vk::ImageLayout::eTransferSrcOptimal:
+            sourceAccessMask = vk::AccessFlagBits::eTransferRead;
             break;
         case vk::ImageLayout::ePreinitialized:
             sourceAccessMask = vk::AccessFlagBits::eHostWrite;
@@ -202,6 +205,7 @@ void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, 
             sourceStage = vk::PipelineStageFlagBits::eHost;
             break;
         case vk::ImageLayout::eTransferDstOptimal:
+        case vk::ImageLayout::eTransferSrcOptimal:
             sourceStage = vk::PipelineStageFlagBits::eTransfer;
             break;
         case vk::ImageLayout::eUndefined:
@@ -347,12 +351,7 @@ vk::raii::DescriptorPool vk::raii::su::makeDescriptorPool(vk::raii::Device const
     assert(0 < maxSets);
 
     vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes);
-    return vk::raii::DescriptorPool(device, descriptorPoolCreateInfo);
-}
-
-vk::raii::CommandBuffer vk::raii::su::makeCommandBuffer(vk::raii::Device const& device, vk::raii::CommandPool const& commandPool) {
-    vk::CommandBufferAllocateInfo commandBufferAllocateInfo(*commandPool, vk::CommandBufferLevel::ePrimary, 1);
-    return std::move(vk::raii::CommandBuffers(device, commandBufferAllocateInfo).front());
+    return {device, descriptorPoolCreateInfo};
 }
 
 vk::raii::Device
@@ -425,9 +424,8 @@ vk::raii::Pipeline vk::raii::su::makeGraphicsPipeline(vk::raii::Device const& de
             vk::PipelineDepthStencilStateCreateFlags(), depthBuffered, depthBuffered, vk::CompareOp::eLessOrEqual, false, false,
             stencilOpState, stencilOpState);
 
-    vk::ColorComponentFlags colorComponentFlags(
-            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA);
+    vk::ColorComponentFlags colorComponentFlags(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
+                                                vk::ColorComponentFlagBits::eA);
     vk::PipelineColorBlendAttachmentState pipelineColorBlendAttachmentState(false,
                                                                             vk::BlendFactor::eZero,
                                                                             vk::BlendFactor::eZero,
@@ -562,8 +560,8 @@ vk::raii::su::makeFramebuffers(vk::raii::Device const& device, vk::raii::RenderP
     vk::ImageView attachments[2];
     attachments[1] = pDepthImageView ? **pDepthImageView : vk::ImageView();
 
-    vk::FramebufferCreateInfo framebufferCreateInfo(
-            vk::FramebufferCreateFlags(), *renderPass, pDepthImageView ? 2 : 1, attachments, extent.width, extent.height, 1);
+    vk::FramebufferCreateInfo framebufferCreateInfo(vk::FramebufferCreateFlags(), *renderPass, pDepthImageView ? 2 : 1, attachments, extent.width,
+                                                    extent.height, 1);
     std::vector<vk::raii::Framebuffer> framebuffers;
     framebuffers.reserve(imageViews.size());
     for (auto const& imageView: imageViews) {

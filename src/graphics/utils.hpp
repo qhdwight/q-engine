@@ -33,7 +33,7 @@ namespace vk::su {
             uint32_t levelCount = 1, uint32_t layerCount = 1, uint32_t baseArrayLevel = 0, uint32_t baseMipLevel = 0);
 
     struct WindowData {
-        WindowData(GLFWwindow* wnd, std::string const& name, vk::Extent2D const& extent);
+        WindowData(GLFWwindow* wnd, std::string name, vk::Extent2D const& extent);
 
         WindowData(const WindowData&) = delete;
 
@@ -104,4 +104,4 @@ namespace vk::su {
 
     vk::SurfaceFormatKHR pickSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& formats);
 
-}  // namespace vk
+}

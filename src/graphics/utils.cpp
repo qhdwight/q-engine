@@ -19,6 +19,7 @@
 
 #include <iomanip>
 #include <numeric>
+#include <utility>
 
 #if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -482,7 +483,7 @@ namespace vk::su {
         }
     }
 
-    WindowData::WindowData(GLFWwindow* wnd, std::string const& name, vk::Extent2D const& extent) : handle{wnd}, name{name}, extent{extent} {}
+    WindowData::WindowData(GLFWwindow* wnd, std::string name, vk::Extent2D const& extent) : handle{wnd}, name{std::move(name)}, extent{extent} {}
 
     WindowData::WindowData(WindowData&& other) noexcept
             : handle(other.handle),

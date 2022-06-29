@@ -56,7 +56,6 @@ void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFl
     std::vector<unsigned int> shaderSPV;
     glslang::GlslangToSpv(*program.getIntermediate(stage), shaderSPV);
 
-
     Shader shaderExt{vk::raii::ShaderModule(*vk.device, vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), shaderSPV))};
     SpvReflectResult result = spvReflectCreateShaderModule(shaderSPV.size() * sizeof(unsigned int), shaderSPV.data(), &shaderExt.reflect);
     if (result != SPV_REFLECT_RESULT_SUCCESS) {
@@ -78,15 +77,16 @@ void createSwapChain(VulkanContext& vk) {
             graphicsFamilyIdx,
             presentFamilyIdx
     );
-    vk::raii::su::DepthBufferData depthBufData(*vk.physDev, *vk.device, vk::Format::eD16Unorm, vk.surfData->extent);
+
+    vk.depthBufferData = vk::raii::su::DepthBufferData(*vk.physDev, *vk.device, vk::raii::su::pickDepthFormat(*vk.physDev), vk.surfData->extent);
 
     vk.renderPass = vk::raii::su::makeRenderPass(
             *vk.device,
             vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
-            depthBufData.format
+            vk.depthBufferData->format
     );
 
-    vk.framebufs = vk::raii::su::makeFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, &*depthBufData.imageView,
+    vk.framebufs = vk::raii::su::makeFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, &*vk.depthBufferData->imageView,
                                                   vk.surfData->extent);
 }
 
@@ -204,28 +204,28 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
                         case SpvDim2D: {
                             vk::raii::su::TextureData texData{*vk.physDev, *vk.device};
                             // Upload image to the GPU
-                            vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            texData.setImage(*vk.cmdBuf, vk::su::MonochromeImageGenerator({255, 255, 255}));
-                            vk.cmdBuf->end();
-                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, **vk.cmdBuf), {});
-                            vk.device->waitIdle();
+                            vk::raii::su::oneTimeSubmit(vk.cmdBufs->front(), *vk.graphicsQueue,
+                                                        [&texData](vk::raii::CommandBuffer const& cmdBuf) {
+                                                            texData.setImage(cmdBuf, vk::su::MonochromeImageGenerator({255, 255, 255}));
+                                                        });
 
                             auto [it, _] = vk.textures.emplace(binding->set + binding->binding * 1024, std::move(texData));
-                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView,
+                                                      vk::ImageLayout::eShaderReadOnlyOptimal);
                             writeDescSets.emplace_back(*descSet, binding->binding, 0,
                                                        vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
                             break;
                         }
                         case SpvDimCube: {
                             CubeMapData cubeData{*vk.physDev, *vk.device};
-                            vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-                            cubeData.setImage(*vk.device, *vk.cmdBuf, SkyboxImageGenerator());
-                            vk.cmdBuf->end();
-                            vk.graphicsQueue->submit(vk::SubmitInfo({}, {}, **vk.cmdBuf), {});
-                            vk.device->waitIdle();
+                            vk::raii::su::oneTimeSubmit(vk.cmdBufs->front(), *vk.graphicsQueue,
+                                                        [&cubeData, &vk](vk::raii::CommandBuffer const& cmdBuf) {
+                                                            cubeData.setImage(*vk.device, cmdBuf, SkyboxImageGenerator());
+                                                        });
 
                             auto [it, _] = vk.cubeMaps.emplace(binding->set + binding->binding * 1024, std::move(cubeData));
-                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+                            descImgInfos.emplace_back(*it->second.sampler, **it->second.imageData->imageView,
+                                                      vk::ImageLayout::eShaderReadOnlyOptimal);
                             writeDescSets.emplace_back(*descSet, binding->binding, 0,
                                                        vk::DescriptorType::eCombinedImageSampler, descImgInfos.back(), nullptr, nullptr);
                             break;
@@ -328,7 +328,7 @@ void setupImgui(VulkanContext& vk) {
     ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(**vk.renderPass));
     std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
-    vk::raii::su::oneTimeSubmit(*vk.cmdBuf, *vk.graphicsQueue, [](vk::raii::CommandBuffer const& cmdBuf) {
+    vk::raii::su::oneTimeSubmit(vk.cmdBufs->front(), *vk.graphicsQueue, [](vk::raii::CommandBuffer const& cmdBuf) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*cmdBuf));
     });
 
@@ -341,10 +341,7 @@ void init(VulkanContext& vk) {
     std::cout << "[Vulkan] Instance created" << std::endl;
 
 #if !defined(NDEBUG)
-    auto result = (**vk.inst).createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
-    if (!result) {
-        throw std::runtime_error("Failed to create debug messenger!");
-    }
+    vk.debugUtilMessenger = vk::raii::DebugUtilsMessengerEXT(*vk.inst, vk::su::makeDebugUtilsMessengerCreateInfoEXT());
 #endif
 
     auto physDevs = vk::raii::PhysicalDevices{*vk.inst};
@@ -376,8 +373,8 @@ void init(VulkanContext& vk) {
 //#endif
     vk.device = vk::raii::su::makeDevice(*vk.physDev, vk.graphicsFamilyIdx, extensions);
 
-    vk::raii::CommandPool cmdPool = vk::raii::CommandPool(*vk.device, vk.graphicsFamilyIdx);
-    vk.cmdBuf = vk::raii::su::makeCommandBuffer(*vk.device, cmdPool);
+    vk.cmdPool = vk::raii::CommandPool(*vk.device, {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphicsFamilyIdx});
+    vk.cmdBufs = vk::raii::CommandBuffers(*vk.device, {**vk.cmdPool, vk::CommandBufferLevel::ePrimary, 2});
 
     vk.graphicsQueue = vk::raii::Queue(*vk.device, vk.graphicsFamilyIdx, 0);
     vk.presentQueue = vk::raii::Queue(*vk.device, vk.presentFamilyIdx, 0);
@@ -454,14 +451,14 @@ void tryFillAttributeBuffer(
 
 void renderOpaque(App& app) {
     auto& vk = app.globalCtx.at<VulkanContext>();
-    vk.cmdBuf->setViewport(0, vk::Viewport(0.0f, 0.0f,
-                                           static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
-                                           0.0f, 1.0f));
-    vk.cmdBuf->setScissor(0, vk::Rect2D({}, vk.surfData->extent));
+    vk.cmdBufs->front().setViewport(0, vk::Viewport(0.0f, 0.0f,
+                                                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
+                                                    0.0f, 1.0f));
+    vk.cmdBufs->front().setScissor(0, vk::Rect2D({}, vk.surfData->extent));
 
     for (auto& [handle, pipeline]: vk.modelPipelines) {
         Shader const& vertShader = pipeline.shaders[0];
-        vk.cmdBuf->bindPipeline(vk::PipelineBindPoint::eGraphics, **pipeline.value);
+        vk.cmdBufs->front().bindPipeline(vk::PipelineBindPoint::eGraphics, **pipeline.value);
         auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
         auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
         for (auto [ent, pos, look, player]: playerIt) {
@@ -537,15 +534,20 @@ void renderOpaque(App& app) {
                 rawModelBuffers = &modelBufIt->second;
             }
             if (rawModelBuffers) {
-                vk.cmdBuf->bindVertexBuffers(0, **rawModelBuffers->vertBufData.buffer, {0});
-                vk.cmdBuf->bindIndexBuffer(**rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
+                vk.cmdBufs->front().bindVertexBuffers(0, **rawModelBuffers->vertBufData.buffer, {0});
+                vk.cmdBufs->front().bindIndexBuffer(**rawModelBuffers->indexBufData.buffer, 0, vk::IndexType::eUint16);
                 std::array<uint32_t, 2> dynamicOffsets{
                         static_cast<uint32_t>(drawIdx * vk.modelUpload.block_size()),
                         static_cast<uint32_t>(drawIdx * vk.materialUpload.block_size())
                 };
-//                vk.cmdBuf->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **pipeline.layout, 0u, *pipeline.descSets, dynamicOffsets);
+
+                std::vector<vk::DescriptorSet> proxyDescSets;
+                proxyDescSets.reserve(pipeline.descSets.size());
+                for (auto& descSet: pipeline.descSets) proxyDescSets.push_back(*descSet);
+
+                vk.cmdBufs->front().bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **pipeline.layout, 0u, proxyDescSets, dynamicOffsets);
                 uint32_t indexCount = model->accessors[model->meshes.front().primitives.front().indices].count;
-                vk.cmdBuf->drawIndexed(indexCount, 1, 0, 0, 0);
+                vk.cmdBufs->front().drawIndexed(indexCount, 1, 0, 0, 0);
             }
             drawIdx++;
         }
@@ -599,7 +601,7 @@ void renderImGui(App& app) {
     renderImGuiInspector(app);
     renderImGuiOverlay(app);
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(**vk.cmdBuf));
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBufs->front()));
 }
 
 void VulkanRenderPlugin::build(App& app) {
@@ -635,7 +637,7 @@ void VulkanRenderPlugin::execute(App& app) {
         createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
     }
 
-    vk.cmdBuf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
+    vk.cmdBufs->front().begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
     vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
     vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
     std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
@@ -645,17 +647,17 @@ void VulkanRenderPlugin::execute(App& app) {
             vk::Rect2D({}, vk.surfData->extent),
             clearVals
     );
-    vk.cmdBuf->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    vk.cmdBufs->front().beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     renderOpaque(app);
     renderImGui(app);
-    vk.cmdBuf->endRenderPass();
-    vk.cmdBuf->end();
+    vk.cmdBufs->front().endRenderPass();
+    vk.cmdBufs->front().end();
 
     vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
     // Fences need to be manually reset
     vk.device->resetFences(**vk.drawFence);
     // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
-    vk.graphicsQueue->submit(vk::SubmitInfo(**vk.imgAcqSem, waitDestStageMask, **vk.cmdBuf), **vk.drawFence);
+    vk.graphicsQueue->submit(vk::SubmitInfo(**vk.imgAcqSem, waitDestStageMask, *vk.cmdBufs->front()), **vk.drawFence);
 
     // Wait for the draw fence to be signaled
     while (vk::Result::eTimeout == vk.device->waitForFences(**vk.drawFence, VK_TRUE, vk::su::FenceTimeout));

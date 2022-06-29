@@ -75,8 +75,6 @@ namespace vk::raii::su {
                    vk::BufferUsageFlags usage,
                    vk::MemoryPropertyFlags propertyFlags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-        explicit BufferData(std::nullptr_t) {}
-
         template<typename DataType>
         void upload(DataType const& data) const {
             assert((m_propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent) &&
@@ -147,9 +145,8 @@ namespace vk::raii::su {
                   vk::MemoryPropertyFlags memoryProperties,
                   vk::ImageAspectFlags aspectMask,
                   vk::ImageCreateFlags imageFlags = {},
-                  uint32_t arrayLayers = 1);
-
-        explicit ImageData(std::nullptr_t) {}
+                  vk::ImageViewType viewType = vk::ImageViewType::e2D,
+                  uint32_t mipLevel = 1, uint32_t layerCount = 1);
 
         vk::Format format;
         std::optional<vk::raii::Image> image;
@@ -240,8 +237,6 @@ namespace vk::raii::su {
 
     std::pair<uint32_t, uint32_t> findGraphicsAndPresentQueueFamilyIndex(vk::raii::PhysicalDevice const& physicalDevice,
                                                                          vk::raii::SurfaceKHR const& surface);
-
-    vk::raii::CommandBuffer makeCommandBuffer(vk::raii::Device const& device, vk::raii::CommandPool const& commandPool);
 
     vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& poolSizes);
 

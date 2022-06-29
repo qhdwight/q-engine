@@ -114,12 +114,15 @@ struct Pipeline {
 
 struct VulkanContext {
     vk::raii::Context ctx;
+    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
     std::optional<vk::raii::Instance> inst;
     std::optional<vk::raii::PhysicalDevice> physDev;
     std::optional<vk::raii::Device> device;
     std::optional<vk::raii::su::SurfaceData> surfData;
-    std::optional<vk::raii::CommandBuffer> cmdBuf;
+    std::optional<vk::raii::CommandPool> cmdPool;
+    std::optional<vk::raii::CommandBuffers> cmdBufs;
     std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
+    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
     std::optional<vk::raii::su::SwapChainData> swapChainData;
     std::optional<vk::raii::RenderPass> renderPass;
     std::vector<vk::raii::Framebuffer> framebufs;

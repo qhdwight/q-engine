@@ -2,21 +2,6 @@
 
 #include "utils_raii.hpp"
 
-struct CubeMapImageData : public vk::raii::su::ImageData {
-    CubeMapImageData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, vk::Format format, vk::Extent2D const& extent)
-            : ImageData(physicalDevice,
-                        device,
-                        format,
-                        extent,
-                        vk::ImageTiling::eOptimal,
-                        vk::ImageUsageFlagBits::eSampled,
-                        vk::ImageLayout::eUndefined,
-                        vk::MemoryPropertyFlagBits::eDeviceLocal,
-                        vk::ImageAspectFlagBits::eColor,
-                        vk::ImageCreateFlagBits::eCubeCompatible) {
-    }
-};
-
 struct CubeMapData {
     CubeMapData(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::Device const& device, uint32_t dim = 256)
             : format(vk::Format::eR8G8B8A8Unorm),
@@ -54,7 +39,10 @@ struct CubeMapData {
                 vk::ImageLayout::eUndefined,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 vk::ImageAspectFlagBits::eColor,
-                vk::ImageCreateFlagBits::eCubeCompatible
+                vk::ImageCreateFlagBits::eCubeCompatible,
+                vk::ImageViewType::eCube,
+                static_cast<uint32_t>(floor(log2(dim))) + 1,
+                6
         );
     }
 
