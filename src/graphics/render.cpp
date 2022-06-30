@@ -77,15 +77,12 @@ void createSwapChain(VulkanContext& vk) {
             graphicsFamilyIdx,
             presentFamilyIdx
     );
-
     vk.depthBufferData = vk::raii::su::DepthBufferData(*vk.physDev, *vk.device, vk::raii::su::pickDepthFormat(*vk.physDev), vk.surfData->extent);
-
     vk.renderPass = vk::raii::su::makeRenderPass(
             *vk.device,
             vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
             vk.depthBufferData->format
     );
-
     vk.framebufs = vk::raii::su::makeFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, &*vk.depthBufferData->imageView,
                                                   vk.surfData->extent);
 }
@@ -297,9 +294,7 @@ void recreatePipeline(VulkanContext& vk) {
     glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
     vk.surfData->extent = vk::Extent2D(width, height);
     // Force recreation of pipelines, as they depend on the swap chain
-    for (auto& [modelHandle, pipeline]: vk.modelPipelines) {
-        pipeline.value.reset();
-    }
+    vk.modelPipelines.clear();
     createSwapChain(vk);
 }
 
@@ -685,6 +680,7 @@ void VulkanRenderPlugin::execute(App& app) {
 }
 
 void VulkanRenderPlugin::cleanup(App& app) {
+    ImGui_ImplVulkan_Shutdown();
     glslang::FinalizeProcess();
     for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
         for (auto& item: pipeline.shaders) {

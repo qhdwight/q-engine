@@ -110,6 +110,7 @@ int main() {
             render.execute(app);
         }
         physics.cleanup(app);
+        render.cleanup(app);
     }
     catch (std::exception const& err) {
         std::cerr << "exception: " << err.what() << std::endl;
