@@ -1,15 +1,13 @@
 #include "render.hpp"
 
-#include <fstream>
-#include <filesystem>
-
 #include <imgui.h>
 #include <spirv_reflect.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 
+#include "app.hpp"
 #include "shaders.hpp"
-#include "../inspector.hpp"
+#include "inspector.hpp"
 #include "shader_math.hpp"
 
 using namespace entt::literals;
@@ -83,8 +81,13 @@ void createSwapChain(VulkanContext& vk) {
             vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
             vk.depthBufferData->format
     );
-    vk.framebufs = vk::raii::su::makeFramebuffers(*vk.device, *vk.renderPass, vk.swapChainData->imageViews, &*vk.depthBufferData->imageView,
-                                                  vk.surfData->extent);
+    vk.framebufs = vk::raii::su::makeFramebuffers(
+            *vk.device,
+            *vk.renderPass,
+            vk.swapChainData->imageViews,
+            &*vk.depthBufferData->imageView,
+            vk.surfData->extent
+    );
 }
 
 //bool ends_with(std::string_view value, std::string_view ending) {
@@ -125,7 +128,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
             SpvReflectDescriptorBinding* binding = shader.bindingsReflect[bind];
             auto descType = static_cast<vk::DescriptorType>(binding->descriptor_type);
             std::string_view name(binding->name);
-            if (descType == vk::DescriptorType::eUniformBuffer && std::find(DynamicName.begin(), DynamicName.end(), name) != DynamicName.end()) {
+            if (descType == vk::DescriptorType::eUniformBuffer && DynamicNames.contains(name)) {
                 // nothing in the shader marks a uniform as dynamic, so we have to infer it from the name
                 descType = vk::DescriptorType::eUniformBufferDynamic;
                 binding->descriptor_type = static_cast<SpvReflectDescriptorType>(descType);

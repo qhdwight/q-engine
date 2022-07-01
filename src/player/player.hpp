@@ -1,5 +1,7 @@
 #pragma once
 
-#include "../state.hpp"
+#include "game_pch.hpp"
+
+#include "app.hpp"
 
 void modify(App& app);

@@ -1,17 +1,6 @@
 #pragma once
 
-#include <string>
-#include <numeric>
-#include <iostream>
-#include <optional>
-#include <unordered_map>
-
-#include <entt/resource/cache.hpp>
-#include <entt/entity/registry.hpp>
-#include <edyn/comp/linvel.hpp>
-#include <edyn/math/vector2.hpp>
-#include <edyn/comp/position.hpp>
-#include <edyn/comp/orientation.hpp>
+#include "game_pch.hpp"
 
 #include "assets.hpp"
 
@@ -23,12 +12,8 @@ using ent_t = entt::registry::entity_type;
 using Position = edyn::position;
 using Orientation = edyn::orientation;
 using LinearVelocity = edyn::linvel;
-using scalar = edyn::scalar;
-using vec3 = edyn::vector3;
-using vec2 = edyn::vector2;
 using player_id_t = uint8_t;
 using asset_handle_t = entt::id_type;
-using ModelAssets = entt::resource_cache<Model, ModelLoader>;
 
 struct Handle {
     asset_handle_t value;
@@ -130,16 +115,4 @@ struct DiagnosticResource {
     void addFrameTime(ns_t deltaNs);
 
     [[nodiscard]] double getAvgFrameTime() const;
-};
-
-struct World : entt::registry {
-};
-
-typedef entt::registry::context Context;
-
-struct App {
-    World logicWorld;
-    World renderWorld;
-    Context globalCtx;
-    ModelAssets modelAssets;
 };

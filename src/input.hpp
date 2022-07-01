@@ -1,5 +1,11 @@
 #pragma once
 
-#include "state.hpp"
+#include "game_pch.hpp"
+
+#include "app.hpp"
+
+struct InputSettings {
+    float sensitivity;
+};
 
 void input(App& app);

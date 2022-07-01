@@ -1,6 +1,6 @@
 #pragma once
 
-#include <memory>
+#include "game_pch.hpp"
 
 #include <tiny_gltf.h>
 

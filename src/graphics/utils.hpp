@@ -15,14 +15,14 @@
 // limitations under the License.
 //
 
+#include "game_pch.hpp"
+
 #include "vulkan/vulkan.hpp"
 
 #define GLFW_INCLUDE_NONE
 
 #include <GLFW/glfw3.h>
-#include <iostream>
-#include <limits>
-#include <map>
+
 
 namespace vk::su {
     const uint64_t FenceTimeout = 100000000;

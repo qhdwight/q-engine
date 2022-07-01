@@ -1,29 +1,26 @@
 #pragma once
 
-#include <array>
-#include <optional>
-#include <unordered_map>
+#include "game_pch.hpp"
 
 #include <spirv_reflect.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
-#include <edyn/math/matrix3x3.hpp>
 #include <backends/imgui_impl_vulkan.h>
 
-#include "../state.hpp"
-#include "../plugin.hpp"
-#include "../matrix4x4.hpp"
-#include "../aligned_vector.hpp"
+#include "state.hpp"
+#include "plugin.hpp"
+#include "matrix4x4.hpp"
+#include "aligned_vector.hpp"
 #include "utils_raii.hpp"
 #include "cubemap.hpp"
 
-const std::vector<std::string_view> DynamicName{"model", "material"};
+const std::unordered_set<std::string_view> DynamicNames{"model", "material"};
 
 using vec2f = std::array<float, 2>;
 using vec3f = std::array<float, 3>;
 using vec4f = std::array<float, 4>;
 
-class VulkanRenderPlugin : Plugin {
+class VulkanRenderPlugin : public Plugin {
 public:
     void build(App& app) override;
 

@@ -1,11 +1,8 @@
 #include "inspector.hpp"
 
-#include <vector>
-
 #include <imgui.h>
-#include <entt/meta/resolve.hpp>
-#include <entt/meta/factory.hpp>
 
+#include "app.hpp"
 #include "state.hpp"
 
 using namespace entt::literals;

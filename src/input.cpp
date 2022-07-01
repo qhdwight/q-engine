@@ -5,6 +5,11 @@
 #include "state.hpp"
 #include "graphics/render.hpp"
 
+double getAxis(GLFWwindow* glfwWindow, int positiveKey, int negativeKey) {
+    return (glfwGetKey(glfwWindow, positiveKey) ? +1.0 : 0.0) +
+           (glfwGetKey(glfwWindow, negativeKey) ? -1.0 : 0.0);
+}
+
 void input(App& app) {
     // TODO:arch restructure so it is graphics API agnostic
     auto vkPtr = app.globalCtx.find<VulkanContext>();
@@ -33,11 +38,11 @@ void input(App& app) {
         window.isFocused = isFocused;
 
         input.move = {
-                (glfwGetKey(glfwWindow, GLFW_KEY_D) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_A) ? -1.0 : 0.0),
-                (glfwGetKey(glfwWindow, GLFW_KEY_W) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_S) ? -1.0 : 0.0),
-                (glfwGetKey(glfwWindow, GLFW_KEY_SPACE) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_LEFT_SHIFT) ? -1.0 : 0.0)
+                getAxis(glfwWindow, GLFW_KEY_D, GLFW_KEY_A),
+                getAxis(glfwWindow, GLFW_KEY_W, GLFW_KEY_S),
+                getAxis(glfwWindow, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT)
         };
-        input.lean = (glfwGetKey(glfwWindow, GLFW_KEY_E) ? 1.0 : 0.0) + (glfwGetKey(glfwWindow, GLFW_KEY_Q) ? -1.0 : 0.0);
+        input.lean = getAxis(glfwWindow, GLFW_KEY_E, GLFW_KEY_Q);
         input.menu.previous = input.menu.current;
         input.menu.current = glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE);
         if (input.menu.current != input.menu.previous && input.menu.current) {

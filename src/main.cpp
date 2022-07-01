@@ -1,9 +1,3 @@
-#include <chrono>
-#include <optional>
-#include <iostream>
-
-#include <edyn/util/rigidbody.hpp>
-
 #include "state.hpp"
 #include "input.hpp"
 #include "player/player.hpp"
@@ -15,10 +9,8 @@ using namespace entt::literals;
 int main() {
     try {
         App app;
-        PhysicsPlugin physics;
-        VulkanRenderPlugin render;
-        physics.build(app);
-        render.build(app);
+        auto physics = app.makePlugin<PhysicsPlugin>();
+        auto render = app.makePlugin<VulkanRenderPlugin>();
 
         app.logicWorld.ctx().emplace<LocalContext>(player_id_t{0});
 
@@ -32,13 +24,14 @@ int main() {
         app.logicWorld.emplace<ItemPickup>(pickupEnt, "M4"_hs);
         app.logicWorld.emplace<ModelHandle>(pickupEnt, "M4"_hs);
 
-        auto player_def = edyn::rigidbody_def();
-        player_def.kind = edyn::rigidbody_kind::rb_dynamic;
-        player_def.sleeping_disabled = true;
-        player_def.shape = edyn::capsule_shape{0.5, 1.0};
-        player_def.gravity = edyn::vector3_zero;
-        player_def.presentation = false;
-        player_def.continuous_contacts = true;
+        auto player_def = edyn::rigidbody_def{
+                .kind = edyn::rigidbody_kind::rb_dynamic,
+                .gravity = edyn::vector3_zero,
+                .shape = edyn::capsule_shape{0.5, 1.0},
+                .continuous_contacts = true,
+                .presentation = false,
+                .sleeping_disabled = true,
+        };
         edyn::make_rigidbody(playerEnt, app.logicWorld, player_def);
 
         for (int i = 0; i < 3; ++i) {
@@ -87,7 +80,7 @@ int main() {
             }
             input(app);
             modify(app);
-            physics.execute(app);
+            physics->execute(app);
 
             app.renderWorld.clear();
             app.renderWorld.ctx().emplace<RenderContext>(app.logicWorld.ctx().at<LocalContext>().localId);
@@ -107,10 +100,8 @@ int main() {
                 app.renderWorld.emplace<Material>(ent, material);
                 app.renderWorld.emplace<ShaderHandle>(ent, "Flat"_hs);
             }
-            render.execute(app);
+            render->execute(app);
         }
-        physics.cleanup(app);
-        render.cleanup(app);
     }
     catch (std::exception const& err) {
         std::cerr << "exception: " << err.what() << std::endl;

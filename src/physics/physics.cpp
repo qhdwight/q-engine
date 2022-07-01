@@ -1,8 +1,6 @@
 #include "physics.hpp"
 
-#include <iostream>
-
-#include <edyn/edyn.hpp>
+#include "app.hpp"
 
 void PhysicsPlugin::build(App& app) {
     edyn::init();

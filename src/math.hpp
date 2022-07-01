@@ -1,10 +1,6 @@
 #pragma once
 
-#include <limits>
-#include <concepts>
-
-#include <edyn/math/vector3.hpp>
-#include <edyn/math/quaternion.hpp>
+#include "game_pch.hpp"
 
 template<typename T>
 requires std::integral<T>

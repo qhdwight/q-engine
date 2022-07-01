@@ -15,8 +15,7 @@
 // limitations under the License.
 //
 
-#include <numeric>
-#include <optional>
+#include "game_pch.hpp"
 
 #include <vulkan/vulkan_raii.hpp>
 

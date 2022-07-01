@@ -1,9 +1,8 @@
 #pragma once
 
-#include "../state.hpp"
-#include "../plugin.hpp"
+#include "plugin.hpp"
 
-class PhysicsPlugin : Plugin {
+class PhysicsPlugin : public Plugin {
 public:
     void build(App& app) override;
 

@@ -1,8 +1,11 @@
 #pragma once
 
-#include "state.hpp"
+#include "game_pch.hpp"
+
+struct App;
 
 class Plugin {
+public:
     virtual void build(App& app) = 0;
 
     virtual void cleanup([[maybe_unused]] App& app) {};

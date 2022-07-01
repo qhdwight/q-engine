@@ -13,13 +13,12 @@
 // limitations under the License.
 //
 
+#include "game_pch.hpp"
+
 #include "vulkan/vulkan_raii.hpp"
 
 #include "SPIRV/GlslangToSpv.h"
 #include "StandAlone/ResourceLimits.h"
-
-#include <string>
-#include <vector>
 
 namespace vk::su {
     vk::ShaderModule createShaderModule(vk::Device const& device, vk::ShaderStageFlagBits shaderStage, std::string const& shaderText);
