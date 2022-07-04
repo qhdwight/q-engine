@@ -5,7 +5,7 @@
 
 #include "assets.hpp"
 
-ModelLoader::result_type ModelLoader::operator()(std::string const& name) {
+ModelLoader::result_type ModelLoader::operator()(std::string_view name) {
     tinygltf::TinyGLTF loader;
     auto model = std::make_shared<tinygltf::Model>();
     std::string err;

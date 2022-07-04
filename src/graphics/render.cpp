@@ -65,6 +65,7 @@ void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFl
 
 void createSwapChain(VulkanContext& vk) {
     auto [graphicsFamilyIdx, presentFamilyIdx] = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
+    vk.swapChainData.reset();
     vk.swapChainData = vk::raii::su::SwapChainData(
             *vk.physDev,
             *vk.device,
@@ -75,7 +76,9 @@ void createSwapChain(VulkanContext& vk) {
             graphicsFamilyIdx,
             presentFamilyIdx
     );
+    vk.depthBufferData.reset();
     vk.depthBufferData = vk::raii::su::DepthBufferData(*vk.physDev, *vk.device, vk::raii::su::pickDepthFormat(*vk.physDev), vk.surfData->extent);
+    vk.renderPass.reset();
     vk.renderPass = vk::raii::su::makeRenderPass(
             *vk.device,
             vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
@@ -358,10 +361,6 @@ void init(VulkanContext& vk) {
 
     // Creates window as well
     vk.surfData.emplace(*vk.inst, "Game Engine", vk::Extent2D(640, 480));
-    float xScale, yScale;
-    glfwGetWindowContentScale(vk.surfData->window.handle, &xScale, &yScale);
-    vk.surfData->extent = vk::Extent2D(static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.width) * xScale),
-                                       static_cast<uint32_t>(static_cast<float>(vk.surfData->extent.height) * yScale));
 
     std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
 
@@ -406,6 +405,7 @@ void init(VulkanContext& vk) {
 }
 
 template<typename T>
+requires std::integral<T>
 vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
     tinygltf::Accessor& acc = model->accessors.at(primitive.indices);

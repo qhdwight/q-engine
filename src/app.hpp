@@ -5,9 +5,7 @@
 #include "plugin.hpp"
 #include "assets.hpp"
 
-typedef entt::registry::context Context;
-
-using ModelAssets = entt::resource_cache<Model, ModelLoader>;
+using Context = entt::registry::context;
 
 struct World : entt::registry {
 };

@@ -26,7 +26,7 @@ func main() {
 		}
 	}
 
-	pkgFile, err := os.Open("pkg.json")
+	pkgFile, err := os.Open(filepath.Join("..", "pkg.json"))
 	handleError(err)
 	bytes, _ := ioutil.ReadAll(pkgFile)
 	err = pkgFile.Close()
@@ -37,7 +37,7 @@ func main() {
 	handleError(err)
 
 	for pkgName, pkg := range packages {
-		path := filepath.Join("pkg", pkgName)
+		path := filepath.Join("..", "pkg", pkgName)
 		repo, err := git.PlainOpen(path)
 		if err == git.ErrRepositoryNotExists {
 			repo, err = git.PlainClone(path, false, &git.CloneOptions{
@@ -50,11 +50,12 @@ func main() {
 		} else if err != nil {
 			handleError(err)
 		}
-		fmt.Println(repo.Head())
+		head, _ := repo.Head()
+		fmt.Printf("[I] Package directory \"%s\" @%s\n", path, head)
 		handleError(err)
 	}
 
-	cmakeFile, err := os.OpenFile(filepath.Join("src", "CMakeLists.txt"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	cmakeFile, err := os.OpenFile(filepath.Join("..", "src", "CMakeLists.txt"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	handleError(err)
 
 	_, _ = cmakeFile.Write([]byte(`cmake_minimum_required(VERSION 3.10)
@@ -80,7 +81,7 @@ find_package(Vulkan REQUIRED)
 `))
 	_, _ = cmakeFile.Write([]byte("set(CMAKE_BUILD_TYPE RelWithDebInfo)\n"))
 	for pkgName, pkg := range packages {
-		if _, err := os.Stat(filepath.Join("pkg", pkgName, "CMakeLists.txt")); err == nil {
+		if _, err := os.Stat(filepath.Join("..", "pkg", pkgName, "CMakeLists.txt")); err == nil {
 			_, _ = cmakeFile.Write([]byte(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../../build/%[1]s)\n", pkgName)))
 		}
 		for _, include := range pkg.Includes {

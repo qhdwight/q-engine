@@ -333,8 +333,7 @@ namespace vk::su {
             vk::Format requestedFormats[] = {vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm, vk::Format::eB8G8R8Unorm,
                                              vk::Format::eR8G8B8Unorm};
             vk::ColorSpaceKHR requestedColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
-            for (size_t i = 0; i < sizeof(requestedFormats) / sizeof(requestedFormats[0]); i++) {
-                vk::Format requestedFormat = requestedFormats[i];
+            for (auto requestedFormat: requestedFormats) {
                 auto it = std::find_if(formats.begin(),
                                        formats.end(),
                                        [requestedFormat, requestedColorSpace](vk::SurfaceFormatKHR const& f) {

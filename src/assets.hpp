@@ -4,10 +4,12 @@
 
 #include <tiny_gltf.h>
 
-typedef tinygltf::Model Model;
+using Model = tinygltf::Model;
 
 struct ModelLoader {
     using result_type = std::shared_ptr<Model>;
 
-    result_type operator()(std::string const& name);
+    result_type operator()(std::string_view name);
 };
+
+using ModelAssets = entt::resource_cache<Model, ModelLoader>;
