@@ -5,15 +5,20 @@
 #include "assets.hpp"
 
 using ns_t = int64_t;
-using ItemName = entt::hashed_string;
-using ItemStateName = entt::hashed_string;
-using EquipStateName = entt::hashed_string;
+using ItemId = entt::hashed_string;
+using ItemStateId = entt::hashed_string;
+using EquipStateId = entt::hashed_string;
 using ent_t = entt::registry::entity_type;
 using Position = edyn::position;
 using Orientation = edyn::orientation;
 using LinearVelocity = edyn::linvel;
 using player_id_t = uint8_t;
 using asset_handle_t = entt::id_type;
+using equip_idx_t = uint8_t;
+
+struct GameSettings {
+    scalar gravity;
+};
 
 struct Handle {
     asset_handle_t value;
@@ -47,6 +52,27 @@ struct Player {
     player_id_t id;
 };
 
+struct GroundedPlayerMove {
+    scalar gravity;
+    scalar walkSpeed;
+    scalar runSpeed;
+    scalar fwdSpeed;
+    scalar sideSpeed;
+    scalar airSpeedCap;
+    scalar airAccel;
+    scalar maxAirSpeed;
+    scalar accel;
+    scalar friction;
+    scalar frictionCutoff;
+    scalar jumpSpeed;
+    scalar stopSpeed;
+    uint8_t groundTick;
+};
+
+struct FlyPlayerMove {
+    scalar speed;
+};
+
 struct Key {
     bool previous: 1;
     bool current: 1;
@@ -69,10 +95,10 @@ struct ItemStateProps {
 };
 
 struct ItemProps {
-    ItemName name;
+    ItemId id;
     scalar moveFactor;
-    std::unordered_map<ItemStateName, ItemStateProps> states;
-    std::unordered_map<EquipStateName, ItemStateProps> equipStates;
+    std::unordered_map<ItemStateId, ItemStateProps> states;
+    std::unordered_map<EquipStateId, ItemStateProps> equipStates;
 };
 
 struct WeaponProps {
@@ -87,22 +113,22 @@ struct Gun {
 };
 
 struct Item {
-    ItemName name;
+    ItemId id;
     uint16_t amount;
-    ItemStateName stateName;
+    ItemStateId stateId;
     ns_t stateDur;
     ent_t invEnt;
-    uint8_t invSlot;
+    equip_idx_t invSlot;
 };
 
 struct ItemPickup {
-    ItemName name;
+    ItemId id;
 };
 
 struct Inventory {
-    std::optional<uint8_t> equippedSlot;
-    std::optional<uint8_t> prevEquippedSlot;
-    EquipStateName equipStateName;
+    std::optional<equip_idx_t> equippedSlot;
+    std::optional<equip_idx_t> prevEquippedSlot;
+    EquipStateId equipStateId;
     ns_t equipStateDur;
     std::array<std::optional<ent_t>, 10> items;
 };

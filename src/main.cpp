@@ -4,8 +4,6 @@
 #include "physics/physics.hpp"
 #include "graphics/render.hpp"
 
-using namespace entt::literals;
-
 int main() {
     try {
         App app;
@@ -19,6 +17,7 @@ int main() {
         app.logicWorld.emplace<Look>(playerEnt);
         app.logicWorld.emplace<Input>(playerEnt);
         app.logicWorld.emplace<UI>(playerEnt);
+//        app.logicWorld.emplace<MoveModeId>(playerEnt, FLY_MOVE_TYPE);
 
         auto pickupEnt = app.logicWorld.create();
         app.logicWorld.emplace<ItemPickup>(pickupEnt, "M4"_hs);

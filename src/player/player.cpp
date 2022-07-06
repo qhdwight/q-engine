@@ -13,10 +13,23 @@ void modify(App& app) {
         look.z = std::fmod(look.z + Tau / 2.0, Tau) - Tau / 2.0;
         look.y = input.lean * edyn::to_radians(15.0);
     }
-    for (auto [ent, input, linVel, look, ts]: app.logicWorld.view<const Input, LinearVelocity, const Look, const Timestamp>().each()) {
-        linVel = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
+
+    auto flyGroup = app.logicWorld.group<const FlyPlayerMove, Input, LinearVelocity, const Look, const Timestamp>();
+    for (auto [ent, move, input, linVel, look, ts]: flyGroup.each()) {
+        vec3 fwd = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
+        linVel = fwd;
         linVel.z = input.move.z;
-        linVel *= 10;
+        linVel *= move.speed;
         edyn::refresh<LinearVelocity>(app.logicWorld, ent);
+    }
+
+    auto groundedGroup = app.logicWorld.group<const GroundedPlayerMove, Input, Position, LinearVelocity, const Look, const Timestamp>();
+    for (auto [ent, move, input, pos, linVel, look, ts]: groundedGroup.each()) {
+        ns_t dt = ts.deltaNs;
+
+//        auto result = edyn::raycast(app.logicWorld, );
+//
+//        vec3 fwd = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
+//        vec3 wishDir = input.move.z * move.fwdSpeed * fwd + input.move.x * grounded.
     }
 }

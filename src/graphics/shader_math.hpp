@@ -5,7 +5,7 @@
 #include "math.hpp"
 
 // Vulkan clip space has inverted y and half z
-constexpr mat4 ClipMat = {
+static constexpr mat4 ClipMat = {
         vec4{1.0, 0.0, 0.0, 0.0},
         vec4{0.0, -1.0, 0.0, 0.0},
         vec4{0.0, 0.0, 0.5, 0.0},
@@ -13,7 +13,7 @@ constexpr mat4 ClipMat = {
 };
 
 /** @brief We do all of our calculations in doubles, but current GPUs work best with float */
-constexpr mat4f toShader(mat4 const& m) {
+static constexpr mat4f toShader(mat4 const& m) {
     return {
             std::array<float, 4>{static_cast<float>(m[0][0]), static_cast<float>(m[0][1]), static_cast<float>(m[0][2]), static_cast<float>(m[0][3])},
             std::array<float, 4>{static_cast<float>(m[1][0]), static_cast<float>(m[1][1]), static_cast<float>(m[1][2]), static_cast<float>(m[1][3])},
@@ -22,11 +22,11 @@ constexpr mat4f toShader(mat4 const& m) {
     };
 }
 
-constexpr vec3f toShader(vec3 const& v) {
+static constexpr vec3f toShader(vec3 const& v) {
     return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)};
 }
 
-mat4 calcView(Position const& eye, Look const& look) {
+static mat4 calcView(Position const& eye, Look const& look) {
     // Calculations from GLM
     vec3 center = eye + rotate(fromEuler(look), edyn::vector3_y);
     vec3 up = rotate(fromEuler(look), edyn::vector3_z);
@@ -57,7 +57,7 @@ mat4 calcView(Position const& eye, Look const& look) {
  * @param extent    Screen dimensions in pixels
  * @return          Matrix which makes objects further away appear smaller
  */
-mat4 calcProj(vk::Extent2D const& extent) {
+static mat4 calcProj(vk::Extent2D const& extent) {
     // Calculations from GLM
     constexpr double rad = edyn::to_radians(45.0);
     double h = std::cos(0.5 * rad) / std::sin(0.5 * rad);
@@ -72,12 +72,12 @@ mat4 calcProj(vk::Extent2D const& extent) {
     return proj;
 }
 
-mat4 translate(mat4 m, vec3 v) {
+static mat4 translate(mat4 m, vec3 v) {
     m[3] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
     return m;
 }
 
-mat4 calcModel(Position const& pos) {
+static mat4 calcModel(Position const& pos) {
     mat4 model = matrix4x4_identity;
     return translate(model, pos);
 }

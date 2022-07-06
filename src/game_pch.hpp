@@ -22,3 +22,5 @@
 using scalar = edyn::scalar;
 using vec3 = edyn::vector3;
 using vec2 = edyn::vector2;
+
+using namespace entt::literals;

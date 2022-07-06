@@ -5,8 +5,6 @@
 #include "app.hpp"
 #include "state.hpp"
 
-using namespace entt::literals;
-
 void renderImGuiInspector(App& app) {
     auto& vk = app.globalCtx.at<VulkanContext>();
 

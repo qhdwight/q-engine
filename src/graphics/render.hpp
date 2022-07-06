@@ -3,7 +3,6 @@
 #include "game_pch.hpp"
 
 #include <spirv_reflect.h>
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
 #include <backends/imgui_impl_vulkan.h>
 
@@ -139,3 +138,13 @@ struct VulkanContext {
     SceneUpload sceneUpload;
     uint32_t graphicsFamilyIdx, presentFamilyIdx;
 };
+
+void renderOpaque(App& app);
+
+void renderImGui(App& app);
+
+void createSwapChain(VulkanContext& vk);
+
+void recreatePipeline(VulkanContext& vk);
+
+void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline);
