@@ -9,7 +9,7 @@
 #include "state.hpp"
 #include "plugin.hpp"
 #include "matrix4x4.hpp"
-#include "aligned_vector.hpp"
+#include "collections/aligned_vector.hpp"
 #include "utils_raii.hpp"
 #include "cubemap.hpp"
 

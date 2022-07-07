@@ -6,7 +6,7 @@
 constexpr scalar Tau = std::numbers::pi * 2.0;
 constexpr scalar XLookCap = Tau / 4.0;
 
-void modify(App& app) {
+void PlayerControllerPlugin::execute(App& app) {
     for (auto [ent, input, look]: app.logicWorld.view<const Input, Look>().each()) {
         look += vec3{-input.cursorDelta.y, 0.0, input.cursorDelta.x};
         look.x = std::clamp(look.x, -XLookCap, XLookCap);

@@ -10,7 +10,7 @@ double getAxis(GLFWwindow* glfwWindow, int positiveKey, int negativeKey) {
            (glfwGetKey(glfwWindow, negativeKey) ? -1.0 : 0.0);
 }
 
-void input(App& app) {
+void InputPlugin::execute(App& app) {
     // TODO:arch restructure so it is graphics API agnostic
     auto vkPtr = app.globalCtx.find<VulkanContext>();
     if (!vkPtr) return;

@@ -3,9 +3,13 @@
 #include "game_pch.hpp"
 
 #include "app.hpp"
+#include "plugin.hpp"
 
 struct InputSettings {
     float sensitivity;
 };
 
-void input(App& app);
+class InputPlugin : public Plugin {
+public:
+    void execute(App& app) override;
+};

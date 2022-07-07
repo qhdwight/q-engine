@@ -6,9 +6,9 @@ struct App;
 
 class Plugin {
 public:
-    virtual void build(App& app) = 0;
+    virtual void build(App& app) {};
 
-    virtual void cleanup([[maybe_unused]] App& app) {};
+    virtual void cleanup(App& app) {};
 
-    virtual void execute(App& app) = 0;
+    virtual void execute(App& app) {};
 };

@@ -9,6 +9,8 @@ int main() {
         App app;
         auto physics = app.makePlugin<PhysicsPlugin>();
         auto render = app.makePlugin<VulkanRenderPlugin>();
+        auto input = app.makePlugin<InputPlugin>();
+        auto player = app.makePlugin<PlayerControllerPlugin>();
 
         app.logicWorld.ctx().emplace<LocalContext>(player_id_t{0});
 
@@ -17,7 +19,7 @@ int main() {
         app.logicWorld.emplace<Look>(playerEnt);
         app.logicWorld.emplace<Input>(playerEnt);
         app.logicWorld.emplace<UI>(playerEnt);
-//        app.logicWorld.emplace<MoveModeId>(playerEnt, FLY_MOVE_TYPE);
+        app.logicWorld.emplace<GroundedPlayerMove>(playerEnt);
 
         auto pickupEnt = app.logicWorld.create();
         app.logicWorld.emplace<ItemPickup>(pickupEnt, "M4"_hs);
@@ -77,8 +79,8 @@ int main() {
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }
-            input(app);
-            modify(app);
+            input->execute(app);
+            player->execute(app);
             physics->execute(app);
 
             app.renderWorld.clear();

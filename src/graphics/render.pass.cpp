@@ -10,8 +10,7 @@
 
 #define PositionAttr "POSITION"
 
-template<typename T>
-requires std::integral<T>
+template<std::integral T>
 vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
     tinygltf::Accessor& acc = model->accessors.at(primitive.indices);
