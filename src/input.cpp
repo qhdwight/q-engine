@@ -10,6 +10,7 @@ double getAxis(GLFWwindow* glfwWindow, int positiveKey, int negativeKey) {
            (glfwGetKey(glfwWindow, negativeKey) ? -1.0 : 0.0);
 }
 
+
 void InputPlugin::execute(App& app) {
     // TODO:arch restructure so it is graphics API agnostic
     auto vkPtr = app.globalCtx.find<VulkanContext>();
@@ -24,13 +25,18 @@ void InputPlugin::execute(App& app) {
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfwWindow, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
     auto it = app.logicWorld.view<UI>().each();
-    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-    glfwSetInputMode(glfwWindow, GLFW_CURSOR, uiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    bool isUiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).isVisible; });
+    glfwSetInputMode(glfwWindow, GLFW_CURSOR, isUiVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     bool isFocused = glfwGetWindowAttrib(glfwWindow, GLFW_FOCUSED);
-    for (auto [ent, input, ui]: app.logicWorld.view<Input, UI>().each()) {
+
+    std::optional<possesion_id_t> possessionId = app.logicWorld.ctx().at<LocalContext>().possessionId;
+
+    for (auto [ent, player, input, ui]: app.logicWorld.view<Player, Input, UI>().each()) {
+        if (player.possessionId != possessionId) continue;
+
         vec2 prevMouse = input.cursor;
         glfwGetCursorPos(glfwWindow, &input.cursor.x, &input.cursor.y);
-        if (window.isFocused == isFocused && !uiVisible) {
+        if (window.isFocused == isFocused && !isUiVisible) {
             input.cursorDelta = (input.cursor - prevMouse) * 0.005;
         } else { // prevent snapping when tabbing back in
             input.cursorDelta = {};
@@ -46,7 +52,7 @@ void InputPlugin::execute(App& app) {
         input.menu.previous = input.menu.current;
         input.menu.current = glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE);
         if (input.menu.current != input.menu.previous && input.menu.current) {
-            ui.visible = !ui.visible;
+            ui.isVisible = !ui.isVisible;
         }
     }
 }

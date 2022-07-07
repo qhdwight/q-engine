@@ -18,9 +18,9 @@ void renderImGuiInspector(App& app) {
     if (isOpen) {
         for (entt::entity const& ent: sortedEntities) {
             if (ImGui::TreeNode(&ent, "#%u", ent)) {
-//                for (auto [id, storage]: app.logicWorld.storage()) {
+//                for (auto [possessionId, storage]: app.logicWorld.storage()) {
 //                    if (storage.contains(ent)) {
-//                        if (id == "position"_hs) {d
+//                        if (possessionId == "position"_hs) {d
 //                            std::array<float, 3>fPosition", position.data());
 //                        }
 //                    }
@@ -53,7 +53,7 @@ void renderImGuiInspector(App& app) {
                     ImGui::InputFloat("alphaMask", &material.alphaMask);
                     ImGui::InputFloat("alphaMaskCutoff", &material.alphaMaskCutoff);
 //                    for (entt::meta_data const& data: entt::resolve<Material>().data()) {
-//                        if (data.id() == "float"_hs) {
+//                        if (data.possessionId() == "float"_hs) {
 //                            data.set(material, 0.0f);
 //                        }
 //                    }

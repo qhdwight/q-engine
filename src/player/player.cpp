@@ -14,22 +14,23 @@ void PlayerControllerPlugin::execute(App& app) {
         look.y = input.lean * edyn::to_radians(15.0);
     }
 
-    auto flyGroup = app.logicWorld.group<const FlyPlayerMove, Input, LinearVelocity, const Look, const Timestamp>();
-    for (auto [ent, move, input, linVel, look, ts]: flyGroup.each()) {
-        vec3 fwd = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
-        linVel = fwd;
+    auto flyView = app.logicWorld.view<const FlyPlayerMove, Input, LinearVelocity, const Look, const Timestamp>();
+    for (auto [ent, move, input, linVel, look, ts]: flyView.each()) {
+        vec3 moveInLook = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
+        linVel = moveInLook;
         linVel.z = input.move.z;
         linVel *= move.speed;
         edyn::refresh<LinearVelocity>(app.logicWorld, ent);
     }
 
-    auto groundedGroup = app.logicWorld.group<const GroundedPlayerMove, Input, Position, LinearVelocity, const Look, const Timestamp>();
-    for (auto [ent, move, input, pos, linVel, look, ts]: groundedGroup.each()) {
+    auto groundedView = app.logicWorld.group<const GroundedPlayerMove, Input, Position, LinearVelocity, const Look, const Timestamp>();
+    for (auto [ent, move, input, pos, linVel, look, ts]: groundedView.each()) {
         ns_t dt = ts.deltaNs;
 
 //        auto result = edyn::raycast(app.logicWorld, );
-//
-//        vec3 fwd = edyn::rotate(fromEuler(look), {input.move.x, input.move.y, 0.0});
-//        vec3 wishDir = input.move.z * move.fwdSpeed * fwd + input.move.x * grounded.
+        quat rot = fromEuler(look);
+        vec3 forward = edyn::rotate(rot, {input.move.x, input.move.y, 0.0});
+        vec3 right = edyn::rotate(rot, {input.move.x, input.move.y, 0.0});
+        vec3 wishDir = input.move.z * move.fwdSpeed * forward + input.move.x * move.sideSpeed * right;
     }
 }

@@ -65,7 +65,7 @@ void renderOpaque(App& app) {
         auto renderCtx = app.renderWorld.ctx().at<RenderContext>();
         auto playerIt = app.renderWorld.view<const Position, const Look, const Player>().each();
         for (auto [ent, pos, look, player]: playerIt) {
-            if (player.id != renderCtx.playerId) continue;
+            if (player.possessionId != renderCtx.possessionId) continue;
 
             CameraUpload camera{
                     .view = toShader(calcView(pos, look)),

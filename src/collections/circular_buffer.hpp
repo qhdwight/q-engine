@@ -6,30 +6,39 @@ template<typename T, size_t Size>
 class circular_buffer {
 private:
     std::array<T, Size> mArray{};
-    size_t mPointer = Size;
-
-    void advance_pointer() {
-        mPointer = (mPointer + 1) % Size;
-    }
+    size_t mHead = Size;
 
 public:
+    void advance() {
+        mHead = (mHead + 1) % Size;
+    }
+
     void push(T const& element) {
-        advance_pointer();
-        mArray[mPointer] = std::forward<T>(element);
+        advance();
+        mArray[mHead] = std::forward<T>(element);
     }
 
     void push(T&& element) {
-        advance_pointer();
-        mArray[mPointer] = std::move(element);
+        advance();
+        mArray[mHead] = std::move(element);
     }
 
-    T& peek(size_t rollback = 0) {
-        if (rollback >= Size) {
-            throw std::runtime_error("Rollback too much");
+    T& advance_and_grab() {
+        advance();
+        return peek();
+    }
+
+    T& peek() {
+        return mArray[mHead];
+    }
+
+    T& peek(ptrdiff_t offset) {
+        if (offset >= Size) {
+            throw std::runtime_error("Query offset bigger than buffer size!");
         }
-        size_t pointer = mPointer;
-        if (rollback >= mPointer)
-            mPointer += Size;
-        return mArray[pointer % Size];
+        size_t queryHead = mHead;
+        if (offset >= mHead)
+            queryHead += Size;
+        return mArray[queryHead % Size];
     }
 };

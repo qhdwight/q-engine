@@ -12,7 +12,7 @@ using ent_t = entt::registry::entity_type;
 using Position = edyn::position;
 using Orientation = edyn::orientation;
 using LinearVelocity = edyn::linvel;
-using player_id_t = uint8_t;
+using possesion_id_t = uint8_t;
 using asset_handle_t = entt::id_type;
 using equip_idx_t = uint8_t;
 
@@ -40,16 +40,22 @@ struct Timestamp {
     ns_t ns, deltaNs;
 };
 
+enum class Authority {
+    Client,
+    Server
+};
+
 struct LocalContext {
-    player_id_t localId;
+    std::optional<possesion_id_t> possessionId;
+    Authority authority{};
 };
 
 struct RenderContext {
-    std::optional<player_id_t> playerId;
+    std::optional<possesion_id_t> possessionId;
 };
 
 struct Player {
-    player_id_t id;
+    possesion_id_t possessionId;
 };
 
 struct GroundedPlayerMove {
@@ -86,7 +92,7 @@ struct Input {
 };
 
 struct UI {
-    bool visible;
+    bool isVisible;
 };
 
 struct ItemStateProps {

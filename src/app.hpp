@@ -16,7 +16,7 @@ constexpr size_t BufferSize = 4096;
 struct App {
     World logicWorld;
     World renderWorld;
-    circular_buffer<World, BufferSize> cmdWorld;
+    circular_buffer<World, BufferSize> cmdWorldHistory;
     Context globalCtx;
     ModelAssets modelAssets;
     std::vector<std::shared_ptr<Plugin>> plugins;
