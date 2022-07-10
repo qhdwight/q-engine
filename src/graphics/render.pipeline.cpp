@@ -103,16 +103,16 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     for (Shader& shader: pipeline.shaders) {
         SpvReflectResult result;
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, nullptr);
-        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        GAME_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
         shader.bindingsReflect = static_cast<SpvReflectDescriptorBinding**>(malloc(shader.bindCount * sizeof(SpvReflectDescriptorBinding*)));
         result = spvReflectEnumerateDescriptorBindings(&shader.reflect, &shader.bindCount, shader.bindingsReflect);
-        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        GAME_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
 
         spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, nullptr);
-        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        GAME_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
         shader.inputsReflect = static_cast<SpvReflectInterfaceVariable**>(malloc(shader.inputCount * sizeof(SpvReflectInterfaceVariable*)));
         result = spvReflectEnumerateInputVariables(&shader.reflect, &shader.inputCount, shader.inputsReflect);
-        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        GAME_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
 
         auto shaderStage = static_cast<vk::ShaderStageFlagBits>(shader.reflect.shader_stage);
 //        std::vector<std::unordered_map<vk::DescriptorType, uint32_t>> setTypeCounts(3);
@@ -262,7 +262,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 
         vertexAttrPairs.emplace_back(format, vertexAttrOffset);
         auto [it, wasAdded] = vertexShader.vertAttrs.emplace(layout, VertexAttr{name, format, size, vertexAttrOffset});
-        assert(wasAdded);
+        GAME_ASSERT(wasAdded);
         vertexAttrOffset += size;
     }
     vertexShader.vertAttrStride = vertexAttrOffset;

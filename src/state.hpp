@@ -54,10 +54,12 @@ struct RenderContext {
     std::optional<possesion_id_t> possessionId;
 };
 
+// #REFLECT()
 struct Player {
     possesion_id_t possessionId;
 };
 
+// #REFLECT()
 struct GroundedPlayerMove {
     scalar gravity;
     scalar walkSpeed;
@@ -75,6 +77,7 @@ struct GroundedPlayerMove {
     uint8_t groundTick;
 };
 
+// #REFLECT()
 struct FlyPlayerMove {
     scalar speed;
 };
@@ -84,6 +87,7 @@ struct Key {
     bool current: 1;
 };
 
+// #REFLECT()
 struct Input {
     vec2 cursor, cursorDelta;
     vec3 move;
@@ -139,12 +143,49 @@ struct Inventory {
     std::array<std::optional<ent_t>, 10> items;
 };
 
+// #REFLECT()
+struct Material {
+    vec4f baseColorFactor;
+    vec4f emissiveFactor;
+    vec4f diffuseFactor;
+    vec4f specularFactor;
+    float workflow;
+    int baseColorTextureSet;
+    int physicalDescriptorTextureSet;
+    int normalTextureSet;
+    int occlusionTextureSet;
+    int emissiveTextureSet;
+    float metallicFactor;
+    float roughnessFactor;
+    float alphaMask;
+    float alphaMaskCutoff;
+};
+
 struct DiagnosticResource {
-    std::array<ns_t, 128> frameTimesNs;
-    size_t frameTimesIndex;
-    size_t readingCount;
+    std::array<ns_t, 128> frameTimesNs{};
+    size_t frameTimesIndex{};
+    size_t readingCount{};
 
     void addFrameTime(ns_t deltaNs);
 
     [[nodiscard]] double getAvgFrameTime() const;
 };
+
+
+#if __has_include("generated/state.generated.hpp")
+
+#include "generated/state.generated.hpp"
+
+#else
+
+#error "Please run tools/meta.go!"
+
+#endif
+
+static void register_reflection() {
+    entt::meta<Position>()
+            .data<&Position::x>("x"_hs)
+            .data<&Position::y>("y"_hs)
+            .data<&Position::z>("z"_hs);
+    register_generated_reflection();
+}

@@ -29,6 +29,8 @@ void renderImGuiInspector(App& app) {
                 for (auto [compEnt, pos]: app.logicWorld.view<Position>().each()) {
                     if (compEnt != ent) continue;
 
+
+
                     ImGui::InputDouble("X", &pos.x);
                     ImGui::InputDouble("Y", &pos.y);
                     ImGui::InputDouble("Z", &pos.z);

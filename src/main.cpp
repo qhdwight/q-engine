@@ -6,6 +6,8 @@
 
 int main() {
     try {
+        register_reflection();
+
         App app;
         auto inputPlugin = app.makePlugin<InputPlugin>();
         auto renderPlugin = app.makePlugin<VulkanRenderPlugin>();
@@ -65,7 +67,6 @@ int main() {
         app.logicWorld.emplace<Timestamp>(playerEnt, 0, 0);
         while (app.globalCtx.at<WindowContext>().keepOpen) {
 
-            /* ======== Tick ======== */
             auto now = std::chrono::steady_clock::now();
             ns_t prevNs = app.logicWorld.get<Timestamp>(playerEnt).ns;
             ns_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
@@ -80,7 +81,17 @@ int main() {
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }
+
             inputPlugin->execute(app);
+
+            World& cmdWorld = app.cmdWorldHistory.peek();
+            cmdWorld.clear();
+            for (auto [ent, player, input]: app.logicWorld.view<Player, Input>().each()) {
+                auto actualEnt = cmdWorld.create(ent);
+                GAME_ASSERT(actualEnt == ent);
+                cmdWorld.emplace<Input>(ent);
+            }
+
             playerControllerPlugin->execute(app);
             physicsPlugin->execute(app);
 
@@ -88,14 +99,14 @@ int main() {
             app.renderWorld.ctx().emplace<RenderContext>(app.logicWorld.ctx().at<LocalContext>().possessionId);
             for (auto [ent, pos, look, player]: app.logicWorld.view<const Position, const Look, const Player>().each()) {
                 auto actualEnt = app.renderWorld.create(ent);
-                assert(actualEnt == ent);
+                GAME_ASSERT(actualEnt == ent);
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Look>(ent, look);
                 app.renderWorld.emplace<Player>(ent, player);
             }
             for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
                 auto actualEnt = app.renderWorld.create(ent);
-                assert(actualEnt == ent);
+                GAME_ASSERT(actualEnt == ent);
                 app.renderWorld.emplace<Position>(ent, pos);
                 app.renderWorld.emplace<Orientation>(ent, orien);
                 app.renderWorld.emplace<ModelHandle>(ent, modelHandle);

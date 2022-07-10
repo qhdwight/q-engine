@@ -76,7 +76,7 @@ namespace vk::su {
         std::vector<char const*> enabledExtensions;
         enabledExtensions.reserve(extensions.size());
         for (auto const& ext: extensions) {
-            assert(std::find_if(extensionProperties.begin(),
+            GAME_ASSERT(std::find_if(extensionProperties.begin(),
                                 extensionProperties.end(),
                                 [ext](vk::ExtensionProperties const& ep) { return ext == ep.extensionName; }) != extensionProperties.end());
             enabledExtensions.push_back(ext.data());
@@ -102,7 +102,7 @@ namespace vk::su {
         std::vector<char const*> enabledLayers;
         enabledLayers.reserve(layers.size());
         for (auto const& layer: layers) {
-            assert(std::find_if(layerProperties.begin(), layerProperties.end(),
+            GAME_ASSERT(std::find_if(layerProperties.begin(), layerProperties.end(),
                                 [layer](vk::LayerProperties const& lp) { return layer == lp.layerName; }) !=
                    layerProperties.end());
             enabledLayers.push_back(layer.data());
@@ -124,7 +124,7 @@ namespace vk::su {
             vk::Device const& device, vk::Format colorFormat, vk::Format depthFormat, vk::AttachmentLoadOp loadOp,
             vk::ImageLayout colorFinalLayout) {
         std::vector<vk::AttachmentDescription> attachmentDescriptions;
-        assert(colorFormat != vk::Format::eUndefined);
+        GAME_ASSERT(colorFormat != vk::Format::eUndefined);
         attachmentDescriptions.emplace_back(vk::AttachmentDescriptionFlags(),
                                             colorFormat,
                                             vk::SampleCountFlagBits::e1,
@@ -220,13 +220,13 @@ namespace vk::su {
                                                         [](vk::QueueFamilyProperties const& qfp) {
                                                             return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
                                                         });
-        assert(graphicsQueueFamilyProperty != queueFamilyProperties.end());
+        GAME_ASSERT(graphicsQueueFamilyProperty != queueFamilyProperties.end());
         return static_cast<uint32_t>( std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty));
     }
 
     std::pair<uint32_t, uint32_t> findGraphicsAndPresentQueueFamilyIndex(vk::PhysicalDevice physicalDevice, vk::SurfaceKHR const& surface) {
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-        assert(queueFamilyProperties.size() < std::numeric_limits<uint32_t>::max());
+        GAME_ASSERT(queueFamilyProperties.size() < std::numeric_limits<uint32_t>::max());
 
         uint32_t graphicsQueueFamilyIndex = findGraphicsQueueFamilyIndex(queueFamilyProperties);
         if (physicalDevice.getSurfaceSupportKHR(graphicsQueueFamilyIndex, surface)) {
@@ -264,7 +264,7 @@ namespace vk::su {
             }
             typeBits >>= 1;
         }
-        assert(typeIndex != uint32_t(~0));
+        GAME_ASSERT(typeIndex != uint32_t(~0));
         return typeIndex;
     }
 
@@ -321,7 +321,7 @@ namespace vk::su {
     }
 
     vk::SurfaceFormatKHR pickSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& formats) {
-        assert(!formats.empty());
+        GAME_ASSERT(!formats.empty());
         vk::SurfaceFormatKHR pickedFormat = formats[0];
         if (formats.size() == 1) {
             if (formats[0].format == vk::Format::eUndefined) {
@@ -345,7 +345,7 @@ namespace vk::su {
                 }
             }
         }
-        assert(pickedFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear);
+        GAME_ASSERT(pickedFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear);
         return pickedFormat;
     }
 
@@ -367,7 +367,7 @@ namespace vk::su {
             case vk::ImageLayout::eUndefined:
                 break;
             default:
-                assert(false);
+                GAME_ASSERT(false);
                 break;
         }
 
@@ -385,7 +385,7 @@ namespace vk::su {
                 sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
                 break;
             default:
-                assert(false);
+                GAME_ASSERT(false);
                 break;
         }
 
@@ -410,7 +410,7 @@ namespace vk::su {
                 destinationAccessMask = vk::AccessFlagBits::eTransferWrite;
                 break;
             default:
-                assert(false);
+                GAME_ASSERT(false);
                 break;
         }
 
@@ -436,7 +436,7 @@ namespace vk::su {
                 destinationStage = vk::PipelineStageFlagBits::eTransfer;
                 break;
             default:
-                assert(false);
+                GAME_ASSERT(false);
                 break;
         }
 

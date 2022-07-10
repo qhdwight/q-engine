@@ -15,10 +15,6 @@
 
 const std::unordered_set<std::string_view> DynamicNames{"model", "material"};
 
-using vec2f = std::array<float, 2>;
-using vec3f = std::array<float, 3>;
-using vec4f = std::array<float, 4>;
-
 class VulkanRenderPlugin : public Plugin {
 public:
     void build(App& app) override;
@@ -57,23 +53,6 @@ struct SceneUpload {
     float scaleIBLAmbient;
     float debugViewInputs;
     float debugViewEquation;
-};
-
-struct Material {
-    vec4f baseColorFactor;
-    vec4f emissiveFactor;
-    vec4f diffuseFactor;
-    vec4f specularFactor;
-    float workflow;
-    int baseColorTextureSet;
-    int physicalDescriptorTextureSet;
-    int normalTextureSet;
-    int occlusionTextureSet;
-    int emissiveTextureSet;
-    float metallicFactor;
-    float roughnessFactor;
-    float alphaMask;
-    float alphaMaskCutoff;
 };
 
 struct ModelBuffers {

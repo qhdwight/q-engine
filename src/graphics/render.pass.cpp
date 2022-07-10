@@ -14,7 +14,7 @@ template<std::integral T>
 vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
     tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
     tinygltf::Accessor& acc = model->accessors.at(primitive.indices);
-    assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
+    GAME_ASSERT(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     tinygltf::BufferView& view = model->bufferViews.at(acc.bufferView);
     tinygltf::Buffer& buf = model->buffers.at(view.buffer);
     vk::raii::su::BufferData bufData{*vk.physDev, *vk.device, view.byteLength, vk::BufferUsageFlagBits::eIndexBuffer};
@@ -116,9 +116,9 @@ void renderOpaque(App& app) {
             // Check if we need to create a vertex buffer for this model
             if (modelBufIt == vk.modelBufData.end()) {
                 auto [assetIt, wasAssetAdded] = app.modelAssets.load(modelHandle.value, "models/Cube.glb");
-                assert(wasAssetAdded);
+                GAME_ASSERT(wasAssetAdded);
                 model = assetIt->second;
-                assert(model);
+                GAME_ASSERT(model);
 
                 auto vertCount = static_cast<uint32_t>(model->accessors[model->meshes.front().primitives.front().attributes.at(PositionAttr)].count);
                 vk::raii::su::BufferData vertBufData{*vk.physDev, *vk.device, vertCount * vertShader.vertAttrStride,
@@ -130,7 +130,7 @@ void renderOpaque(App& app) {
                         createIndexBufferData<uint16_t>(vk, model),
                         std::move(vertBufData)
                 });
-                assert(wasBufAdded);
+                GAME_ASSERT(wasBufAdded);
                 rawModelBuffers = &addedIt->second;
             } else {
                 model = app.modelAssets[modelHandle.value];

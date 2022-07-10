@@ -47,7 +47,7 @@ namespace vk::su {
             case vk::ShaderStageFlagBits::eMeshNV:
                 return EShLangMeshNV;
             default:
-                assert(false && "Unknown shader stage");
+                GAME_ASSERT(false && "Unknown shader stage");
                 return EShLangVertex;
         }
     }

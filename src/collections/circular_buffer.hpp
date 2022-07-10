@@ -6,7 +6,7 @@ template<typename T, size_t Size>
 class circular_buffer {
 private:
     std::array<T, Size> mArray{};
-    size_t mHead = Size;
+    size_t mHead = 0;
 
 public:
     void advance() {

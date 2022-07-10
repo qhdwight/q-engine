@@ -109,7 +109,7 @@ vk::raii::su::TextureData::TextureData(vk::raii::PhysicalDevice const& physicalD
     vk::ImageLayout initialLayout;
     vk::MemoryPropertyFlags requirements;
     if (needsStaging) {
-        assert((formatProperties.optimalTilingFeatures & formatFeatureFlags) == formatFeatureFlags);
+        GAME_ASSERT((formatProperties.optimalTilingFeatures & formatFeatureFlags) == formatFeatureFlags);
         stagingBufferData = BufferData(physicalDevice, device, extent.width * extent.height * 4,
                                        vk::BufferUsageFlagBits::eTransferSrc);
         imageTiling = vk::ImageTiling::eOptimal;
@@ -194,7 +194,7 @@ void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, 
         case vk::ImageLayout::eUndefined:
             break;
         default:
-            assert(false);
+            GAME_ASSERT(false);
             break;
     }
 
@@ -212,7 +212,7 @@ void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, 
             sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
             break;
         default:
-            assert(false);
+            GAME_ASSERT(false);
             break;
     }
 
@@ -237,7 +237,7 @@ void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, 
             destinationAccessMask = vk::AccessFlagBits::eTransferWrite;
             break;
         default:
-            assert(false);
+            GAME_ASSERT(false);
             break;
     }
 
@@ -263,7 +263,7 @@ void vk::raii::su::setImageLayout(vk::raii::CommandBuffer const& commandBuffer, 
             destinationStage = vk::PipelineStageFlagBits::eTransfer;
             break;
         default:
-            assert(false);
+            GAME_ASSERT(false);
             break;
     }
 
@@ -315,7 +315,7 @@ vk::raii::su::DepthBufferData::DepthBufferData(vk::raii::PhysicalDevice const& p
 std::pair<uint32_t, uint32_t>
 vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::SurfaceKHR const& surface) {
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-    assert(queueFamilyProperties.size() < std::numeric_limits<uint32_t>::max());
+    GAME_ASSERT(queueFamilyProperties.size() < std::numeric_limits<uint32_t>::max());
 
     uint32_t graphicsQueueFamilyIndex = vk::su::findGraphicsQueueFamilyIndex(queueFamilyProperties);
     if (physicalDevice.getSurfaceSupportKHR(graphicsQueueFamilyIndex, *surface)) {
@@ -344,11 +344,11 @@ vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(vk::raii::PhysicalDevice co
 }
 
 vk::raii::DescriptorPool vk::raii::su::makeDescriptorPool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& poolSizes) {
-    assert(!poolSizes.empty());
+    GAME_ASSERT(!poolSizes.empty());
     uint32_t maxSets = std::accumulate(
             poolSizes.begin(), poolSizes.end(), 0,
             [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
-    assert(0 < maxSets);
+    GAME_ASSERT(0 < maxSets);
 
     vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes);
     return {device, descriptorPoolCreateInfo};
@@ -464,7 +464,7 @@ vk::raii::RenderPass
 vk::raii::su::makeRenderPass(vk::raii::Device const& device, vk::Format colorFormat, vk::Format depthFormat, vk::AttachmentLoadOp loadOp,
                              vk::ImageLayout colorFinalLayout) {
     std::vector<vk::AttachmentDescription> attachmentDescriptions;
-    assert(colorFormat != vk::Format::eUndefined);
+    GAME_ASSERT(colorFormat != vk::Format::eUndefined);
     attachmentDescriptions.emplace_back(
             vk::AttachmentDescriptionFlags(),
             colorFormat,

@@ -29,7 +29,7 @@ namespace vk::raii::su {
 
     template<typename T>
     void copyToDevice(vk::raii::DeviceMemory const& deviceMemory, T const* pData, size_t count, vk::DeviceSize stride = sizeof(T)) {
-        assert(sizeof(T) <= stride);
+        GAME_ASSERT(sizeof(T) <= stride);
         uint8_t* deviceData = static_cast<uint8_t*>( deviceMemory.mapMemory(0, count * stride));
         if (stride == sizeof(T)) {
             memcpy(deviceData, pData, count * sizeof(T));
@@ -76,9 +76,9 @@ namespace vk::raii::su {
 
         template<typename DataType>
         void upload(DataType const& data) const {
-            assert((m_propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent) &&
+            GAME_ASSERT((m_propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent) &&
                    (m_propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible));
-            assert(sizeof(DataType) <= m_size);
+            GAME_ASSERT(sizeof(DataType) <= m_size);
 
             void* dataPtr = deviceMemory->mapMemory(0, sizeof(DataType));
             memcpy(dataPtr, &data, sizeof(DataType));
@@ -87,10 +87,10 @@ namespace vk::raii::su {
 
         template<typename DataType>
         void upload(std::vector<DataType> const& data, size_t stride = 0) const {
-            assert(m_propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible);
+            GAME_ASSERT(m_propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible);
 
             size_t elementSize = stride ? stride : sizeof(DataType);
-            assert(sizeof(DataType) <= elementSize);
+            GAME_ASSERT(sizeof(DataType) <= elementSize);
 
             copyToDevice(deviceMemory, data.data(), data.size(), elementSize);
         }
@@ -102,14 +102,14 @@ namespace vk::raii::su {
                     vk::raii::Queue const& queue,
                     std::vector<DataType> const& data,
                     size_t stride) const {
-            assert(m_usage & vk::BufferUsageFlagBits::eTransferDst);
-            assert(m_propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal);
+            GAME_ASSERT(m_usage & vk::BufferUsageFlagBits::eTransferDst);
+            GAME_ASSERT(m_propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal);
 
             size_t elementSize = stride ? stride : sizeof(DataType);
-            assert(sizeof(DataType) <= elementSize);
+            GAME_ASSERT(sizeof(DataType) <= elementSize);
 
             size_t dataSize = data.size() * elementSize;
-            assert(dataSize <= m_size);
+            GAME_ASSERT(dataSize <= m_size);
 
             vk::raii::su::BufferData stagingBuffer(physicalDevice, device, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
             copyToDevice(stagingBuffer.deviceMemory, data.data(), data.size(), elementSize);
