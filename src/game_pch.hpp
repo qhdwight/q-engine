@@ -28,8 +28,19 @@ using vec3 = edyn::vector3;
 using vec2 = edyn::vector2;
 using quat = edyn::quaternion;
 
-using vec2f = std::array<float, 2>;
-using vec3f = std::array<float, 3>;
-using vec4f = std::array<float, 4>;
+// #REFLECT()
+struct vec2f {
+    float x, y;
+};
+
+// #REFLECT()
+struct vec3f {
+    float x, y, z;
+};
+
+// #REFLECT()
+struct vec4f {
+    float x, y, z, w;
+};
 
 using namespace entt::literals;

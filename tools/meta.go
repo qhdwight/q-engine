@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var structRegex = regexp.MustCompile(`// #REFLECT\(\)\sstruct (\w*) {([\w\s;,]*)};`)
+
 func rglob(dir string, ext string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
@@ -27,7 +29,7 @@ func main() {
 		}
 	}
 
-	matches, err := rglob("src", ".hpp")
+	headerFilePaths, err := rglob("src", ".hpp")
 	handleError(err)
 
 	genFile, _ := os.OpenFile(filepath.Join("src", "generated", "state.generated.hpp"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -38,28 +40,48 @@ func main() {
 static void register_generated_reflection() {
 `)
 
-	for _, match := range matches {
-		text, err := ioutil.ReadFile(match)
-		structRegex := regexp.MustCompile(`// #REFLECT\(\)\sstruct (\w*) {([\w\s;]*)};`)
-		structDefs := structRegex.FindAllStringSubmatch(string(text), -1)
+	for _, path := range headerFilePaths {
+		fmt.Println("Scanning header file: ", path)
+
+		fileBytes, err := ioutil.ReadFile(path)
+		text := string(fileBytes)
+		structDefs := structRegex.FindAllStringSubmatch(text, -1)
+
+		var fieldNames []string
 
 		for _, structDef := range structDefs {
 			structName := structDef[1]
 			structBody := structDef[2]
 
+			fmt.Println("	Found struct: ", structName)
+
 			varDefs := strings.Split(structBody, ";")
 
 			_, _ = genFile.WriteString(fmt.Sprintf(`	entt::meta<%s>()`, structName))
-			for _, varDef := range varDefs {
-				varDef = strings.TrimSpace(varDef)
-				varDefSplit := strings.Split(varDef, " ")
-				if len(varDefSplit) < 2 {
+			for _, fieldDef := range varDefs {
+				fieldDef = strings.TrimSpace(fieldDef)
+				fieldDefSplit := strings.Split(fieldDef, " ")
+				if len(fieldDefSplit) < 2 {
 					continue
 				}
 
-				_, _ = genFile.WriteString(fmt.Sprintf(`
-			.data<&%s::%[2]s>("%[2]s"_hs)`, structName, varDefSplit[1]))
+				for _, fieldName := range fieldDefSplit[1:] {
+					fieldName = strings.TrimFunc(fieldName, func(r rune) bool { return r == ',' })
+					_, _ = genFile.WriteString(fmt.Sprintf(`
+			.data<&%[1]s::%[2]s>("%[2]s"_hs)`, structName, fieldName))
+					fieldNames = append(fieldNames, fieldName)
+				}
 			}
+
+			// 			_, _ := genFile.WriteString(`.prop("tooltips"_hs, std::unordered_map<std::string, std::string>{`)
+			//
+			// 			for fieldName := range fieldNames {
+			// 				_, _ := genFile.WriteString(fmt.Sprintf("{%s, %s}"))
+			// 			}
+			//
+			// 			_, _ = genFile.WriteString(`});
+			// `)
+
 			_, _ = genFile.WriteString(`;
 `)
 		}
