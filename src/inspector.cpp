@@ -5,6 +5,19 @@
 #include "app.hpp"
 #include "state.hpp"
 
+template<typename TComp>
+void renderComponent(App& app, entt::entity ent) {
+    for (auto [compEnt, comp]: app.logicWorld.view<TComp>().each()) {
+        if (compEnt != ent) continue;
+
+        for (auto data: entt::resolve<TComp>().data()) {
+            if (data.type() == entt::resolve<double>()) {
+                ImGui::InputDouble("F", static_cast<double*>(data.get(comp).data()));
+            }
+        }
+    }
+}
+
 void renderImGuiInspector(App& app) {
     auto& vk = app.globalCtx.at<VulkanContext>();
 
@@ -26,14 +39,7 @@ void renderImGuiInspector(App& app) {
 //                    }
 //                }
 
-                for (auto [compEnt, pos]: app.logicWorld.view<Position>().each()) {
-                    if (compEnt != ent) continue;
-
-                    for (auto data: entt::resolve<Position>().data()) {
-                        auto tooltip = data.prop("tooltip"_hs).value().cast<const char*>();
-                        ImGui::InputDouble(tooltip, static_cast<double*>(data.get(pos).data()));
-                    }
-                }
+                renderComponent<Position>(app, ent);
 
 //                entt::meta<Material>().data<&Material::alphaMask>("alphaMask"_hs);
                 for (auto [compEnt, material]: app.logicWorld.view<Material>().each()) {
