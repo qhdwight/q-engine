@@ -10,9 +10,26 @@ void renderComponent(App& app, entt::entity ent) {
     for (auto [compEnt, comp]: app.logicWorld.view<TComp>().each()) {
         if (compEnt != ent) continue;
 
-        for (auto data: entt::resolve<TComp>().data()) {
-            if (data.type() == entt::resolve<double>()) {
-                ImGui::InputDouble("F", static_cast<double*>(data.get(comp).data()));
+        entt::meta_type const& type = entt::resolve<TComp>();
+        auto prop = type.prop("tooltips"_hs);
+        if (!prop)
+            continue;
+
+        auto nameMap = prop.value().cast<std::unordered_map<entt::id_type, std::string>>();
+        for (auto field: type.data()) {
+            auto it = nameMap.find(field.id());
+            if (it == nameMap.end())
+                continue;
+
+            char const* prettyName = it->second.c_str();
+            entt::meta_type const& fieldType = field.type();
+            void* fieldData = field.get(comp).data();
+            if (fieldType == entt::resolve<double>()) {
+                ImGui::InputDouble(prettyName, static_cast<double*>(fieldData));
+            } else if (fieldType == entt::resolve<int>()) {
+                ImGui::InputInt(prettyName, static_cast<int*>(fieldData));
+            } else if (fieldType == entt::resolve<vec4f>()) {
+                ImGui::InputFloat4(prettyName, static_cast<float*>(fieldData));
             }
         }
     }
@@ -40,31 +57,7 @@ void renderImGuiInspector(App& app) {
 //                }
 
                 renderComponent<Position>(app, ent);
-
-//                entt::meta<Material>().data<&Material::alphaMask>("alphaMask"_hs);
-                for (auto [compEnt, material]: app.logicWorld.view<Material>().each()) {
-                    if (compEnt != ent) continue;
-
-//                    ImGui::InputFloat3("baseColorFactor", material.baseColorFactor.data());
-//                    ImGui::InputFloat3("emissiveFactor", material.emissiveFactor.data());
-//                    ImGui::InputFloat3("diffuseFactor", material.diffuseFactor.data());
-//                    ImGui::InputFloat3("specularFactor", material.specularFactor.data());
-//                    ImGui::InputFloat("workflow", &material.workflow);
-//                    ImGui::InputInt("baseColorTextureSet", &material.baseColorTextureSet);
-//                    ImGui::InputInt("physicalDescriptorTextureSet", &material.physicalDescriptorTextureSet);
-//                    ImGui::InputInt("normalTextureSet", &material.normalTextureSet);
-//                    ImGui::InputInt("occlusionTextureSet", &material.occlusionTextureSet);
-//                    ImGui::InputInt("emissiveTextureSet", &material.emissiveTextureSet);
-//                    ImGui::InputFloat("metallicFactor", &material.metallicFactor);
-//                    ImGui::InputFloat("roughnessFactor", &material.roughnessFactor);
-//                    ImGui::InputFloat("alphaMask", &material.alphaMask);
-//                    ImGui::InputFloat("alphaMaskCutoff", &material.alphaMaskCutoff);
-//                    for (entt::meta_data const& data: entt::resolve<Material>().data()) {
-//                        if (data.possessionId() == "float"_hs) {
-//                            data.set(material, 0.0f);
-//                        }
-//                    }
-                }
+                renderComponent<Material>(app, ent);
 
                 ImGui::TreePop();
             }

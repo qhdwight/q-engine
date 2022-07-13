@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 )
 
 var structRegex = regexp.MustCompile(`// #REFLECT\(\)\sstruct (\w*) {([\w\s;,]*)};`)
+var titleCase = cases.Title(language.AmericanEnglish, cases.NoLower)
 
 func rglob(dir string, ext string) ([]string, error) {
 	var files []string
@@ -47,9 +50,8 @@ static void register_generated_reflection() {
 		text := string(fileBytes)
 		structDefs := structRegex.FindAllStringSubmatch(text, -1)
 
-		var fieldNames []string
-
 		for _, structDef := range structDefs {
+			var fieldNames []string
 			structName := structDef[1]
 			structBody := structDef[2]
 
@@ -73,17 +75,21 @@ static void register_generated_reflection() {
 				}
 			}
 
-			// 			_, _ := genFile.WriteString(`.prop("tooltips"_hs, std::unordered_map<std::string, std::string>{`)
-			//
-			// 			for fieldName := range fieldNames {
-			// 				_, _ := genFile.WriteString(fmt.Sprintf("{%s, %s}"))
-			// 			}
-			//
-			// 			_, _ = genFile.WriteString(`});
-			// `)
+			_, _ = genFile.WriteString(fmt.Sprintf(`
+			.type("%s"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{`, structName))
 
-			_, _ = genFile.WriteString(`;
+			for _, fieldName := range fieldNames {
+				_, _ = genFile.WriteString(fmt.Sprintf(`
+					{"%s"_hs, "%s"},`, fieldName, titleCase.String(fieldName)))
+			}
+
+			_, _ = genFile.WriteString(`
+			});
 `)
+
+			// 			_, _ = genFile.WriteString(`;
+			// `)
 		}
 		handleError(err)
 	}

@@ -5,18 +5,40 @@
 static void register_generated_reflection() {
 	entt::meta<vec2f>()
 			.data<&vec2f::x>("x"_hs)
-			.data<&vec2f::y>("y"_hs);
+			.data<&vec2f::y>("y"_hs)
+			.type("vec2f"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"x"_hs, "X"},
+					{"y"_hs, "Y"},
+			});
 	entt::meta<vec3f>()
 			.data<&vec3f::x>("x"_hs)
 			.data<&vec3f::y>("y"_hs)
-			.data<&vec3f::z>("z"_hs);
+			.data<&vec3f::z>("z"_hs)
+			.type("vec3f"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"x"_hs, "X"},
+					{"y"_hs, "Y"},
+					{"z"_hs, "Z"},
+			});
 	entt::meta<vec4f>()
 			.data<&vec4f::x>("x"_hs)
 			.data<&vec4f::y>("y"_hs)
 			.data<&vec4f::z>("z"_hs)
-			.data<&vec4f::w>("w"_hs);
+			.data<&vec4f::w>("w"_hs)
+			.type("vec4f"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"x"_hs, "X"},
+					{"y"_hs, "Y"},
+					{"z"_hs, "Z"},
+					{"w"_hs, "W"},
+			});
 	entt::meta<Player>()
-			.data<&Player::possessionId>("possessionId"_hs);
+			.data<&Player::possessionId>("possessionId"_hs)
+			.type("Player"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"possessionId"_hs, "PossessionId"},
+			});
 	entt::meta<GroundedPlayerMove>()
 			.data<&GroundedPlayerMove::gravity>("gravity"_hs)
 			.data<&GroundedPlayerMove::walkSpeed>("walkSpeed"_hs)
@@ -31,15 +53,44 @@ static void register_generated_reflection() {
 			.data<&GroundedPlayerMove::frictionCutoff>("frictionCutoff"_hs)
 			.data<&GroundedPlayerMove::jumpSpeed>("jumpSpeed"_hs)
 			.data<&GroundedPlayerMove::stopSpeed>("stopSpeed"_hs)
-			.data<&GroundedPlayerMove::groundTick>("groundTick"_hs);
+			.data<&GroundedPlayerMove::groundTick>("groundTick"_hs)
+			.type("GroundedPlayerMove"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"gravity"_hs, "Gravity"},
+					{"walkSpeed"_hs, "WalkSpeed"},
+					{"runSpeed"_hs, "RunSpeed"},
+					{"fwdSpeed"_hs, "FwdSpeed"},
+					{"sideSpeed"_hs, "SideSpeed"},
+					{"airSpeedCap"_hs, "AirSpeedCap"},
+					{"airAccel"_hs, "AirAccel"},
+					{"maxAirSpeed"_hs, "MaxAirSpeed"},
+					{"accel"_hs, "Accel"},
+					{"friction"_hs, "Friction"},
+					{"frictionCutoff"_hs, "FrictionCutoff"},
+					{"jumpSpeed"_hs, "JumpSpeed"},
+					{"stopSpeed"_hs, "StopSpeed"},
+					{"groundTick"_hs, "GroundTick"},
+			});
 	entt::meta<FlyPlayerMove>()
-			.data<&FlyPlayerMove::speed>("speed"_hs);
+			.data<&FlyPlayerMove::speed>("speed"_hs)
+			.type("FlyPlayerMove"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"speed"_hs, "Speed"},
+			});
 	entt::meta<Input>()
 			.data<&Input::cursor>("cursor"_hs)
 			.data<&Input::cursorDelta>("cursorDelta"_hs)
 			.data<&Input::move>("move"_hs)
 			.data<&Input::lean>("lean"_hs)
-			.data<&Input::menu>("menu"_hs);
+			.data<&Input::menu>("menu"_hs)
+			.type("Input"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"cursor"_hs, "Cursor"},
+					{"cursorDelta"_hs, "CursorDelta"},
+					{"move"_hs, "Move"},
+					{"lean"_hs, "Lean"},
+					{"menu"_hs, "Menu"},
+			});
 	entt::meta<Material>()
 			.data<&Material::baseColorFactor>("baseColorFactor"_hs)
 			.data<&Material::emissiveFactor>("emissiveFactor"_hs)
@@ -54,6 +105,23 @@ static void register_generated_reflection() {
 			.data<&Material::metallicFactor>("metallicFactor"_hs)
 			.data<&Material::roughnessFactor>("roughnessFactor"_hs)
 			.data<&Material::alphaMask>("alphaMask"_hs)
-			.data<&Material::alphaMaskCutoff>("alphaMaskCutoff"_hs);
+			.data<&Material::alphaMaskCutoff>("alphaMaskCutoff"_hs)
+			.type("Material"_hs)
+			.prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
+					{"baseColorFactor"_hs, "BaseColorFactor"},
+					{"emissiveFactor"_hs, "EmissiveFactor"},
+					{"diffuseFactor"_hs, "DiffuseFactor"},
+					{"specularFactor"_hs, "SpecularFactor"},
+					{"workflow"_hs, "Workflow"},
+					{"baseColorTextureSet"_hs, "BaseColorTextureSet"},
+					{"physicalDescriptorTextureSet"_hs, "PhysicalDescriptorTextureSet"},
+					{"normalTextureSet"_hs, "NormalTextureSet"},
+					{"occlusionTextureSet"_hs, "OcclusionTextureSet"},
+					{"emissiveTextureSet"_hs, "EmissiveTextureSet"},
+					{"metallicFactor"_hs, "MetallicFactor"},
+					{"roughnessFactor"_hs, "RoughnessFactor"},
+					{"alphaMask"_hs, "AlphaMask"},
+					{"alphaMaskCutoff"_hs, "AlphaMaskCutoff"},
+			});
 
 }
