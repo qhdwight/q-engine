@@ -14,6 +14,7 @@
 #include <concepts>
 #include <iostream>
 #include <optional>
+#include <algorithm>
 #include <filesystem>
 #include <unordered_set>
 #include <unordered_map>

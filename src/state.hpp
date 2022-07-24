@@ -75,6 +75,7 @@ struct GroundedPlayerMove {
     scalar jumpSpeed;
     scalar stopSpeed;
     uint8_t groundTick;
+    vec3 linVel;
 };
 
 // #REFLECT()
@@ -93,6 +94,7 @@ struct Input {
     vec3 move;
     scalar lean;
     Key menu;
+    Key jump;
 };
 
 struct UI {

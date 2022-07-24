@@ -2,11 +2,15 @@
 
 #include "game_pch.hpp"
 
-template<typename T>
-requires std::integral<T>
+template<std::integral T>
 T saturating_add(T a, T b) {
     T c = a + b;
     return c < a ? std::numeric_limits<T>::max() : c;
+}
+
+template<std::integral T>
+T saturating_increment(T a) {
+    return saturating_add(a, T{1});
 }
 
 static edyn::quaternion fromEuler(vec3 const& vec) {
