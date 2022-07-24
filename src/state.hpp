@@ -4,7 +4,6 @@
 
 #include "assets.hpp"
 
-using ns_t = int64_t;
 using ItemId = entt::hashed_string;
 using ItemStateId = entt::hashed_string;
 using EquipStateId = entt::hashed_string;
@@ -37,7 +36,8 @@ struct Look : vec3 {
 };
 
 struct Timestamp {
-    ns_t ns, deltaNs;
+    clock_point_t point;
+    clock_delta_t delta;
 };
 
 enum class Authority {
@@ -162,13 +162,13 @@ struct Material {
 };
 
 struct DiagnosticResource {
-    std::array<ns_t, 128> frameTimesNs{};
+    std::array<clock_delta_t, 128> frameTimes{};
     size_t frameTimesIndex{};
     size_t readingCount{};
 
-    void addFrameTime(ns_t deltaNs);
+    void addFrameTime(clock_delta_t delta);
 
-    [[nodiscard]] double getAvgFrameTime() const;
+    [[nodiscard]] clock_delta_t getAvgFrameTime() const;
 };
 
 

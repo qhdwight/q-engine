@@ -63,21 +63,19 @@ int main() {
 
         app.globalCtx.emplace<DiagnosticResource>();
 
-        auto start = std::chrono::steady_clock::now();
-        app.logicWorld.emplace<Timestamp>(playerEnt, 0, 0);
+        app.logicWorld.emplace<Timestamp>(playerEnt);
         while (app.globalCtx.at<WindowContext>().keepOpen) {
 
-            auto now = std::chrono::steady_clock::now();
-            ns_t prevNs = app.logicWorld.get<Timestamp>(playerEnt).ns;
-            ns_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
-            ns_t deltaNs = ns - prevNs;
-            app.logicWorld.emplace_or_replace<Timestamp>(playerEnt, ns, deltaNs);
+            clock_point_t now = steady_clock_t::now();
+            clock_point_t prevPoint = app.logicWorld.get<Timestamp>(playerEnt).point;
+            clock_delta_t delta = now - prevPoint;
+            app.logicWorld.emplace_or_replace<Timestamp>(playerEnt, now, delta);
             auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
-            diagnostics.addFrameTime(deltaNs);
+            diagnostics.addFrameTime(delta);
 
             auto modelView = app.logicWorld.view<Position, Orientation, Material, ModelHandle>();
             for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
-                scalar add = std::cos(static_cast<double>(ns) / 1e9);
+                scalar add = std::cos(sec_t(delta).count());
                 scalar x_pos = ((int) ent - 0) * 3.0;
                 app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
             }

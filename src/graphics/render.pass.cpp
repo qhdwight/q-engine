@@ -178,8 +178,8 @@ void renderImGuiOverlay(App& app) {
     }
     ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
     if (ImGui::Begin("Diagnostics", &open, windowFlags)) {
-        double avgFrameTime = diagnostics.getAvgFrameTime();
-        ImGui::Text("%.3f ms/frame (%.1f FPS)", avgFrameTime / 10000000.0f, 1000000000.0f / avgFrameTime);
+        clock_delta_t avgFrameTime = diagnostics.getAvgFrameTime();
+        ImGui::Text("%.3f ms/frame (%.1f FPS)", ms_t(avgFrameTime).count(), 1.0 / sec_t(avgFrameTime).count());
         if (ImGui::BeginPopupContextWindow()) {
             if (ImGui::MenuItem("Custom", nullptr, corner == -1)) corner = -1;
             if (ImGui::MenuItem("Top-left", nullptr, corner == 0)) corner = 0;

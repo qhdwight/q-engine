@@ -13,7 +13,7 @@
 #include "utils_raii.hpp"
 #include "cubemap.hpp"
 
-const std::unordered_set<std::string_view> DynamicNames{"model", "material"};
+const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
 
 class VulkanRenderPlugin : public Plugin {
 public:

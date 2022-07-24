@@ -28,6 +28,13 @@ using vec3 = edyn::vector3;
 using vec2 = edyn::vector2;
 using quat = edyn::quaternion;
 
+using ns_t = std::chrono::nanoseconds;
+using ms_t = std::chrono::duration<double, std::chrono::milliseconds::period>;
+using sec_t = std::chrono::duration<double, std::chrono::seconds::period>;
+using steady_clock_t = std::chrono::steady_clock;
+using clock_point_t = std::chrono::time_point<steady_clock_t>;
+using clock_delta_t = clock_point_t::duration;
+
 // #REFLECT()
 struct vec2f {
     float x, y;

@@ -15,7 +15,7 @@
   },
   "glfw": {
     "uri": "https://github.com/glfw/glfw.git",
-    "reference": "refs/tags/3.3.7",
+    "reference": "refs/tags/3.3.8",
     "includes": [
       "include"
     ],

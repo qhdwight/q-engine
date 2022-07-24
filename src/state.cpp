@@ -1,15 +1,15 @@
 #include "state.hpp"
 
-void DiagnosticResource::addFrameTime(ns_t deltaNs) {
-    frameTimesNs[frameTimesIndex++] = deltaNs;
-    frameTimesIndex %= frameTimesNs.size();
-    readingCount = std::min(readingCount + 1, frameTimesNs.size());
+void DiagnosticResource::addFrameTime(clock_delta_t delta) {
+    frameTimes[frameTimesIndex++] = delta;
+    frameTimesIndex %= frameTimes.size();
+    readingCount = std::min(readingCount + 1, frameTimes.size());
 }
 
-double DiagnosticResource::getAvgFrameTime() const {
-    double avgFrameTime = 0.0;
+clock_delta_t DiagnosticResource::getAvgFrameTime() const {
+    clock_delta_t avgFrameTime{};
     for (size_t i = 0; i < readingCount; ++i) {
-        avgFrameTime += static_cast<double>(frameTimesNs[i]) / static_cast<double>(readingCount);
+        avgFrameTime += frameTimes[i];
     }
-    return avgFrameTime;
+    return avgFrameTime / readingCount;
 }
