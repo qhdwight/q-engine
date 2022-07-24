@@ -11,17 +11,12 @@ void renderComponent(App& app, entt::entity ent) {
         if (compEnt != ent) continue;
 
         entt::meta_type const& type = entt::resolve<TComp>();
-        auto prop = type.prop("tooltips"_hs);
-        if (!prop)
-            continue;
 
-        auto nameMap = prop.value().cast<std::unordered_map<entt::id_type, std::string>>();
         for (auto field: type.data()) {
-            auto it = nameMap.find(field.id());
-            if (it == nameMap.end())
-                continue;
+            entt::meta_prop tooltip = field.prop("tooltip"_hs);
+            if (!tooltip) continue;
 
-            char const* prettyName = it->second.c_str();
+            char const* prettyName = tooltip.value().cast<std::string_view>().data();
             entt::meta_type const& fieldType = field.type();
             void* fieldData = field.get(comp).data();
             if (fieldType == entt::resolve<double>()) {

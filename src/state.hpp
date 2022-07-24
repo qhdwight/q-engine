@@ -185,13 +185,10 @@ struct DiagnosticResource {
 static void register_reflection() {
     entt::meta<Position>()
             .data<&Position::x>("x"_hs)
+            .prop("tooltip"_hs, "X"sv)
             .data<&Position::y>("y"_hs)
+            .prop("tooltip"_hs, "Y"sv)
             .data<&Position::z>("z"_hs)
-            .type("Position"_hs)
-            .prop("tooltips"_hs, std::unordered_map<entt::id_type, std::string>{
-                    {"x"_hs, "X"},
-                    {"y"_hs, "Y"},
-                    {"z"_hs, "Z"},
-            });
+            .prop("tooltip"_hs, "Z"sv);
     register_generated_reflection();
 }
