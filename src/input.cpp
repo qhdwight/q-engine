@@ -48,9 +48,12 @@ void InputPlugin::execute(App& app) {
                 getAxis(glfwWindow, GLFW_KEY_W, GLFW_KEY_S),
                 getAxis(glfwWindow, GLFW_KEY_SPACE, GLFW_KEY_LEFT_SHIFT)
         };
+//        input.move.y = 1.0;
         input.lean = getAxis(glfwWindow, GLFW_KEY_E, GLFW_KEY_Q);
         input.menu.previous = input.menu.current;
         input.menu.current = glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE);
+        input.jump.previous = input.menu.current;
+        input.jump.current = glfwGetKey(glfwWindow, GLFW_KEY_SPACE);
         if (input.menu.current != input.menu.previous && input.menu.current) {
             ui.isVisible = !ui.isVisible;
         }

@@ -71,7 +71,7 @@ static void register_generated_reflection() {
 					fieldName = strings.TrimFunc(fieldName, func(r rune) bool { return r == ',' })
 					_, _ = genFile.WriteString(fmt.Sprintf(`
 		.data<&%[1]s::%[2]s>("%[2]s"_hs)
-			.prop("tooltip"_hs, "%[3]s"sv)`, structName, fieldName, titleCase.String(fieldName)))
+			.prop("display_name"_hs, "%[3]s"sv)`, structName, fieldName, titleCase.String(fieldName)))
 					fieldNames = append(fieldNames, fieldName)
 				}
 			}

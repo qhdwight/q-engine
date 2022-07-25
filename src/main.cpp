@@ -21,21 +21,46 @@ int main() {
         app.logicWorld.emplace<Look>(playerEnt);
         app.logicWorld.emplace<Input>(playerEnt);
         app.logicWorld.emplace<UI>(playerEnt);
-        app.logicWorld.emplace<GroundedPlayerMove>(playerEnt);
+        app.logicWorld.emplace<GroundedPlayerMove>(playerEnt, GroundedPlayerMove{
+                .gravity = 30.0,
+                .walkSpeed = 10.0,
+                .runSpeed = 30.0,
+                .fwdSpeed = 30.0,
+                .sideSpeed = 30.0,
+                .airSpeedCap = 2.0,
+                .airAccel = 20.0,
+                .maxAirSpeed = 8.0,
+                .accel = 10.0,
+                .friction = 10.0,
+                .frictionCutoff = 0.1,
+                .jumpSpeed = 8.5,
+                .stopSpeed = 1.0,
+        });
+//        app.logicWorld.emplace<FlyPlayerMove>(playerEnt, 5.0);
+        app.logicWorld.emplace<MoveStats>(playerEnt);
+
+        auto playerDef = edyn::rigidbody_def{
+                .kind = edyn::rigidbody_kind::rb_dynamic,
+                .position = {0.0, 0.0, 5.0},
+                .gravity = edyn::vector3_zero,
+                .shape = edyn::capsule_shape{.radius = 0.5, .half_length = 0.5, .axis = edyn::coordinate_axis::z},
+                .continuous_contacts = true,
+                .presentation = false,
+                .sleeping_disabled = true,
+        };
+        playerDef.material->friction = 0.0;
+        edyn::make_rigidbody(playerEnt, app.logicWorld, playerDef);
 
         auto pickupEnt = app.logicWorld.create();
         app.logicWorld.emplace<ItemPickup>(pickupEnt, "M4"_hs);
         app.logicWorld.emplace<ModelHandle>(pickupEnt, "M4"_hs);
 
-        auto playerDef = edyn::rigidbody_def{
-                .kind = edyn::rigidbody_kind::rb_dynamic,
-                .gravity = edyn::vector3_zero,
-                .shape = edyn::capsule_shape{0.5, 1.0},
-                .continuous_contacts = true,
-                .presentation = false,
-                .sleeping_disabled = true,
-        };
-        edyn::make_rigidbody(playerEnt, app.logicWorld, playerDef);
+        auto floor_def = edyn::rigidbody_def();
+        floor_def.kind = edyn::rigidbody_kind::rb_static;
+        floor_def.material->restitution = 1;
+        floor_def.material->friction = 0.5;
+        floor_def.shape = edyn::plane_shape{.normal = {0, 0, 1}};
+        edyn::make_rigidbody(app.logicWorld, floor_def);
 
         for (int i = 0; i < 3; ++i) {
             auto cubeEnt = app.logicWorld.create();
@@ -63,7 +88,7 @@ int main() {
 
         app.globalCtx.emplace<DiagnosticResource>();
 
-        app.logicWorld.emplace<Timestamp>(playerEnt);
+        app.logicWorld.emplace<Timestamp>(playerEnt, steady_clock_t::now(), clock_delta_t::zero());
         while (app.globalCtx.at<WindowContext>().keepOpen) {
 
             clock_point_t now = steady_clock_t::now();
@@ -74,10 +99,11 @@ int main() {
             diagnostics.addFrameTime(delta);
 
             auto modelView = app.logicWorld.view<Position, Orientation, Material, ModelHandle>();
+            int i = -1;
             for (auto [ent, pos, orien, material, modelHandle]: modelView.each()) {
                 scalar add = std::cos(sec_t(delta).count());
-                scalar x_pos = ((int) ent - 0) * 3.0;
-                app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 10.0, add - 1);
+                scalar x_pos = i++ * 3.0;
+                app.logicWorld.emplace_or_replace<Position>(ent, x_pos, 16.0, add - 1);
             }
 
             inputPlugin->execute(app);

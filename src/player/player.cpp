@@ -6,7 +6,7 @@
 constexpr scalar Tau = std::numbers::pi * 2.0; // Tau makes more sense than using Pi!
 constexpr scalar XLookCap = Tau / 4.0;
 
-void friction(scalar friction, scalar stopSpeed, scalar lateralSpeed, LinearVelocity& linVel, scalar dt) {
+void friction(scalar friction, scalar stopSpeed, scalar lateralSpeed, vec3& linVel, scalar dt) {
     scalar control = std::max(lateralSpeed, stopSpeed);
     scalar drop = control * friction * dt;
     scalar newSpeed = std::max((lateralSpeed - drop) / lateralSpeed, 0.0);
@@ -14,15 +14,15 @@ void friction(scalar friction, scalar stopSpeed, scalar lateralSpeed, LinearVelo
     linVel.y *= newSpeed;
 }
 
-void accelerate(scalar accel, vec3 wishDir, scalar wishSpeed, LinearVelocity& linVel, scalar dt) {
+void accelerate(scalar accel, vec3 wishDir, scalar wishSpeed, vec3& linVel, scalar dt) {
     scalar velProj = dot(linVel, wishDir);
     scalar addSpeed = wishSpeed - velProj;
-    if (addSpeed <= std::numeric_limits<scalar>::epsilon()) return;
+    if (addSpeed <= SCALAR_EPSILON) return;
 
     scalar accelSpeed = std::min(accel * wishSpeed * dt, addSpeed);
     wishDir *= accelSpeed;
     linVel.x += wishDir.x;
-    linVel.y += wishDir.z;
+    linVel.y += wishDir.y;
 }
 
 void PlayerControllerPlugin::execute(App& app) {
@@ -57,14 +57,20 @@ void PlayerControllerPlugin::execute(App& app) {
         vec3 endVel = initVel;
         scalar lateralSpeed = length(to_vector2_xz(initVel));
 
-        edyn::raycast_result result = edyn::raycast(app.logicWorld, pos, pos);
-        quat rot = fromEuler(look);
-        vec3 forward = edyn::rotate(rot, {input.move.x, input.move.y, 0.0});
-        vec3 right = edyn::rotate(rot, {input.move.x, input.move.y, 0.0});
-        vec3 wishDir = input.move.z * move.fwdSpeed * forward + input.move.x * move.sideSpeed * right;
+        edyn::raycast_result result = edyn::raycast(
+                app.logicWorld,
+                pos,
+                pos - vec3{0.0, 0.0, 1.0625},
+                [ent](entt::entity hitEnt) { return hitEnt == ent; } // prevent self collisions
+        );
+        vec3 wishDir = edyn::rotate(fromEuler(look), {input.move.x * move.sideSpeed, input.move.y * move.fwdSpeed, 0.0});
         scalar wishSpeed = length(wishDir);
-        if (wishSpeed > std::numeric_limits<scalar>::epsilon())
+        if (wishSpeed > SCALAR_EPSILON)
             wishDir / wishSpeed;
+
+        if (auto* stats = app.logicWorld.try_get<MoveStats>(ent)) {
+            stats->wishDir = wishDir;
+        }
 
         bool isGrounded = result.entity != entt::null;
 
@@ -72,13 +78,13 @@ void PlayerControllerPlugin::execute(App& app) {
         if (isGrounded) {
             if (move.groundTick >= 1) {
                 if (lateralSpeed > move.frictionCutoff) {
-                    friction(move.friction, move.stopSpeed, lateralSpeed, linVel, dt);
+                    friction(move.friction, move.stopSpeed, lateralSpeed, endVel, dt);
                 } else {
-                    endVel.x = endVel.z = 0.0;
+                    endVel.x = endVel.y = 0.0;
                 }
-                endVel.y = 0.0;
+                endVel.z = -0.125;
             }
-            accelerate(move.accel, wishDir, wishSpeed, linVel, dt);
+            accelerate(move.accel, wishDir, wishSpeed, endVel, dt);
             if (input.jump.current) {
                 initVel.z = move.jumpSpeed;
                 endVel.z = initVel.z - move.gravity * dt;
@@ -88,7 +94,7 @@ void PlayerControllerPlugin::execute(App& app) {
         } else {
             move.groundTick = 0;
             wishSpeed = std::min(wishSpeed, move.airSpeedCap);
-            accelerate(move.airAccel, wishDir, wishSpeed, linVel, dt);
+            accelerate(move.airAccel, wishDir, wishSpeed, endVel, dt);
             endVel.z -= move.gravity * dt;
             scalar airSpeed = length(to_vector2_xz(endVel));
             if (airSpeed > move.maxAirSpeed) {
@@ -100,5 +106,6 @@ void PlayerControllerPlugin::execute(App& app) {
 
         move.linVel = endVel;
         linVel = (initVel + endVel) / 2.0;
+        edyn::refresh<LinearVelocity>(app.logicWorld, ent);
     }
 }

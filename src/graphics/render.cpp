@@ -69,7 +69,7 @@ void init(VulkanContext& vk) {
               << std::endl;
 
     // Creates window as well
-    vk.surfData.emplace(*vk.inst, "Game Engine", vk::Extent2D(640, 480));
+    vk.surfData.emplace(*vk.inst, "Game Engine", vk::Extent2D(1280, 960));
 
     std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
 

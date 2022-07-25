@@ -9,4 +9,3 @@ class PlayerControllerPlugin : public Plugin {
 public:
     void execute(App& app) override;
 };
-

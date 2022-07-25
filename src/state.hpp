@@ -37,7 +37,7 @@ struct Look : vec3 {
 
 struct Timestamp {
     clock_point_t point;
-    clock_delta_t delta;
+    clock_delta_t delta{};
 };
 
 enum class Authority {
@@ -57,6 +57,11 @@ struct RenderContext {
 // #REFLECT()
 struct Player {
     possesion_id_t possessionId;
+};
+
+// #REFLECT()
+struct MoveStats {
+    vec3 wishDir;
 };
 
 // #REFLECT()
@@ -187,10 +192,10 @@ struct DiagnosticResource {
 static void register_reflection() {
     entt::meta<Position>()
             .data<&Position::x>("x"_hs)
-            .prop("tooltip"_hs, "X"sv)
+            .prop("display_name"_hs, "X"sv)
             .data<&Position::y>("y"_hs)
-            .prop("tooltip"_hs, "Y"sv)
+            .prop("display_name"_hs, "Y"sv)
             .data<&Position::z>("z"_hs)
-            .prop("tooltip"_hs, "Z"sv);
+            .prop("display_name"_hs, "Z"sv);
     register_generated_reflection();
 }

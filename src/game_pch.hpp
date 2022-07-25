@@ -36,6 +36,8 @@ using steady_clock_t = std::chrono::steady_clock;
 using clock_point_t = std::chrono::time_point<steady_clock_t>;
 using clock_delta_t = clock_point_t::duration;
 
+constexpr auto SCALAR_EPSILON = std::numeric_limits<scalar>::epsilon();
+
 // #REFLECT()
 struct vec2f {
     float x, y;
