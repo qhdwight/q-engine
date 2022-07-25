@@ -55,7 +55,7 @@ void PlayerControllerPlugin::execute(App& app) {
         scalar dt = sec_t(ts.delta).count();
         vec3 initVel = move.linVel;
         vec3 endVel = initVel;
-        scalar lateralSpeed = length(to_vector2_xz(initVel));
+        scalar lateralSpeed = length(to_vector2_xy(initVel));
 
         edyn::raycast_result result = edyn::raycast(
                 app.logicWorld,
@@ -66,15 +66,18 @@ void PlayerControllerPlugin::execute(App& app) {
         vec3 wishDir = edyn::rotate(fromEuler(look), {input.move.x * move.sideSpeed, input.move.y * move.fwdSpeed, 0.0});
         scalar wishSpeed = length(wishDir);
         if (wishSpeed > SCALAR_EPSILON)
-            wishDir / wishSpeed;
-
-        if (auto* stats = app.logicWorld.try_get<MoveStats>(ent)) {
-            stats->wishDir = wishDir;
-        }
+            wishDir /= wishSpeed;
 
         bool isGrounded = result.entity != entt::null;
 
         wishSpeed = std::min(wishSpeed, move.runSpeed);
+
+        if (auto* stats = app.logicWorld.try_get<MoveStats>(ent)) {
+            stats->wishDir = wishDir;
+            stats->wishSpeed = wishSpeed;
+            stats->lateralSpeed = lateralSpeed;
+        }
+
         if (isGrounded) {
             if (move.groundTick >= 1) {
                 if (lateralSpeed > move.frictionCutoff) {
@@ -82,7 +85,7 @@ void PlayerControllerPlugin::execute(App& app) {
                 } else {
                     endVel.x = endVel.y = 0.0;
                 }
-                endVel.z = -0.125;
+                endVel.z = -0.0625;
             }
             accelerate(move.accel, wishDir, wishSpeed, endVel, dt);
             if (input.jump.current) {
@@ -96,7 +99,7 @@ void PlayerControllerPlugin::execute(App& app) {
             wishSpeed = std::min(wishSpeed, move.airSpeedCap);
             accelerate(move.airAccel, wishDir, wishSpeed, endVel, dt);
             endVel.z -= move.gravity * dt;
-            scalar airSpeed = length(to_vector2_xz(endVel));
+            scalar airSpeed = length(to_vector2_xy(endVel));
             if (airSpeed > move.maxAirSpeed) {
                 scalar ratio = move.maxAirSpeed / airSpeed;
                 endVel.x *= ratio;
@@ -105,7 +108,7 @@ void PlayerControllerPlugin::execute(App& app) {
         }
 
         move.linVel = endVel;
-        linVel = (initVel + endVel) / 2.0;
+        linVel = (initVel + endVel) * 0.5;
         edyn::refresh<LinearVelocity>(app.logicWorld, ent);
     }
 }

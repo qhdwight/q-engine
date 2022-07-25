@@ -29,7 +29,11 @@ static void register_generated_reflection() {
 			.prop("display_name"_hs, "PossessionId"sv);
 	entt::meta<MoveStats>()
 		.data<&MoveStats::wishDir>("wishDir"_hs)
-			.prop("display_name"_hs, "WishDir"sv);
+			.prop("display_name"_hs, "WishDir"sv)
+		.data<&MoveStats::wishSpeed>("wishSpeed"_hs)
+			.prop("display_name"_hs, "WishSpeed"sv)
+		.data<&MoveStats::lateralSpeed>("lateralSpeed"_hs)
+			.prop("display_name"_hs, "LateralSpeed"sv);
 	entt::meta<GroundedPlayerMove>()
 		.data<&GroundedPlayerMove::gravity>("gravity"_hs)
 			.prop("display_name"_hs, "Gravity"sv)

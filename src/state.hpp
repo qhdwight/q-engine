@@ -62,6 +62,8 @@ struct Player {
 // #REFLECT()
 struct MoveStats {
     vec3 wishDir;
+    scalar wishSpeed;
+    scalar lateralSpeed;
 };
 
 // #REFLECT()
