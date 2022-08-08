@@ -10,4 +10,4 @@
 
 ### Developing & Building
 
-Run `go run build.go` to generate a `CMakeLists.txt`. Then use your favorite editor of choice!
+Run `go run tools/build.go` to generate a `CMakeLists.txt`. Then use your favorite editor of choice!
