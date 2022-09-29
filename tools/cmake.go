@@ -107,7 +107,9 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE "game_pch.hpp" "../pkg/imgui/i
 	}
 
 	_, _ = cmakeFile.WriteString(`
-target_compile_options(Edyn PRIVATE /w)
+if (MSVC)
+    target_compile_options(Edyn PRIVATE /w)
+endif ()
 target_compile_definitions(Edyn PUBLIC EDYN_DOUBLE_PRECISION)
 target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CPP14)
 
