@@ -1,7 +1,7 @@
 {
   "entt": {
     "uri": "https://github.com/skypjack/entt.git",
-    "reference": "refs/tags/v3.10.1",
+    "reference": "refs/tags/v3.10.3",
     "includes": [
       "src"
     ],
