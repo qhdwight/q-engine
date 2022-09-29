@@ -61,7 +61,7 @@ void PlayerControllerPlugin::execute(App& app) {
                 app.logicWorld,
                 pos,
                 pos - vec3{0.0, 0.0, 1.0625},
-                [ent](entt::entity hitEnt) { return hitEnt == ent; } // prevent self collisions
+                [myEnt=ent](entt::entity hitEnt) { return hitEnt == myEnt; } // prevent self collisions
         );
         vec3 wishDir = edyn::rotate(fromEuler(look), {input.move.x * move.sideSpeed, input.move.y * move.fwdSpeed, 0.0});
         scalar wishSpeed = length(wishDir);

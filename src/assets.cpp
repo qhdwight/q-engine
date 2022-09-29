@@ -10,8 +10,10 @@ ModelLoader::result_type ModelLoader::operator()(std::string_view name) {
     auto model = std::make_shared<tinygltf::Model>();
     std::string err;
     std::string warn;
-    std::string bruh("assets");
-    std::filesystem::path path = std::filesystem::current_path() / bruh / name;
-    loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
+    std::filesystem::path path = std::filesystem::current_path() / "assets" / name;
+    bool wasLoaded = loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
+    if (!wasLoaded) {
+        throw std::runtime_error("Assets: " + path.string() + " does not exist");
+    }
     return model;
 }
