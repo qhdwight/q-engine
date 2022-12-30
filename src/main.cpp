@@ -44,7 +44,6 @@ int main() {
                 .position = {0.0, 0.0, 5.0},
                 .gravity = edyn::vector3_zero,
                 .shape = edyn::capsule_shape{.radius = 0.5, .half_length = 0.5, .axis = edyn::coordinate_axis::z},
-                .continuous_contacts = true,
                 .presentation = false,
                 .sleeping_disabled = true,
         };

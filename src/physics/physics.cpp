@@ -3,7 +3,6 @@
 #include "app.hpp"
 
 void PhysicsPlugin::build(App& app) {
-    edyn::init();
     std::cout << "[Edyn]" << " 1.1.0 initialized" << std::endl;
     edyn::attach(app.logicWorld);
     std::cout << "[Edyn]" << " Attached" << std::endl;
@@ -23,5 +22,4 @@ void PhysicsPlugin::execute(App& app) {
 
 void PhysicsPlugin::cleanup(App& app) {
     edyn::detach(app.logicWorld);
-    edyn::deinit();
 }

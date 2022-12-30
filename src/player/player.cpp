@@ -43,7 +43,6 @@ void PlayerControllerPlugin::execute(App& app) {
         linVel = moveInLook;
         linVel.z = input.move.z;
         linVel *= move.speed;
-        edyn::refresh<LinearVelocity>(app.logicWorld, ent);
     }
 
     auto groundedView = app.logicWorld.group<
@@ -61,7 +60,7 @@ void PlayerControllerPlugin::execute(App& app) {
                 app.logicWorld,
                 pos,
                 pos - vec3{0.0, 0.0, 1.0625},
-                [myEnt=ent](entt::entity hitEnt) { return hitEnt == myEnt; } // prevent self collisions
+                {ent} // prevent self collisions
         );
         vec3 wishDir = edyn::rotate(fromEuler(look), {input.move.x * move.sideSpeed, input.move.y * move.fwdSpeed, 0.0});
         scalar wishSpeed = length(wishDir);
@@ -109,6 +108,5 @@ void PlayerControllerPlugin::execute(App& app) {
 
         move.linVel = endVel;
         linVel = (initVel + endVel) * 0.5;
-        edyn::refresh<LinearVelocity>(app.logicWorld, ent);
     }
 }

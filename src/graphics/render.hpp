@@ -3,15 +3,18 @@
 #include "game_pch.hpp"
 
 #include <spirv_reflect.h>
-#include <vulkan/vulkan_raii.hpp>
 #include <backends/imgui_impl_vulkan.h>
+#include <vma/vk_mem_alloc.h>
 
 #include "state.hpp"
 #include "plugin.hpp"
 #include "matrix4x4.hpp"
-#include "collections/aligned_vector.hpp"
-#include "utils_raii.hpp"
-#include "cubemap.hpp"
+//#include "collections/aligned_vector.hpp"
+//#include "utils_raii.hpp"
+//#include "cubemap.hpp"
+
+using Extensions = std::vector<std::string_view>;
+using Layers = std::vector<std::string_view>;
 
 const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
 
@@ -55,10 +58,10 @@ struct SceneUpload {
     float debugViewEquation;
 };
 
-struct ModelBuffers {
-    vk::raii::su::BufferData indexBufData;
-    vk::raii::su::BufferData vertBufData;
-};
+//struct ModelBuffers {
+//    vk::raii::su::BufferData indexBufData;
+//    vk::raii::su::BufferData vertBufData;
+//};
 
 struct VertexAttr {
     std::string name;
@@ -84,39 +87,42 @@ struct Pipeline {
     std::optional<vk::raii::PipelineLayout> layout;
     std::vector<vk::raii::DescriptorSetLayout> descSetLayouts;
     std::vector<vk::raii::DescriptorSet> descSets;
-    std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
+//    std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
 };
 
 struct VulkanContext {
     vk::raii::Context ctx;
+    vk::ApplicationInfo appInfo;
     std::optional<vk::raii::Instance> inst;
-    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
-    std::optional<vk::raii::PhysicalDevice> physDev;
-    std::optional<vk::raii::su::SurfaceData> surfData;
-    std::optional<vk::raii::Device> device;
-    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
-    std::optional<vk::raii::CommandPool> cmdPool;
-    std::optional<vk::raii::CommandBuffers> cmdBufs;
-    std::optional<vk::raii::su::SwapChainData> swapChainData;
-    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
-    std::vector<vk::raii::Framebuffer> framebufs;
-    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
-    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
-    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
-    aligned_vector<Material> materialUpload;
-    aligned_vector<ModelUpload> modelUpload;
-    std::optional<vk::raii::RenderPass> renderPass;
-    std::optional<vk::raii::DescriptorPool> descriptorPool;
-    std::optional<vk::raii::PipelineCache> pipelineCache;
-    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    std::optional<vk::raii::Semaphore> imgAcqSem;
-    std::optional<vk::raii::Fence> drawFence;
-
-    ImGui_ImplVulkanH_Window imGuiWindow;
-    CameraUpload cameraUpload;
-    SceneUpload sceneUpload;
-    uint32_t graphicsFamilyIdx, presentFamilyIdx;
+//    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
+//    std::optional<vk::raii::PhysicalDevice> physDev;
+//    std::optional<vk::raii::su::SurfaceData> surfData;
+//    std::optional<vk::raii::Device> device;
+//    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
+//    std::optional<vk::raii::CommandPool> cmdPool;
+//    std::optional<vk::raii::CommandBuffers> cmdBufs;
+//    std::optional<vk::raii::su::SwapChainData> swapChainData;
+//    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
+//    std::vector<vk::raii::Framebuffer> framebufs;
+//    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
+//    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
+//    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
+//    aligned_vector<Material> materialUpload;
+//    aligned_vector<ModelUpload> modelUpload;
+//    std::optional<vk::raii::RenderPass> renderPass;
+//    std::optional<vk::raii::DescriptorPool> descriptorPool;
+//    std::optional<vk::raii::PipelineCache> pipelineCache;
+//    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
+//    std::optional<vk::raii::Semaphore> imgAcqSem;
+//    std::optional<vk::raii::Fence> drawFence;
+//
+//    ImGui_ImplVulkanH_Window imGuiWindow;
+//    CameraUpload cameraUpload;
+//    SceneUpload sceneUpload;
+//    uint32_t graphicsFamilyIdx, presentFamilyIdx;
 };
+
+void init(VulkanContext &vk);
 
 void renderOpaque(App& app);
 

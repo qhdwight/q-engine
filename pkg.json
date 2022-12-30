@@ -54,7 +54,7 @@
   },
   "imgui": {
     "uri": "https://github.com/ocornut/imgui.git",
-    "reference": "refs/tags/v1.88",
+    "reference": "refs/tags/v1.89.1",
     "includes": [
       ""
     ],
@@ -85,7 +85,7 @@
   },
   "tinygltf": {
     "uri": "https://github.com/syoyo/tinygltf.git",
-    "reference": "refs/heads/master",
+    "reference": "refs/heads/release",
     "includes": [
       ""
     ]

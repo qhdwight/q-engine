@@ -64,7 +64,7 @@ namespace vk::su {
         // Enable SPIR-V and Vulkan rules when parsing GLSL
         auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules);
 
-        if (!shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
+        if (!shader.parse(GetDefaultResources(), 100, false, messages)) {
             puts(shader.getInfoLog());
             puts(shader.getInfoDebugLog());
             return false;  // something didn't work
