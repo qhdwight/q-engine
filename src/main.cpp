@@ -115,8 +115,8 @@ int main() {
                 cmdWorld.emplace<Input>(ent);
             }
 
-            playerControllerPlugin->execute(app);
-            physicsPlugin->execute(app);
+//            playerControllerPlugin->execute(app);
+//            physicsPlugin->execute(app);
 
             app.renderWorld.clear();
             app.renderWorld.ctx().emplace<RenderContext>(app.logicWorld.ctx().at<LocalContext>().possessionId);

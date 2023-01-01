@@ -5,6 +5,7 @@
 #include <spirv_reflect.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <vma/vk_mem_alloc.h>
+#include <GLFW/glfw3.h>
 
 #include "state.hpp"
 #include "plugin.hpp"
@@ -13,8 +14,8 @@
 //#include "utils_raii.hpp"
 //#include "cubemap.hpp"
 
-using Extensions = std::vector<std::string_view>;
-using Layers = std::vector<std::string_view>;
+using Extensions = std::vector<const char*>;
+using Layers = std::vector<const char*>;
 
 const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
 
@@ -63,6 +64,14 @@ struct SceneUpload {
 //    vk::raii::su::BufferData vertBufData;
 //};
 
+struct Window {
+    Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent);
+
+    std::string window_name;
+    std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> window_handle;
+    std::optional<vk::raii::SurfaceKHR> surface;
+};
+
 struct VertexAttr {
     std::string name;
     vk::Format format;
@@ -94,9 +103,9 @@ struct VulkanContext {
     vk::raii::Context ctx;
     vk::ApplicationInfo appInfo;
     std::optional<vk::raii::Instance> inst;
-//    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
-//    std::optional<vk::raii::PhysicalDevice> physDev;
-//    std::optional<vk::raii::su::SurfaceData> surfData;
+    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
+    std::optional<vk::raii::PhysicalDevice> physDev;
+    std::optional<Window> window;
 //    std::optional<vk::raii::Device> device;
 //    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
 //    std::optional<vk::raii::CommandPool> cmdPool;
@@ -119,10 +128,10 @@ struct VulkanContext {
 //    ImGui_ImplVulkanH_Window imGuiWindow;
 //    CameraUpload cameraUpload;
 //    SceneUpload sceneUpload;
-//    uint32_t graphicsFamilyIdx, presentFamilyIdx;
+    uint32_t graphicsFamilyIdx, presentFamilyIdx;
 };
 
-void init(VulkanContext &vk);
+void init(VulkanContext& vk);
 
 void renderOpaque(App& app);
 

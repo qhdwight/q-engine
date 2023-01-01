@@ -6,6 +6,8 @@
 #include <string>
 #include <limits>
 #include <chrono>
+#include <format>
+#include <ranges>
 #include <numeric>
 #include <numbers>
 #include <fstream>
@@ -27,7 +29,6 @@
 
 #define VULKAN_HPP_NO_STRUCT_SETTERS
 #define VULKAN_HPP_NO_SMART_HANDLE
-#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #define VULKAN_HPP_NO_SPACESHIP_OPERATOR
 
 #include <vulkan/vulkan_raii.hpp>
