@@ -33,6 +33,10 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+
 using scalar = edyn::scalar;
 using vec3 = edyn::vector3;
 using vec2 = edyn::vector2;

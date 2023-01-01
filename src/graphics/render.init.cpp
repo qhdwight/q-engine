@@ -219,6 +219,47 @@ MemAllocator::MemAllocator(VulkanContext& vk) {
     });
 }
 
+template<typename Func>
+void one_time_submit(vk::raii::CommandBuffer const& command_buffer, vk::raii::Queue const& queue, Func const& func) {
+    command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    func(command_buffer);
+    command_buffer.end();
+    queue.submit(vk::SubmitInfo{nullptr, nullptr, *command_buffer}, nullptr);
+    queue.waitIdle();
+}
+
+void setup_imgui(VulkanContext& vk) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void) io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForVulkan(vk.window.window_handle.get(), true);
+    ImGui_ImplVulkan_InitInfo init_info{
+            .Instance = static_cast<VkInstance>(*vk.inst),
+            .PhysicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
+            .Device = static_cast<VkDevice>(*vk.device),
+            .QueueFamily = vk.graphics_family_index,
+            .Queue = static_cast<VkQueue>(*vk.graphics_queue),
+            .PipelineCache = static_cast<VkPipelineCache>(*vk.pipeline_cache),
+            .DescriptorPool = static_cast<VkDescriptorPool>(*vk.descriptor_pool),
+            .Subpass = 0,
+            .MinImageCount = 2,
+            .ImageCount = 2,
+            .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+            .Allocator = nullptr,
+            .CheckVkResultFn = nullptr
+    };
+    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.render_pass));
+    std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
+
+    one_time_submit(vk.command_buffers.front(), vk.graphics_queue, [](vk::raii::CommandBuffer const& commands) {
+        ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
+    });
+
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
 void init(VulkanContext& vk) {
     fill_instance(vk);
 
@@ -238,10 +279,10 @@ void init(VulkanContext& vk) {
     vk.graphics_queue = {vk.device, vk.graphics_family_index, 0};
     vk.present_queue = {vk.device, vk.present_family_index, 0};
 
-    vk.draw_fence = {vk.device, {}};
-    vk.image_acquire_semaphore = {vk.device, {}};
+    vk.draw_fence = {vk.device, vk::FenceCreateInfo{}};
+    vk.image_acquire_semaphore = {vk.device, vk::SemaphoreCreateInfo{}};
 
-    vk.pipeline_cache = {vk.device, {}};
+    vk.pipeline_cache = {vk.device, vk::PipelineCacheCreateInfo{}};
 
     vk.descriptor_pool = make_descriptor_pool(
             vk.device, {
@@ -263,7 +304,7 @@ void init(VulkanContext& vk) {
 
 //    createSwapChain(vk);
 //
-//    setupImgui(vk);
+    setup_imgui(vk);
 //
 //    glslang::InitializeProcess();
 }

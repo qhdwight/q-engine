@@ -1,9 +1,5 @@
 #include "render.hpp"
 
-#include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
-
 #include "app.hpp"
 #include "inspector.hpp"
 #include "shader_math.hpp"
@@ -52,7 +48,7 @@
 //    bufData.deviceMemory->unmapMemory();
 //}
 
-void renderOpaque(App& app) {
+void render_opaque(App& app) {
 //    auto& vk = app.globalCtx.at<VulkanContext>();
 //    vk.cmdBufs->front().setViewport(0, vk::Viewport(0.0f, 0.0f,
 //                                                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
@@ -193,7 +189,7 @@ void renderImGuiOverlay(App& app) {
     ImGui::End();
 }
 
-void renderImGui(App& app) {
+void render_imgui(App& app) {
 //    auto& vk = app.globalCtx.at<VulkanContext>();
 //    ImGui_ImplVulkan_NewFrame();
 //    ImGui_ImplGlfw_NewFrame();

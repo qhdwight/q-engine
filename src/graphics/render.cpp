@@ -8,41 +8,11 @@
 //#include "shaders.hpp"
 #include "shader_math.hpp"
 
+constexpr uint64_t FENCE_TIMEOUT = 100000000;
+
 void VulkanRenderPlugin::build(App& app) {
     app.globalCtx.emplace<VulkanContext>();
     app.globalCtx.emplace<WindowContext>(false, true, false);
-}
-
-void setupImgui(VulkanContext& vk) {
-//    IMGUI_CHECKVERSION();
-//    ImGui::CreateContext();
-//    ImGuiIO& io = ImGui::GetIO();
-//    (void) io;
-//    ImGui::StyleColorsDark();
-//    ImGui_ImplGlfw_InitForVulkan(vk.surfData->window.handle, true);
-//    ImGui_ImplVulkan_InitInfo init_info{
-//            .Instance = static_cast<VkInstance>(**vk.inst),
-//            .PhysicalDevice = static_cast<VkPhysicalDevice>(**vk.physDev),
-//            .Device = static_cast<VkDevice>(**vk.device),
-//            .QueueFamily = vk.graphicsFamilyIdx,
-//            .Queue = static_cast<VkQueue>(**vk.graphicsQueue),
-//            .PipelineCache = static_cast<VkPipelineCache>(**vk.pipelineCache),
-//            .DescriptorPool = static_cast<VkDescriptorPool>(**vk.descriptorPool),
-//            .Subpass = 0,
-//            .MinImageCount = 2,
-//            .ImageCount = 2,
-//            .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-//            .Allocator = nullptr,
-//            .CheckVkResultFn = nullptr
-//    };
-//    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(**vk.renderPass));
-//    std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
-//
-//    vk::raii::su::oneTimeSubmit(vk.cmdBufs->front(), *vk.graphicsQueue, [](vk::raii::CommandBuffer const& cmdBuf) {
-//        ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*cmdBuf));
-//    });
-//
-//    ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 void VulkanRenderPlugin::execute(App& app) {
@@ -52,19 +22,26 @@ void VulkanRenderPlugin::execute(App& app) {
     VulkanContext& vk = *pVk;
     if (!*vk.inst) init(vk);
 
-//    // Acquire next image and signal the semaphore
-//    auto [acqResult, curBuf] = vk.swapChainData->swapChain->acquireNextImage(vk::su::FenceTimeout, **vk.imgAcqSem, nullptr);
-//
-//    if (acqResult == vk::Result::eSuboptimalKHR) {
-//        recreatePipeline(vk);
-//        return;
-//    }
-//    if (acqResult != vk::Result::eSuccess) {
-//        throw std::runtime_error("Invalid acquire next image KHR result");
-//    }
-//    if (vk.framebufs.size() <= curBuf) {
-//        throw std::runtime_error("Invalid framebuffer size");
-//    }
+    GAME_ASSERT(*vk.device);
+    GAME_ASSERT(*vk.draw_fence);
+    GAME_ASSERT(*vk.render_pass);
+    GAME_ASSERT(*vk.swapchain.swapchain);
+    GAME_ASSERT(*vk.image_acquire_semaphore);
+    GAME_ASSERT(!vk.command_buffers.empty());
+
+    // Acquire next image and signal the semaphore
+    auto [acquire_result, current_buffer_index] = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *vk.image_acquire_semaphore, nullptr);
+
+    if (acquire_result == vk::Result::eSuboptimalKHR) {
+        recreatePipeline(vk);
+        return;
+    }
+    if (acquire_result != vk::Result::eSuccess) {
+        throw std::runtime_error("Invalid acquire next image KHR result");
+    }
+    if (vk.framebuffers.size() <= current_buffer_index) {
+        throw std::runtime_error("Invalid framebuffer size");
+    }
 //
 //    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
 //        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
@@ -73,55 +50,55 @@ void VulkanRenderPlugin::execute(App& app) {
 //        createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
 //    }
 //
-//    vk.cmdBufs->front().begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlags()));
-//    vk::ClearValue clearColor = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
-//    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
-//    std::array<vk::ClearValue, 2> clearVals{clearColor, clearDepth};
-//    vk::RenderPassBeginInfo renderPassBeginInfo(
-//            **vk.renderPass,
-//            *vk.framebufs[curBuf],
-//            vk::Rect2D({}, vk.surfData->extent),
-//            clearVals
-//    );
-//    vk.cmdBufs->front().beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-//    renderOpaque(app);
-//    renderImGui(app);
-//    vk.cmdBufs->front().endRenderPass();
-//    vk.cmdBufs->front().end();
+    vk.command_buffers.front().begin({});
+    vk::ClearValue clear_color = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
+    vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.0f, 0);
+    std::array<vk::ClearValue, 2> clear_values{clear_color, clear_depth};
+    vk::RenderPassBeginInfo render_pass_begin_info{
+            *vk.render_pass,
+            *vk.framebuffers[current_buffer_index],
+            vk::Rect2D{{}, vk.window.extent()},
+            clear_values
+    };
+    vk.command_buffers.front().beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
+    render_opaque(app);
+    render_imgui(app);
+    vk.command_buffers.front().endRenderPass();
+    vk.command_buffers.front().end();
 //
-//    vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-//    // Fences need to be manually reset
-//    vk.device->resetFences(**vk.drawFence);
-//    // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
-//    vk.graphicsQueue->submit(vk::SubmitInfo(**vk.imgAcqSem, waitDestStageMask, *vk.cmdBufs->front()), **vk.drawFence);
-//
-//    // Wait for the draw fence to be signaled
-//    while (vk::Result::eTimeout == vk.device->waitForFences(**vk.drawFence, VK_TRUE, vk::su::FenceTimeout));
-//
-//    try {
-//        // Present frame to display
-//        vk::Result result = vk.presentQueue->presentKHR({nullptr, **vk.swapChainData->swapChain, curBuf});
-//        switch (result) {
-//            case vk::Result::eSuccess:
-//            case vk::Result::eSuboptimalKHR:
-//                break;
-//            default:
-//                throw std::runtime_error("Bad present KHR result: " + vk::to_string(result));
-//        }
-//    } catch (vk::OutOfDateKHRError const&) {
-//        recreatePipeline(vk);
-//    }
-//
-//    glfwPollEvents();
-//    bool& keepOpen = app.globalCtx.at<WindowContext>().keepOpen;
-//    keepOpen = !glfwWindowShouldClose(vk.surfData->window.handle);
-//    if (!keepOpen) {
-//        vk.device->waitIdle();
-//    }
+    vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    // Fences need to be manually reset
+    vk.device.resetFences(*vk.draw_fence);
+    // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
+    vk.graphics_queue.submit(vk::SubmitInfo{*vk.image_acquire_semaphore, waitDestStageMask, *vk.command_buffers.front()}, *vk.draw_fence);
+
+    // Wait for the draw fence to be signaled
+    while (vk::Result::eTimeout == vk.device.waitForFences(*vk.draw_fence, VK_TRUE, FENCE_TIMEOUT));
+
+    try {
+        // Present frame to display
+        vk::Result result = vk.present_queue.presentKHR({nullptr, *vk.swapchain.swapchain, current_buffer_index});
+        switch (result) {
+            case vk::Result::eSuccess:
+            case vk::Result::eSuboptimalKHR:
+                break;
+            default:
+                throw std::runtime_error("Bad present KHR result: " + vk::to_string(result));
+        }
+    } catch (vk::OutOfDateKHRError const&) {
+        recreatePipeline(vk);
+    }
+
+    glfwPollEvents();
+    bool& keep_open = app.globalCtx.at<WindowContext>().keepOpen;
+    keep_open = !glfwWindowShouldClose(vk.window.window_handle.get());
+    if (!keep_open) {
+        vk.device.waitIdle();
+    }
 }
 
 void VulkanRenderPlugin::cleanup(App& app) {
-//    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplVulkan_Shutdown();
 //    glslang::FinalizeProcess();
 //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
 //        for (auto& item: pipeline.shaders) {

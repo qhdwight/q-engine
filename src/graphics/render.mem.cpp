@@ -30,7 +30,7 @@ DepthImage::DepthImage(VulkanContext& vk) : Image(
     }};
 }
 
-Image::Image(MemAllocator const& alloc, VmaAllocationCreateInfo const& create_info, vk::ImageCreateInfo const& image_info) {
+Image::Image(MemAllocator const& alloc, VmaAllocationCreateInfo const& create_info, vk::ImageCreateInfo const& image_info) : allocator{alloc} {
     auto create_info_raw = static_cast<VkImageCreateInfo>(image_info);
     VkImage image_raw;
     vmaCreateImage(*alloc, &create_info_raw, &create_info, &image_raw, &allocation, nullptr);

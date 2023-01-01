@@ -179,6 +179,7 @@ struct VulkanContext {
     vk::raii::Queue present_queue = nullptr;
     vk::raii::CommandPool command_pool = nullptr;
     vk::raii::CommandBuffers command_buffers = nullptr;
+    MemAllocator allocator;
     Swapchain swapchain;
     std::optional<DepthImage> depth_image;
     std::vector<vk::raii::Framebuffer> framebuffers;
@@ -193,19 +194,21 @@ struct VulkanContext {
 //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
     vk::raii::Semaphore image_acquire_semaphore = nullptr;
     vk::raii::Fence draw_fence = nullptr;
-    MemAllocator allocator;
 //
 //    ImGui_ImplVulkanH_Window imGuiWindow;
 //    CameraUpload cameraUpload;
 //    SceneUpload sceneUpload;
-    uint32_t graphics_family_index, present_family_index;
+    uint32_t graphics_family_index;
+    uint32_t present_family_index;
 };
 
 void init(VulkanContext& vk);
 
-void renderOpaque(App& app);
+void render_opaque(App& app);
 
-void renderImGui(App& app);
+void setup_imgui(App& app);
+
+void render_imgui(App& app);
 
 void create_swapchain(VulkanContext& vk);
 
