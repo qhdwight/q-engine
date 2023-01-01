@@ -81,6 +81,18 @@ Window::Window(vk::raii::Instance const& instance, std::string_view window_name,
     return desired_extensions;
 }
 
+[[nodiscard]] DeviceExtensions get_device_extensions() {
+    DeviceExtensions extensions;
+    extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    if constexpr (OS == OS::macOS) {
+        extensions.push_back("VK_KHR_portability_subset");
+    }
+    if constexpr (IS_DEBUG && OS != OS::macOS) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+    return extensions;
+}
+
 auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const& layers, Extensions const& extensions) {
     vk::InstanceCreateInfo create_info{{}, &app_info, layers, extensions};
     if constexpr (OS == OS::macOS) create_info.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
@@ -112,7 +124,6 @@ void fill_instance(VulkanContext& vk) {
     }
 }
 
-
 struct PhysicalDeviceComparator {
     uint32_t score(vk::raii::PhysicalDevice const& device) const {
         uint32_t score = 0;
@@ -142,6 +153,8 @@ struct PhysicalDeviceComparator {
 };
 
 vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
+    GAME_ASSERT(vk.inst);
+
     auto physical_devices = vk::raii::PhysicalDevices{*vk.inst};
     if (physical_devices.empty()) {
         throw std::runtime_error("No physical devices found");
@@ -158,11 +171,14 @@ vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
 }
 
 std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
+    GAME_ASSERT(vk.window);
+    GAME_ASSERT(vk.window->surface);
+
     using QueueIndex = uint32_t;
     using Queue = std::tuple<QueueIndex, vk::QueueFamilyProperties>;
 
     auto queue_properties = vk.physDev->getQueueFamilyProperties();
-    auto queues = std::views::zip(std::views::iota(uint32_t{0}), queue_properties);
+    auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queue_properties);
 
     auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
         return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
@@ -170,7 +186,7 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
 
     auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
-        return vk.physDev->getSurfaceSupportKHR(std::get<QueueIndex>(queue), **vk.window->surface);
+        return vk.physDev->getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window->surface.value());
     }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
 
@@ -181,6 +197,24 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     return {graphics_queues.front(), presentation_queues.front()};
 }
 
+vk::raii::Device make_device(VulkanContext const& vulkan) {
+    GAME_ASSERT(vulkan.physDev.has_value());
+
+    DeviceExtensions extensions = get_device_extensions();
+    float queue_priority = 0.0f;
+    vk::DeviceQueueCreateInfo queue_create_info(vk::DeviceQueueCreateFlags(), vulkan.graphicsFamilyIdx, 1, &queue_priority);
+    vk::DeviceCreateInfo create_info{{}, queue_create_info, {}, extensions};
+    return {vulkan.physDev.value(), create_info};
+}
+
+vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& pool_sizes) {
+    GAME_ASSERT(!pool_sizes.empty());
+    uint32_t max_sets = std::accumulate(pool_sizes.begin(), pool_sizes.end(), 0,
+                                        [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
+    GAME_ASSERT(max_sets > 0);
+    vk::DescriptorPoolCreateInfo create_info{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, max_sets, pool_sizes};
+    return {device, create_info};
+}
 
 void init(VulkanContext& vk) {
 
@@ -189,75 +223,38 @@ void init(VulkanContext& vk) {
 
     vk.physDev = make_physical_device(vk);
 
-    vk.window.emplace(*vk.inst, "Window"sv, vk::Extent2D{800, 600});
+    vk.window.emplace(vk.inst.value(), "Window"sv, vk::Extent2D{800, 600});
 
     std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = find_queue_indices(vk);
 
-//    vk.surf
+    vk.device = make_device(vk);
 
+    vk.cmdPool = vk::raii::CommandPool(vk.device.value(), {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphicsFamilyIdx});
+    vk.cmdBufs = vk::raii::CommandBuffers(vk.device.value(), {*vk.cmdPool.value(), vk::CommandBufferLevel::ePrimary, 2});
 
-//    std::string const appName = "Game Engine", engineName = "QEngine";
-//    vk.inst = vk::raii::su::makeInstance(vk.ctx, appName, engineName, {}, vk::su::getInstanceExtensions());
-//    std::cout << "[Vulkan] Instance created" << std::endl;
-//
-//#if !defined(NDEBUG)
-//    vk.debugUtilMessenger = vk::raii::DebugUtilsMessengerEXT(*vk.inst, vk::su::makeDebugUtilsMessengerCreateInfoEXT());
-//#endif
-//
-//    auto physDevs = vk::raii::PhysicalDevices{*vk.inst};
-//    if (physDevs.empty()) {
-//        throw std::runtime_error("No physical vk.devices found");
-//    }
-//    vk.physDev = std::move(physDevs.front());
-//
-//    vk::PhysicalDeviceProperties const &props = vk.physDev->getProperties();
-//    std::cout << "[Vulkan]" << " Chose physical device: " << props.deviceName
-//              << std::endl;
-//    uint32_t apiVer = props.apiVersion;
-//    std::cout << "[Vulkan]" << " " << VK_VERSION_MAJOR(apiVer) << '.' << VK_VERSION_MINOR(apiVer) << '.'
-//              << VK_VERSION_PATCH(apiVer)
-//              << " device API version"
-//              << std::endl;
-//
-//    // Creates window as well
-//    vk.surfData.emplace(*vk.inst, "Game Engine", vk::Extent2D(1280, 960));
-//
-//    std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(
-//            *vk.physDev, *vk.surfData->surface);
-//
-//    std::vector<std::string> extensions = vk::su::getDeviceExtensions();
-////#if !defined(NDEBUG)
-////    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-////#endif
-//    vk.device = vk::raii::su::makeDevice(*vk.physDev, vk.graphicsFamilyIdx, extensions);
-//
-//    vk.cmdPool = vk::raii::CommandPool(*vk.device,
-//                                       {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphicsFamilyIdx});
-//    vk.cmdBufs = vk::raii::CommandBuffers(*vk.device, {**vk.cmdPool, vk::CommandBufferLevel::ePrimary, 2});
-//
-//    vk.graphicsQueue = vk::raii::Queue(*vk.device, vk.graphicsFamilyIdx, 0);
-//    vk.presentQueue = vk::raii::Queue(*vk.device, vk.presentFamilyIdx, 0);
-//
-//    vk.drawFence = vk::raii::Fence(*vk.device, vk::FenceCreateInfo());
-//    vk.imgAcqSem = vk::raii::Semaphore(*vk.device, vk::SemaphoreCreateInfo());
-//
-//    vk.pipelineCache = vk::raii::PipelineCache(*vk.device, vk::PipelineCacheCreateInfo());
-//
-//    vk.descriptorPool = vk::raii::su::makeDescriptorPool(
-//            *vk.device, {
-//                    {vk::DescriptorType::eSampler,              64},
-//                    {vk::DescriptorType::eCombinedImageSampler, 64},
-//                    {vk::DescriptorType::eSampledImage,         64},
-//                    {vk::DescriptorType::eStorageImage,         64},
-//                    {vk::DescriptorType::eUniformTexelBuffer,   64},
-//                    {vk::DescriptorType::eStorageTexelBuffer,   64},
-//                    {vk::DescriptorType::eUniformBuffer,        64},
-//                    {vk::DescriptorType::eStorageBuffer,        64},
-//                    {vk::DescriptorType::eUniformBufferDynamic, 64},
-//                    {vk::DescriptorType::eStorageBufferDynamic, 64},
-//                    {vk::DescriptorType::eInputAttachment,      64},
-//            }
-//    );
+    vk.graphicsQueue = vk::raii::Queue(vk.device.value(), vk.graphicsFamilyIdx, 0);
+    vk.presentQueue = vk::raii::Queue(vk.device.value(), vk.presentFamilyIdx, 0);
+
+    vk.drawFence = vk::raii::Fence(vk.device.value(), vk::FenceCreateInfo());
+    vk.imgAcqSem = vk::raii::Semaphore(vk.device.value(), vk::SemaphoreCreateInfo());
+
+    vk.pipelineCache = vk::raii::PipelineCache(vk.device.value(), vk::PipelineCacheCreateInfo());
+
+    vk.descriptorPool = make_descriptor_pool(
+            vk.device.value(), {
+                    {vk::DescriptorType::eSampler,              64},
+                    {vk::DescriptorType::eCombinedImageSampler, 64},
+                    {vk::DescriptorType::eSampledImage,         64},
+                    {vk::DescriptorType::eStorageImage,         64},
+                    {vk::DescriptorType::eUniformTexelBuffer,   64},
+                    {vk::DescriptorType::eStorageTexelBuffer,   64},
+                    {vk::DescriptorType::eUniformBuffer,        64},
+                    {vk::DescriptorType::eStorageBuffer,        64},
+                    {vk::DescriptorType::eUniformBufferDynamic, 64},
+                    {vk::DescriptorType::eStorageBufferDynamic, 64},
+                    {vk::DescriptorType::eInputAttachment,      64},
+            }
+    );
 //
 //    createSwapChain(vk);
 //

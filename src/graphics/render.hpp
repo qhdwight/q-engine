@@ -15,6 +15,7 @@
 //#include "cubemap.hpp"
 
 using Extensions = std::vector<const char*>;
+using DeviceExtensions = std::vector<const char*>;
 using Layers = std::vector<const char*>;
 
 const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
@@ -67,6 +68,10 @@ struct SceneUpload {
 struct Window {
     Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent);
 
+    Window(const Window&) = delete;
+
+    Window& operator=(Window&) = delete;
+
     std::string window_name;
     std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> window_handle;
     std::optional<vk::raii::SurfaceKHR> surface;
@@ -106,10 +111,10 @@ struct VulkanContext {
     std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
     std::optional<vk::raii::PhysicalDevice> physDev;
     std::optional<Window> window;
-//    std::optional<vk::raii::Device> device;
-//    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
-//    std::optional<vk::raii::CommandPool> cmdPool;
-//    std::optional<vk::raii::CommandBuffers> cmdBufs;
+    std::optional<vk::raii::Device> device;
+    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
+    std::optional<vk::raii::CommandPool> cmdPool;
+    std::optional<vk::raii::CommandBuffers> cmdBufs;
 //    std::optional<vk::raii::su::SwapChainData> swapChainData;
 //    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
 //    std::vector<vk::raii::Framebuffer> framebufs;
@@ -119,11 +124,11 @@ struct VulkanContext {
 //    aligned_vector<Material> materialUpload;
 //    aligned_vector<ModelUpload> modelUpload;
 //    std::optional<vk::raii::RenderPass> renderPass;
-//    std::optional<vk::raii::DescriptorPool> descriptorPool;
-//    std::optional<vk::raii::PipelineCache> pipelineCache;
+    std::optional<vk::raii::DescriptorPool> descriptorPool;
+    std::optional<vk::raii::PipelineCache> pipelineCache;
 //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-//    std::optional<vk::raii::Semaphore> imgAcqSem;
-//    std::optional<vk::raii::Fence> drawFence;
+    std::optional<vk::raii::Semaphore> imgAcqSem;
+    std::optional<vk::raii::Fence> drawFence;
 //
 //    ImGui_ImplVulkanH_Window imGuiWindow;
 //    CameraUpload cameraUpload;
