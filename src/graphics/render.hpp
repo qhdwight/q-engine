@@ -20,6 +20,7 @@ using Layers = std::vector<const char*>;
 
 const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
 
+struct Image;
 struct VulkanContext;
 
 class VulkanRenderPlugin : public Plugin {
@@ -67,6 +68,31 @@ struct SceneUpload {
 //    vk::raii::su::BufferData vertBufData;
 //};
 
+struct MemAllocator : std::shared_ptr<VmaAllocator> {
+    MemAllocator() = default;
+
+    MemAllocator(VulkanContext& context);
+};
+
+struct Image {
+    MemAllocator allocator;
+    vk::Image image;
+    vk::ImageView view;
+    VmaAllocation allocation{};
+
+    Image(const Image&) = delete;
+
+    Image& operator=(Image&) = delete;
+
+    Image(Image&&) = default;
+
+    Image& operator=(Image&&) = default;
+
+    Image(MemAllocator const& alloc, VmaAllocationCreateInfo const& alloc_info, vk::ImageCreateInfo const& create_info);
+
+    ~Image();
+};
+
 struct Window {
     Window() = default;
 
@@ -79,6 +105,8 @@ struct Window {
     Window(Window&&) = default;
 
     Window& operator=(Window&&) = default;
+
+    [[nodiscard]] vk::Extent2D extent() const;
 
     std::string window_name;
     std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> window_handle;
@@ -140,6 +168,7 @@ struct VulkanContext {
     vk::raii::CommandPool command_pool = nullptr;
     vk::raii::CommandBuffers command_buffers = nullptr;
     Swapchain swapchain;
+    std::optional<Image> depth_image;
 //    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
 //    std::vector<vk::raii::Framebuffer> framebufs;
 //    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
@@ -153,6 +182,7 @@ struct VulkanContext {
 //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
     vk::raii::Semaphore image_acquire_semaphore = nullptr;
     vk::raii::Fence draw_fence = nullptr;
+    MemAllocator allocator;
 //
 //    ImGui_ImplVulkanH_Window imGuiWindow;
 //    CameraUpload cameraUpload;

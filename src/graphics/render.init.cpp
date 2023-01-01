@@ -191,6 +191,34 @@ vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, st
     return {device, create_info};
 }
 
+MemAllocator::MemAllocator(VulkanContext& vk) {
+    GAME_ASSERT(*vk.inst);
+    GAME_ASSERT(*vk.device);
+    GAME_ASSERT(*vk.physical_device);
+
+    VmaVulkanFunctions functions{
+            .vkGetInstanceProcAddr = &vkGetInstanceProcAddr,
+            .vkGetDeviceProcAddr = &vkGetDeviceProcAddr,
+    };
+
+    VmaAllocatorCreateInfo create_info{
+            .physicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
+            .device = static_cast<VkDevice>(*vk.device),
+            .pVulkanFunctions = &functions,
+            .instance = static_cast<VkInstance>(*vk.inst),
+            .vulkanApiVersion = VK_API_VERSION_1_3,
+    };
+
+    auto* raw = new VmaAllocator{};
+    if (vmaCreateAllocator(&create_info, raw) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create memory allocator");
+    }
+    reset(raw, [](VmaAllocator* p) {
+        vmaDestroyAllocator(*p);
+        delete p;
+    });
+}
+
 void init(VulkanContext& vk) {
     fill_instance(vk);
 
@@ -202,21 +230,7 @@ void init(VulkanContext& vk) {
 
     vk.device = make_device(vk);
 
-    VmaVulkanFunctions vulkanFunctions = {
-            .vkGetInstanceProcAddr = &vkGetInstanceProcAddr,
-            .vkGetDeviceProcAddr = &vkGetDeviceProcAddr,
-    };
-
-    VmaAllocatorCreateInfo allocatorCreateInfo = {
-            .physicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
-            .device = static_cast<VkDevice>(*vk.device),
-            .pVulkanFunctions = &vulkanFunctions,
-            .instance = static_cast<VkInstance>(*vk.inst),
-            .vulkanApiVersion = VK_API_VERSION_1_3,
-    };
-
-    VmaAllocator allocator;
-    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
+    vk.allocator = {vk};
 
     vk.command_pool = {vk.device, vk::CommandPoolCreateInfo{vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphics_family_index}};
     vk.command_buffers = {vk.device, vk::CommandBufferAllocateInfo{*vk.command_pool, vk::CommandBufferLevel::ePrimary, 2}};
@@ -245,7 +259,7 @@ void init(VulkanContext& vk) {
             }
     );
 
-//    create_swapchain(vk);
+    create_swapchain(vk);
 
 //    createSwapChain(vk);
 //

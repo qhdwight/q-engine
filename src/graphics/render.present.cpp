@@ -25,6 +25,12 @@ Window::Window(vk::raii::Instance const& instance, std::string_view window_name,
     surface = {instance, raw_surface};
 }
 
+vk::Extent2D Window::extent() const {
+    int width, height;
+    glfwGetFramebufferSize(window_handle.get(), &width, &height);
+    return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+}
+
 vk::SurfaceFormatKHR pick_surface_format(std::vector<vk::SurfaceFormatKHR> const& formats) {
     GAME_ASSERT(!formats.empty());
 
@@ -41,6 +47,10 @@ vk::PresentModeKHR pick_present_mode(std::vector<vk::PresentModeKHR> const& pres
 }
 
 vk::raii::SwapchainKHR make_swapchain(VulkanContext& vk, vk::SwapchainKHR const& from_swapchain = {}) {
+    GAME_ASSERT(*vk.device);
+    GAME_ASSERT(*vk.window.surface);
+    GAME_ASSERT(*vk.physical_device);
+
     vk::SurfaceKHR const& surface = *vk.window.surface;
 
     vk::SurfaceFormatKHR surface_format = pick_surface_format(vk.physical_device.getSurfaceFormatsKHR(surface));
@@ -52,7 +62,7 @@ vk::raii::SwapchainKHR make_swapchain(VulkanContext& vk, vk::SwapchainKHR const&
             surface_capabilities.minImageCount,
             surface_format.format,
             surface_format.colorSpace,
-            surface_capabilities.currentExtent,
+            vk.window.extent(),
             1,
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             vk::SharingMode::eExclusive,
@@ -100,6 +110,23 @@ void create_swapchain(VulkanContext& vk) {
             .usage = VMA_MEMORY_USAGE_GPU_ONLY,
             .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
+
+    vk::ImageCreateInfo depth_image_info{
+            {},
+            vk::ImageType::e2D,
+            vk::Format::eD32Sfloat,
+            vk::Extent3D{vk.window.extent(), 1},
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            vk::SharingMode::eExclusive,
+            {},
+            vk::ImageLayout::eUndefined
+    };
+
+    vk.depth_image = {vk.allocator, depth_alloc_info, depth_image_info};
 
 //    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
 //    vk.swapChainData.reset();
