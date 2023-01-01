@@ -1,3 +1,5 @@
+#define VMA_IMPLEMENTATION
+
 #include "render.hpp"
 
 #include "render.debug.hpp"
@@ -10,31 +12,6 @@ constexpr std::string_view APP_NAME = "Game Engine"sv;
 constexpr uint32_t APP_VERSION = 1u;
 constexpr std::string_view ENGINE_NAME = "QEngine"sv;
 constexpr uint32_t ENGINE_VERSION = 1u;
-
-Window::Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
-        : window_name{window_name} {
-    glfwInit();
-    std::cout << std::format("[GLFW] {} initialized\n", glfwGetVersionString());
-    glfwSetErrorCallback([](int error, const char* msg) {
-        std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
-    });
-    if (!glfwVulkanSupported()) {
-        throw std::runtime_error("[GLFW] Vulkan is not supported");
-    }
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window_raw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(), nullptr, nullptr);
-    window_handle = {window_raw, [](GLFWwindow* p) {
-        glfwDestroyWindow(p);
-        glfwTerminate();
-    }};
-
-    VkSurfaceKHR raw_surface;
-    if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window_raw, nullptr, &raw_surface) != VK_SUCCESS)
-        throw std::runtime_error("[GLFW] Failed to create window surface");
-
-    surface = {instance, raw_surface};
-}
 
 [[nodiscard]] Extensions get_extensions(VulkanContext const& vulkan) {
     Extensions desired_extensions{VK_KHR_SURFACE_EXTENSION_NAME};
@@ -111,16 +88,15 @@ auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const
 }
 
 void fill_instance(VulkanContext& vk) {
-    vk.appInfo = {APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
-
+    vk::ApplicationInfo app_info{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
     Extensions extensions = get_extensions(vk);
     Layers layers;
 
-    auto create_info = make_instance_create_info(vk.appInfo, layers, extensions);
-    vk.inst.emplace(vk.ctx, create_info.get<vk::InstanceCreateInfo>());
+    auto create_info = make_instance_create_info(app_info, layers, extensions);
+    vk.inst = {vk.ctx, create_info.get<vk::InstanceCreateInfo>()};
 
     if constexpr (IS_DEBUG) {
-        vk.debugUtilMessenger.emplace(*vk.inst, create_info.get<vk::DebugUtilsMessengerCreateInfoEXT>());
+        vk.debug_util_messenger = {vk.inst, create_info.get<vk::DebugUtilsMessengerCreateInfoEXT>()};
     }
 }
 
@@ -153,9 +129,9 @@ struct PhysicalDeviceComparator {
 };
 
 vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
-    GAME_ASSERT(vk.inst);
+    GAME_ASSERT(*vk.inst);
 
-    auto physical_devices = vk::raii::PhysicalDevices{*vk.inst};
+    auto physical_devices = vk::raii::PhysicalDevices{vk.inst};
     if (physical_devices.empty()) {
         throw std::runtime_error("No physical devices found");
     }
@@ -171,13 +147,12 @@ vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
 }
 
 std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
-    GAME_ASSERT(vk.window);
-    GAME_ASSERT(vk.window->surface);
+    GAME_ASSERT(*vk.window.surface);
 
     using QueueIndex = uint32_t;
     using Queue = std::tuple<QueueIndex, vk::QueueFamilyProperties>;
 
-    auto queue_properties = vk.physDev->getQueueFamilyProperties();
+    auto queue_properties = vk.physical_device.getQueueFamilyProperties();
     auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queue_properties);
 
     auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
@@ -186,7 +161,7 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
 
     auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
-        return vk.physDev->getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window->surface.value());
+        return vk.physical_device.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
     }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
 
@@ -198,13 +173,13 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
 }
 
 vk::raii::Device make_device(VulkanContext const& vulkan) {
-    GAME_ASSERT(vulkan.physDev.has_value());
+    GAME_ASSERT(*vulkan.physical_device);
 
     DeviceExtensions extensions = get_device_extensions();
     float queue_priority = 0.0f;
-    vk::DeviceQueueCreateInfo queue_create_info(vk::DeviceQueueCreateFlags(), vulkan.graphicsFamilyIdx, 1, &queue_priority);
+    vk::DeviceQueueCreateInfo queue_create_info(vk::DeviceQueueCreateFlags(), vulkan.graphics_family_index, 1, &queue_priority);
     vk::DeviceCreateInfo create_info{{}, queue_create_info, {}, extensions};
-    return {vulkan.physDev.value(), create_info};
+    return {vulkan.physical_device, create_info};
 }
 
 vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& pool_sizes) {
@@ -217,31 +192,45 @@ vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, st
 }
 
 void init(VulkanContext& vk) {
-
-
     fill_instance(vk);
 
-    vk.physDev = make_physical_device(vk);
+    vk.physical_device = make_physical_device(vk);
 
-    vk.window.emplace(vk.inst.value(), "Window"sv, vk::Extent2D{800, 600});
+    vk.window = {vk.inst, "Window"sv, vk::Extent2D{800, 600}};
 
-    std::tie(vk.graphicsFamilyIdx, vk.graphicsFamilyIdx) = find_queue_indices(vk);
+    std::tie(vk.graphics_family_index, vk.present_family_index) = find_queue_indices(vk);
 
     vk.device = make_device(vk);
 
-    vk.cmdPool = vk::raii::CommandPool(vk.device.value(), {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphicsFamilyIdx});
-    vk.cmdBufs = vk::raii::CommandBuffers(vk.device.value(), {*vk.cmdPool.value(), vk::CommandBufferLevel::ePrimary, 2});
+    VmaVulkanFunctions vulkanFunctions = {
+            .vkGetInstanceProcAddr = &vkGetInstanceProcAddr,
+            .vkGetDeviceProcAddr = &vkGetDeviceProcAddr,
+    };
 
-    vk.graphicsQueue = vk::raii::Queue(vk.device.value(), vk.graphicsFamilyIdx, 0);
-    vk.presentQueue = vk::raii::Queue(vk.device.value(), vk.presentFamilyIdx, 0);
+    VmaAllocatorCreateInfo allocatorCreateInfo = {
+            .physicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
+            .device = static_cast<VkDevice>(*vk.device),
+            .pVulkanFunctions = &vulkanFunctions,
+            .instance = static_cast<VkInstance>(*vk.inst),
+            .vulkanApiVersion = VK_API_VERSION_1_3,
+    };
 
-    vk.drawFence = vk::raii::Fence(vk.device.value(), vk::FenceCreateInfo());
-    vk.imgAcqSem = vk::raii::Semaphore(vk.device.value(), vk::SemaphoreCreateInfo());
+    VmaAllocator allocator;
+    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
 
-    vk.pipelineCache = vk::raii::PipelineCache(vk.device.value(), vk::PipelineCacheCreateInfo());
+    vk.command_pool = {vk.device, vk::CommandPoolCreateInfo{vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphics_family_index}};
+    vk.command_buffers = {vk.device, vk::CommandBufferAllocateInfo{*vk.command_pool, vk::CommandBufferLevel::ePrimary, 2}};
 
-    vk.descriptorPool = make_descriptor_pool(
-            vk.device.value(), {
+    vk.graphics_queue = {vk.device, vk.graphics_family_index, 0};
+    vk.present_queue = {vk.device, vk.present_family_index, 0};
+
+    vk.draw_fence = {vk.device, vk::FenceCreateInfo{}};
+    vk.image_acquire_semaphore = {vk.device, vk::SemaphoreCreateInfo{}};
+
+    vk.pipeline_cache = {vk.device, vk::PipelineCacheCreateInfo{}};
+
+    vk.descriptor_pool = make_descriptor_pool(
+            vk.device, {
                     {vk::DescriptorType::eSampler,              64},
                     {vk::DescriptorType::eCombinedImageSampler, 64},
                     {vk::DescriptorType::eSampledImage,         64},
@@ -255,7 +244,9 @@ void init(VulkanContext& vk) {
                     {vk::DescriptorType::eInputAttachment,      64},
             }
     );
-//
+
+//    create_swapchain(vk);
+
 //    createSwapChain(vk);
 //
 //    setupImgui(vk);

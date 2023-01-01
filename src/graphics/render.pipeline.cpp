@@ -52,36 +52,6 @@ void createShaderModule(VulkanContext& vk, Pipeline& pipeline, vk::ShaderStageFl
 //    pipeline.shaders.push_back(std::move(shaderExt));
 }
 
-void createSwapChain(VulkanContext& vk) {
-//    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
-//    vk.swapChainData.reset();
-//    vk.swapChainData = vk::raii::su::SwapChainData(
-//            *vk.physDev,
-//            *vk.device,
-//            *vk.surfData->surface,
-//            vk.surfData->extent,
-//            vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-//            {},
-//            graphicsFamilyIdx,
-//            presentFamilyIdx
-//    );
-//    vk.depthBufferData.reset();
-//    vk.depthBufferData = vk::raii::su::DepthBufferData(*vk.physDev, *vk.device, vk::raii::su::pickDepthFormat(*vk.physDev), vk.surfData->extent);
-//    vk.renderPass.reset();
-//    vk.renderPass = vk::raii::su::makeRenderPass(
-//            *vk.device,
-//            vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
-//            vk.depthBufferData->format
-//    );
-//    vk.framebufs = vk::raii::su::makeFramebuffers(
-//            *vk.device,
-//            *vk.renderPass,
-//            vk.swapChainData->imageViews,
-//            &*vk.depthBufferData->imageView,
-//            vk.surfData->extent
-//    );
-}
-
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 //    auto shadersPath = std::filesystem::current_path() / "assets" / "shaders";
 //    pipeline.shaders.clear();

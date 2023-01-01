@@ -50,7 +50,7 @@ void VulkanRenderPlugin::execute(App& app) {
     if (!pVk) return;
 
     VulkanContext& vk = *pVk;
-    if (!vk.inst) init(vk);
+    if (!*vk.inst) init(vk);
 
 //    // Acquire next image and signal the semaphore
 //    auto [acqResult, curBuf] = vk.swapChainData->swapChain->acquireNextImage(vk::su::FenceTimeout, **vk.imgAcqSem, nullptr);

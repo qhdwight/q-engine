@@ -20,6 +20,8 @@ using Layers = std::vector<const char*>;
 
 const std::unordered_set<std::string_view> DynamicNames{"model"sv, "material"sv};
 
+struct VulkanContext;
+
 class VulkanRenderPlugin : public Plugin {
 public:
     void build(App& app) override;
@@ -66,15 +68,37 @@ struct SceneUpload {
 //};
 
 struct Window {
+    Window() = default;
+
     Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent);
 
     Window(const Window&) = delete;
 
     Window& operator=(Window&) = delete;
 
+    Window(Window&&) = default;
+
+    Window& operator=(Window&&) = default;
+
     std::string window_name;
     std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> window_handle;
-    std::optional<vk::raii::SurfaceKHR> surface;
+    vk::raii::SurfaceKHR surface = nullptr;
+};
+
+struct Swapchain {
+    Swapchain() = default;
+
+    Swapchain(VulkanContext& context, Swapchain&& from);
+
+    Swapchain(const Swapchain&) = delete;
+
+    Swapchain& operator=(Swapchain&) = delete;
+
+    Swapchain(Swapchain&&) = default;
+
+    Swapchain& operator=(Swapchain&&) = default;
+
+    vk::raii::SwapchainKHR swapchain = nullptr;
 };
 
 struct VertexAttr {
@@ -106,16 +130,16 @@ struct Pipeline {
 
 struct VulkanContext {
     vk::raii::Context ctx;
-    vk::ApplicationInfo appInfo;
-    std::optional<vk::raii::Instance> inst;
-    std::optional<vk::raii::DebugUtilsMessengerEXT> debugUtilMessenger;
-    std::optional<vk::raii::PhysicalDevice> physDev;
-    std::optional<Window> window;
-    std::optional<vk::raii::Device> device;
-    std::optional<vk::raii::Queue> graphicsQueue, presentQueue;
-    std::optional<vk::raii::CommandPool> cmdPool;
-    std::optional<vk::raii::CommandBuffers> cmdBufs;
-//    std::optional<vk::raii::su::SwapChainData> swapChainData;
+    vk::raii::Instance inst = nullptr;
+    vk::raii::DebugUtilsMessengerEXT debug_util_messenger = nullptr;
+    vk::raii::PhysicalDevice physical_device = nullptr;
+    Window window;
+    vk::raii::Device device = nullptr;
+    vk::raii::Queue graphics_queue = nullptr;
+    vk::raii::Queue present_queue = nullptr;
+    vk::raii::CommandPool command_pool = nullptr;
+    vk::raii::CommandBuffers command_buffers = nullptr;
+    Swapchain swapchain;
 //    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
 //    std::vector<vk::raii::Framebuffer> framebufs;
 //    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
@@ -124,16 +148,16 @@ struct VulkanContext {
 //    aligned_vector<Material> materialUpload;
 //    aligned_vector<ModelUpload> modelUpload;
 //    std::optional<vk::raii::RenderPass> renderPass;
-    std::optional<vk::raii::DescriptorPool> descriptorPool;
-    std::optional<vk::raii::PipelineCache> pipelineCache;
+    vk::raii::DescriptorPool descriptor_pool = nullptr;
+    vk::raii::PipelineCache pipeline_cache = nullptr;
 //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    std::optional<vk::raii::Semaphore> imgAcqSem;
-    std::optional<vk::raii::Fence> drawFence;
+    vk::raii::Semaphore image_acquire_semaphore = nullptr;
+    vk::raii::Fence draw_fence = nullptr;
 //
 //    ImGui_ImplVulkanH_Window imGuiWindow;
 //    CameraUpload cameraUpload;
 //    SceneUpload sceneUpload;
-    uint32_t graphicsFamilyIdx, presentFamilyIdx;
+    uint32_t graphics_family_index, present_family_index;
 };
 
 void init(VulkanContext& vk);
@@ -142,7 +166,7 @@ void renderOpaque(App& app);
 
 void renderImGui(App& app);
 
-void createSwapChain(VulkanContext& vk);
+void create_swapchain(VulkanContext& vk);
 
 void recreatePipeline(VulkanContext& vk);
 
