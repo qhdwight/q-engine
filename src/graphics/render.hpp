@@ -77,7 +77,7 @@ struct MemAllocator : std::shared_ptr<VmaAllocator> {
 struct Image {
     MemAllocator allocator;
     vk::Image image;
-    vk::ImageView view;
+    vk::raii::ImageView view = nullptr;
     VmaAllocation allocation{};
 
     Image(const Image&) = delete;
@@ -91,6 +91,16 @@ struct Image {
     Image(MemAllocator const& alloc, VmaAllocationCreateInfo const& alloc_info, vk::ImageCreateInfo const& create_info);
 
     ~Image();
+};
+
+constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32Sfloat;
+
+struct DepthImage : Image {
+    DepthImage(VulkanContext& context);
+
+    DepthImage(DepthImage&&) = default;
+
+    DepthImage& operator=(DepthImage&&) = default;
 };
 
 struct Window {
@@ -127,6 +137,8 @@ struct Swapchain {
     Swapchain& operator=(Swapchain&&) = default;
 
     vk::raii::SwapchainKHR swapchain = nullptr;
+    vk::SurfaceFormatKHR format;
+    std::vector<vk::raii::ImageView> views;
 };
 
 struct VertexAttr {
@@ -168,15 +180,14 @@ struct VulkanContext {
     vk::raii::CommandPool command_pool = nullptr;
     vk::raii::CommandBuffers command_buffers = nullptr;
     Swapchain swapchain;
-    std::optional<Image> depth_image;
-//    std::optional<vk::raii::su::DepthBufferData> depthBufferData;
-//    std::vector<vk::raii::Framebuffer> framebufs;
+    std::optional<DepthImage> depth_image;
+    std::vector<vk::raii::Framebuffer> framebuffers;
 //    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
 //    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
 //    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
 //    aligned_vector<Material> materialUpload;
 //    aligned_vector<ModelUpload> modelUpload;
-//    std::optional<vk::raii::RenderPass> renderPass;
+    vk::raii::RenderPass render_pass = nullptr;
     vk::raii::DescriptorPool descriptor_pool = nullptr;
     vk::raii::PipelineCache pipeline_cache = nullptr;
 //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;

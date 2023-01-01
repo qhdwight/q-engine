@@ -177,7 +177,7 @@ vk::raii::Device make_device(VulkanContext const& vulkan) {
 
     DeviceExtensions extensions = get_device_extensions();
     float queue_priority = 0.0f;
-    vk::DeviceQueueCreateInfo queue_create_info(vk::DeviceQueueCreateFlags(), vulkan.graphics_family_index, 1, &queue_priority);
+    vk::DeviceQueueCreateInfo queue_create_info({}, vulkan.graphics_family_index, 1, &queue_priority);
     vk::DeviceCreateInfo create_info{{}, queue_create_info, {}, extensions};
     return {vulkan.physical_device, create_info};
 }
@@ -232,16 +232,16 @@ void init(VulkanContext& vk) {
 
     vk.allocator = {vk};
 
-    vk.command_pool = {vk.device, vk::CommandPoolCreateInfo{vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphics_family_index}};
-    vk.command_buffers = {vk.device, vk::CommandBufferAllocateInfo{*vk.command_pool, vk::CommandBufferLevel::ePrimary, 2}};
+    vk.command_pool = {vk.device, {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphics_family_index}};
+    vk.command_buffers = {vk.device, {*vk.command_pool, vk::CommandBufferLevel::ePrimary, 2}};
 
     vk.graphics_queue = {vk.device, vk.graphics_family_index, 0};
     vk.present_queue = {vk.device, vk.present_family_index, 0};
 
-    vk.draw_fence = {vk.device, vk::FenceCreateInfo{}};
-    vk.image_acquire_semaphore = {vk.device, vk::SemaphoreCreateInfo{}};
+    vk.draw_fence = {vk.device, {}};
+    vk.image_acquire_semaphore = {vk.device, {}};
 
-    vk.pipeline_cache = {vk.device, vk::PipelineCacheCreateInfo{}};
+    vk.pipeline_cache = {vk.device, {}};
 
     vk.descriptor_pool = make_descriptor_pool(
             vk.device, {

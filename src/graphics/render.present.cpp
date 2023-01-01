@@ -46,35 +46,34 @@ vk::PresentModeKHR pick_present_mode(std::vector<vk::PresentModeKHR> const& pres
     return it == present_modes.end() ? present_modes.front() : *it;
 }
 
-vk::raii::SwapchainKHR make_swapchain(VulkanContext& vk, vk::SwapchainKHR const& from_swapchain = {}) {
+
+Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
     GAME_ASSERT(*vk.device);
     GAME_ASSERT(*vk.window.surface);
     GAME_ASSERT(*vk.physical_device);
 
     vk::SurfaceKHR const& surface = *vk.window.surface;
 
-    vk::SurfaceFormatKHR surface_format = pick_surface_format(vk.physical_device.getSurfaceFormatsKHR(surface));
+    format = pick_surface_format(vk.physical_device.getSurfaceFormatsKHR(surface));
     vk::SurfaceCapabilitiesKHR surface_capabilities = vk.physical_device.getSurfaceCapabilitiesKHR(surface);
     vk::PresentModeKHR present_mode = pick_present_mode(vk.physical_device.getSurfacePresentModesKHR(surface));
     vk::SwapchainCreateInfoKHR create_info(
             {},
             surface,
             surface_capabilities.minImageCount,
-            surface_format.format,
-            surface_format.colorSpace,
+            format.format, format.colorSpace,
             vk.window.extent(),
-            1,
+            1, // image array layers
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             vk::SharingMode::eExclusive,
-            {},
+            {}, // queue family indices
             surface_capabilities.currentTransform,
             vk::CompositeAlphaFlagBitsKHR::eOpaque,
             present_mode,
-            true,
-            from_swapchain
+            true, // clipped
+            *from.swapchain
     );
-    std::cout << std::format("[Vulkan] Creating swapchain with format: {} {}\n",
-                             vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace));
+    std::cout << std::format("[Vulkan] Creating swapchain with format: {} {}\n", vk::to_string(format.format), vk::to_string(format.colorSpace));
     if (vk.graphics_family_index != vk.present_family_index) {
         std::array<uint32_t, 2> queue_family_indices{vk.graphics_family_index, vk.present_family_index};
         // If the graphics and present queues are from different queue families, we either have to explicitly
@@ -84,75 +83,98 @@ vk::raii::SwapchainKHR make_swapchain(VulkanContext& vk, vk::SwapchainKHR const&
         create_info.queueFamilyIndexCount = queue_family_indices.size();
         create_info.pQueueFamilyIndices = queue_family_indices.data();
     }
-    return {vk.device, create_info};
+    swapchain = {vk.device, create_info};
+
+    // Create views
+    std::vector<vk::Image> images = swapchain.getImages();
+    views.reserve(images.size());
+    vk::ImageViewCreateInfo view_create_info{{}, {}, vk::ImageViewType::e2D, format.format, {},
+                                             {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+    for (vk::Image const& image: images) {
+        view_create_info.image = static_cast<vk::Image>(image);
+        views.emplace_back(vk.device, view_create_info);
+    }
+
+    // Invalidate swapchain we are moving from
+    from.swapchain = nullptr;
 }
 
-Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) : swapchain{make_swapchain(vk, *from.swapchain)} {
-    from.swapchain = nullptr;
-//    swapchain->getImages()
-//    images = swapChain->getImages();
-//
-//    imageViews.reserve(images.size());
-//    vk::ImageViewCreateInfo imageViewCreateInfo({}, {}, vk::ImageViewType::e2D, colorFormat, {},
-//                                                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-//    for (auto image: images) {
-//        imageViewCreateInfo.image = static_cast<vk::Image>( image );
-//        imageViews.emplace_back(device, imageViewCreateInfo);
-//    }
+vk::raii::RenderPass make_render_pass(VulkanContext& vk) {
+    GAME_ASSERT(*vk.device);
+    GAME_ASSERT(*vk.swapchain.swapchain);
+
+    std::array<vk::AttachmentDescription, 2> attachment_descriptions{
+            vk::AttachmentDescription{
+                    {},
+                    vk.swapchain.format.format,
+                    vk::SampleCountFlagBits::e1,
+                    vk::AttachmentLoadOp::eClear,
+                    vk::AttachmentStoreOp::eStore,
+                    vk::AttachmentLoadOp::eDontCare,
+                    vk::AttachmentStoreOp::eDontCare,
+                    vk::ImageLayout::eUndefined,
+                    vk::ImageLayout::ePresentSrcKHR
+            },
+            vk::AttachmentDescription{
+                    {},
+                    DEPTH_FORMAT,
+                    vk::SampleCountFlagBits::e1,
+                    vk::AttachmentLoadOp::eClear,
+                    vk::AttachmentStoreOp::eDontCare,
+                    vk::AttachmentLoadOp::eDontCare,
+                    vk::AttachmentStoreOp::eDontCare,
+                    vk::ImageLayout::eUndefined,
+                    vk::ImageLayout::eDepthStencilAttachmentOptimal
+            }
+    };
+    vk::AttachmentReference color_attachment{0, vk::ImageLayout::eColorAttachmentOptimal};
+    vk::AttachmentReference depth_attachment{1, vk::ImageLayout::eDepthStencilAttachmentOptimal};
+    vk::SubpassDescription subpass_description{
+            {},
+            vk::PipelineBindPoint::eGraphics,
+            {},
+            color_attachment,
+            {},
+            &depth_attachment
+    };
+    vk::RenderPassCreateInfo renderPassCreateInfo{{}, attachment_descriptions, subpass_description};
+    return {vk.device, renderPassCreateInfo};
+}
+
+std::vector<vk::raii::Framebuffer> make_framebuffers(VulkanContext& context) {
+    GAME_ASSERT(*context.device);
+    GAME_ASSERT(context.depth_image);
+    GAME_ASSERT(*context.window.surface);
+    GAME_ASSERT(*context.depth_image->view);
+    GAME_ASSERT(*context.swapchain.swapchain);
+    GAME_ASSERT(!context.swapchain.views.empty());
+
+    std::array<vk::ImageView, 2> attachments;
+    attachments[1] = *context.depth_image->view;
+
+    vk::Extent2D extent = context.window.extent();
+    vk::FramebufferCreateInfo create_info(
+            {},
+            *context.render_pass,
+            attachments.size(), attachments.data(),
+            extent.width, extent.height, 1
+    );
+    std::vector<vk::raii::Framebuffer> framebuffers;
+
+    std::vector<vk::raii::ImageView>& views = context.swapchain.views;
+    framebuffers.reserve(views.size());
+    for (vk::raii::ImageView const& view: views) {
+        attachments[0] = *view;
+        framebuffers.emplace_back(context.device, create_info);
+    }
+
+    return framebuffers;
 }
 
 void create_swapchain(VulkanContext& vk) {
-
     Swapchain current = std::move(vk.swapchain);
     vk.swapchain = {vk, std::move(current)};
-
-    VmaAllocationCreateInfo depth_alloc_info = {
-            .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-            .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    };
-
-    vk::ImageCreateInfo depth_image_info{
-            {},
-            vk::ImageType::e2D,
-            vk::Format::eD32Sfloat,
-            vk::Extent3D{vk.window.extent(), 1},
-            1,
-            1,
-            vk::SampleCountFlagBits::e1,
-            vk::ImageTiling::eOptimal,
-            vk::ImageUsageFlagBits::eDepthStencilAttachment,
-            vk::SharingMode::eExclusive,
-            {},
-            vk::ImageLayout::eUndefined
-    };
-
-    vk.depth_image = {vk.allocator, depth_alloc_info, depth_image_info};
-
-//    auto [graphicsFamilyIdx, presentFamilyIdx] = vk::raii::su::findGraphicsAndPresentQueueFamilyIndex(*vk.physDev, *vk.surfData->surface);
-//    vk.swapChainData.reset();
-//    vk.swapChainData = vk::raii::su::SwapChainData(
-//            *vk.physDev,
-//            *vk.device,
-//            *vk.surfData->surface,
-//            vk.surfData->extent,
-//            vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-//            {},
-//            graphicsFamilyIdx,
-//            presentFamilyIdx
-//    );
-//    vk.depthBufferData.reset();
-//    vk.depthBufferData = vk::raii::su::DepthBufferData(*vk.physDev, *vk.device, vk::raii::su::pickDepthFormat(*vk.physDev), vk.surfData->extent);
-//    vk.renderPass.reset();
-//    vk.renderPass = vk::raii::su::makeRenderPass(
-//            *vk.device,
-//            vk::su::pickSurfaceFormat(vk.physDev->getSurfaceFormatsKHR(**vk.surfData->surface)).format,
-//            vk.depthBufferData->format
-//    );
-//    vk.framebufs = vk::raii::su::makeFramebuffers(
-//            *vk.device,
-//            *vk.renderPass,
-//            vk.swapChainData->imageViews,
-//            &*vk.depthBufferData->imageView,
-//            vk.surfData->extent
-//    );
+    vk.depth_image.emplace(vk);
+    vk.render_pass = make_render_pass(vk);
+    vk.framebuffers = make_framebuffers(vk);
 }
