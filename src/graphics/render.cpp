@@ -33,7 +33,7 @@ void VulkanRenderPlugin::execute(App& app) {
     auto [acquire_result, current_buffer_index] = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *vk.image_acquire_semaphore, nullptr);
 
     if (acquire_result == vk::Result::eSuboptimalKHR) {
-        recreatePipeline(vk);
+        recreate_pipeline(vk);
         return;
     }
     if (acquire_result != vk::Result::eSuccess) {
@@ -86,7 +86,7 @@ void VulkanRenderPlugin::execute(App& app) {
                 throw std::runtime_error("Bad present KHR result: " + vk::to_string(result));
         }
     } catch (vk::OutOfDateKHRError const&) {
-        recreatePipeline(vk);
+        recreate_pipeline(vk);
     }
 
     glfwPollEvents();

@@ -190,15 +190,15 @@ void renderImGuiOverlay(App& app) {
 }
 
 void render_imgui(App& app) {
-//    auto& vk = app.globalCtx.at<VulkanContext>();
-//    ImGui_ImplVulkan_NewFrame();
-//    ImGui_ImplGlfw_NewFrame();
-//    ImGui::NewFrame();
-////    ImGui::ShowDemoWindow();
-////    auto it = world->view<UI>().each();
-////    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-//    renderImGuiInspector(app);
-//    renderImGuiOverlay(app);
-//    ImGui::Render();
-//    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.cmdBufs->front()));
+    auto& vk = app.globalCtx.at<VulkanContext>();
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+//    ImGui::ShowDemoWindow();
+//    auto it = world->view<UI>().each();
+//    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
+    renderImGuiInspector(app);
+    renderImGuiOverlay(app);
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.command_buffers.front()));
 }

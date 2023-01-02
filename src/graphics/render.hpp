@@ -88,7 +88,7 @@ struct Image {
 
     Image& operator=(Image&&) = default;
 
-    Image(MemAllocator const& alloc, VmaAllocationCreateInfo const& alloc_info, vk::ImageCreateInfo const& create_info);
+    Image(MemAllocator const& allocator, VmaAllocationCreateInfo const& alloc_info, vk::ImageCreateInfo const& create_info);
 
     ~Image();
 };
@@ -212,6 +212,6 @@ void render_imgui(App& app);
 
 void create_swapchain(VulkanContext& vk);
 
-void recreatePipeline(VulkanContext& vk);
+void recreate_pipeline(VulkanContext& vk);
 
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline);

@@ -248,12 +248,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
 //    );
 }
 
-void recreatePipeline(VulkanContext& vk) {
-//    vk.device->waitIdle();
-//    int width, height;
-//    glfwGetFramebufferSize(vk.surfData->window.handle, &width, &height);
-//    vk.surfData->extent = vk::Extent2D(width, height);
-//    // Force recreation of pipelines, as they depend on the swap chain
-//    vk.modelPipelines.clear();
-//    createSwapChain(vk);
+void recreate_pipeline(VulkanContext& vk) {
+    vk.device.waitIdle();
+    create_swapchain(vk);
 }
