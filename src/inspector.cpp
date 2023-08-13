@@ -1,10 +1,7 @@
 #include "inspector.hpp"
 
-#include <imgui.h>
-
 #include "app.hpp"
 #include "state.hpp"
-
 
 template<std::copyable TComp>
 void renderValue(TComp& comp, entt::meta_data const& field, std::string_view name) {
@@ -65,13 +62,13 @@ void renderImGuiInspector(App& app) {
     if (isOpen) {
         for (entt::entity const& ent: sortedEntities) {
             if (ImGui::TreeNode(&ent, "#%u", ent)) {
-//                for (auto [possessionId, storage]: app.logicWorld.storage()) {
-//                    if (storage.contains(ent)) {
-//                        if (possessionId == "position"_hs) {d
-//                            std::array<float, 3>fPosition", position.data());
-//                        }
-//                    }
-//                }
+                //                for (auto [possessionId, storage]: app.logicWorld.storage()) {
+                //                    if (storage.contains(ent)) {
+                //                        if (possessionId == "position"_hs) {d
+                //                            std::array<float, 3>fPosition", position.data());
+                //                        }
+                //                    }
+                //                }
 
                 renderComponent<Position>(app, ent);
                 renderComponent<Material>(app, ent);

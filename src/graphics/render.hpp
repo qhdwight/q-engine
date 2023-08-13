@@ -2,19 +2,19 @@
 
 #include "game_pch.hpp"
 
-#include <spirv_reflect.h>
-#include <backends/imgui_impl_vulkan.h>
-#include <vma/vk_mem_alloc.h>
 #include <GLFW/glfw3.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <spirv_reflect.h>
+#include <vma/vk_mem_alloc.h>
 
-#include "state.hpp"
-#include "plugin.hpp"
 #include "matrix4x4.hpp"
+#include "plugin.hpp"
+#include "state.hpp"
 //#include "collections/aligned_vector.hpp"
 //#include "utils_raii.hpp"
 //#include "cubemap.hpp"
 
-using Extensions = std::vector<const char*>;
+using InstanceExtensions = std::vector<const char*>;
 using DeviceExtensions = std::vector<const char*>;
 using Layers = std::vector<const char*>;
 
@@ -41,7 +41,8 @@ struct mat4f {
 };
 
 enum class PBRWorkflows {
-    MetallicRoughness = 0, SpecularGlossiness = 1
+    MetallicRoughness = 0,
+    SpecularGlossiness = 1
 };
 
 struct CameraUpload {
@@ -96,7 +97,7 @@ struct Image {
 constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32Sfloat;
 
 struct DepthImage : Image {
-    DepthImage(VulkanContext& context);
+    explicit DepthImage(VulkanContext& context);
 
     DepthImage(DepthImage&&) = default;
 
@@ -119,7 +120,7 @@ struct Window {
     [[nodiscard]] vk::Extent2D extent() const;
 
     std::string window_name;
-    std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> window_handle;
+    std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> windowHandle;
     vk::raii::SurfaceKHR surface = nullptr;
 };
 
@@ -165,41 +166,39 @@ struct Pipeline {
     std::optional<vk::raii::PipelineLayout> layout;
     std::vector<vk::raii::DescriptorSetLayout> descSetLayouts;
     std::vector<vk::raii::DescriptorSet> descSets;
-//    std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
+    //    std::map<std::pair<uint32_t, uint32_t>, vk::raii::su::BufferData> uniforms;
 };
 
 struct VulkanContext {
     vk::raii::Context ctx;
     vk::raii::Instance inst = nullptr;
-    vk::raii::DebugUtilsMessengerEXT debug_util_messenger = nullptr;
-    vk::raii::PhysicalDevice physical_device = nullptr;
+    vk::raii::DebugUtilsMessengerEXT debugUtilMessenger = nullptr;
+    vk::raii::PhysicalDevice physicalDevice = nullptr;
     Window window;
     vk::raii::Device device = nullptr;
-    vk::raii::Queue graphics_queue = nullptr;
-    vk::raii::Queue present_queue = nullptr;
-    vk::raii::CommandPool command_pool = nullptr;
-    vk::raii::CommandBuffers command_buffers = nullptr;
+    vk::raii::Queue graphicsQueue = nullptr;
+    vk::raii::Queue presentQueue = nullptr;
+    vk::raii::CommandPool commandPool = nullptr;
+    vk::raii::CommandBuffers commandBuffers = nullptr;
     MemAllocator allocator;
     Swapchain swapchain;
-    std::optional<DepthImage> depth_image;
-    std::vector<vk::raii::Framebuffer> framebuffers;
-//    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
-//    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
-//    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
-//    aligned_vector<Material> materialUpload;
-//    aligned_vector<ModelUpload> modelUpload;
-    vk::raii::RenderPass render_pass = nullptr;
-    vk::raii::DescriptorPool descriptor_pool = nullptr;
-    vk::raii::PipelineCache pipeline_cache = nullptr;
-//    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    vk::raii::Semaphore image_acquire_semaphore = nullptr;
-    vk::raii::Fence draw_fence = nullptr;
-//
-//    ImGui_ImplVulkanH_Window imGuiWindow;
-//    CameraUpload cameraUpload;
-//    SceneUpload sceneUpload;
-    uint32_t graphics_family_index;
-    uint32_t present_family_index;
+    std::optional<DepthImage> depthImage;
+    //    std::unordered_map<asset_handle_t, vk::raii::su::TextureData> textures;
+    //    std::unordered_map<asset_handle_t, ModelBuffers> modelBufData;
+    //    std::unordered_map<asset_handle_t, CubeMapData> cubeMaps;
+    //    aligned_vector<Material> materialUpload;
+    //    aligned_vector<ModelUpload> modelUpload;
+    vk::raii::DescriptorPool descriptorPool = nullptr;
+    vk::raii::PipelineCache pipelineCache = nullptr;
+    //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
+    vk::raii::Semaphore presentComplete = nullptr;
+    vk::raii::Semaphore renderComplete = nullptr;
+    //
+    //    ImGui_ImplVulkanH_Window imGuiWindow;
+    //    CameraUpload cameraUpload;
+    //    SceneUpload sceneUpload;
+    uint32_t graphicsFamilyIndex;
+    uint32_t presentFamilyIndex;
 };
 
 void init(VulkanContext& vk);
@@ -210,7 +209,7 @@ void setup_imgui(App& app);
 
 void render_imgui(App& app);
 
-void create_swapchain(VulkanContext& vk);
+void createSwapchain(VulkanContext& vk);
 
 void recreate_pipeline(VulkanContext& vk);
 

@@ -1,7 +1,7 @@
 {
   "entt": {
     "uri": "https://github.com/skypjack/entt.git",
-    "reference": "refs/tags/v3.10.3",
+    "reference": "refs/tags/v3.12.2",
     "includes": [
       "src"
     ],
@@ -32,7 +32,7 @@
   },
   "glslang": {
     "uri": "https://github.com/KhronosGroup/glslang.git",
-    "reference": "refs/heads/master",
+    "reference": "refs/heads/main",
     "includes": [
       ""
     ],
@@ -54,7 +54,7 @@
   },
   "imgui": {
     "uri": "https://github.com/ocornut/imgui.git",
-    "reference": "refs/tags/v1.89.1",
+    "reference": "refs/tags/v1.89.8",
     "includes": [
       ""
     ],
@@ -92,7 +92,7 @@
   },
   "spirv-reflect": {
     "uri": "https://github.com/KhronosGroup/SPIRV-Reflect.git",
-    "reference": "refs/heads/master",
+    "reference": "refs/heads/main",
     "includes": [
       ""
     ],

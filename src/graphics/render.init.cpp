@@ -4,104 +4,105 @@
 
 #include "render.debug.hpp"
 
-#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-#endif
-
 constexpr std::string_view APP_NAME = "Game Engine"sv;
 constexpr uint32_t APP_VERSION = 1u;
 constexpr std::string_view ENGINE_NAME = "QEngine"sv;
 constexpr uint32_t ENGINE_VERSION = 1u;
 
-[[nodiscard]] Extensions get_extensions(VulkanContext const& vulkan) {
-    Extensions desired_extensions{VK_KHR_SURFACE_EXTENSION_NAME};
-    if constexpr (OS == OS::Windows) {
-        desired_extensions.push_back("VK_KHR_win32_surface");
-    } else if constexpr (OS == OS::Linux) {
-        desired_extensions.push_back("VK_KHR_xcb_surface");
-    } else if constexpr (OS == OS::macOS) {
-        // TODO: make defines
-        desired_extensions.push_back("VK_EXT_metal_surface");
-        desired_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-        desired_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    };
-    if constexpr (IS_DEBUG) {
-        desired_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+[[nodiscard]] InstanceExtensions get_instance_extensions(VulkanContext const& vulkan) {
+    InstanceExtensions desiredExtensions{VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
+
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+            desiredExtensions.emplace_back(glfwExtensions[i]);
     }
 
-    std::vector<vk::ExtensionProperties> available_extensions = vulkan.ctx.enumerateInstanceExtensionProperties();
+    if constexpr (IS_DEBUG) {
+        desiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
 
-    std::vector<std::string_view> sorted_desired_extensions(desired_extensions.size());
-    std::ranges::partial_sort_copy(desired_extensions | std::views::transform([](const char* s) { return std::string_view{s}; }),
+    log("[Vulkan] Desired instance extensions:");
+    for (std::string_view extension: desiredExtensions) {
+        log("\t{}", extension);
+    }
+
+    std::vector<vk::ExtensionProperties> availableExtensions = vulkan.ctx.enumerateInstanceExtensionProperties();
+
+    std::vector<std::string_view> sorted_desired_extensions(desiredExtensions.size());
+    std::ranges::partial_sort_copy(desiredExtensions | std::views::transform([](const char* s) { return std::string_view{s}; }),
                                    sorted_desired_extensions);
-    std::vector<std::string_view> sorted_available_extensions(available_extensions.size());
-    std::ranges::partial_sort_copy(available_extensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }),
+    std::vector<std::string_view> sorted_available_extensions(availableExtensions.size());
+    std::ranges::partial_sort_copy(availableExtensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }),
                                    sorted_available_extensions);
 
     std::vector<std::string_view> missing_extensions;
     std::ranges::set_difference(sorted_desired_extensions, sorted_available_extensions, std::back_inserter(missing_extensions));
 
-    std::cout << "[Vulkan] Available extensions:\n";
-    for (std::string_view name: sorted_available_extensions) {
-        std::cout << std::format("\t{}\n", name);
+    log("[Vulkan] Available instance extensions:");
+    for (std::string_view extension: sorted_available_extensions) {
+        log("\t{}", extension);
     }
 
     if (!missing_extensions.empty()) {
         std::ostringstream out;
-        out << "[Vulkan] Missing extensions:\n";
-        for (std::string_view name: missing_extensions) {
-            out << std::format("\t{}\n", name);
+        std::println(out, "[Vulkan] Missing extensions:");
+        for (std::string_view extension: missing_extensions) {
+            std::println(out, "\t{}", extension);
         }
         throw std::runtime_error(out.str());
     }
 
-    return desired_extensions;
+    return desiredExtensions;
 }
 
 [[nodiscard]] DeviceExtensions get_device_extensions() {
-    DeviceExtensions extensions;
-    extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    DeviceExtensions extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
     if constexpr (OS == OS::macOS) {
         extensions.push_back("VK_KHR_portability_subset");
-    }
-    if constexpr (IS_DEBUG && OS != OS::macOS) {
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
     return extensions;
 }
 
-auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const& layers, Extensions const& extensions) {
-    vk::InstanceCreateInfo create_info{{}, &app_info, layers, extensions};
-    if constexpr (OS == OS::macOS) create_info.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const& layers, InstanceExtensions const& extensions) {
+    vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &app_info, layers, extensions};
     if constexpr (IS_DEBUG) {
-        using
-        enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-        using
-        enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
         return vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT>{
-                create_info,
+                createInfo,
                 {{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
         };
     } else {
-        return vk::StructureChain<vk::InstanceCreateInfo>{create_info};
+        return vk::StructureChain<vk::InstanceCreateInfo>{createInfo};
     }
 }
 
 void fill_instance(VulkanContext& vk) {
-    vk::ApplicationInfo app_info{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
-    Extensions extensions = get_extensions(vk);
+    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
+    InstanceExtensions extensions = get_instance_extensions(vk);
     Layers layers;
+    if constexpr (IS_DEBUG) {
+        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+    }
 
-    auto create_info = make_instance_create_info(app_info, layers, extensions);
-    vk.inst = {vk.ctx, create_info.get<vk::InstanceCreateInfo>()};
+    log("[Vulkan] Available instance layers:");
+    for (auto const& layer: vk::enumerateInstanceLayerProperties()) {
+        log("\t{}", std::string_view{layer.layerName});
+    }
+
+    auto createInfo = make_instance_create_info(appInfo, layers, extensions);
+    vk.inst = {vk.ctx, createInfo.get<vk::InstanceCreateInfo>()};
 
     if constexpr (IS_DEBUG) {
-        vk.debug_util_messenger = {vk.inst, create_info.get<vk::DebugUtilsMessengerCreateInfoEXT>()};
+        vk.debugUtilMessenger = {vk.inst, createInfo.get<vk::DebugUtilsMessengerCreateInfoEXT>()};
     }
 }
 
 struct PhysicalDeviceComparator {
-    uint32_t score(vk::raii::PhysicalDevice const& device) const {
+    [[nodiscard]] static uint32_t score(vk::raii::PhysicalDevice const& device) {
         uint32_t score = 0;
         auto properties = device.getProperties();
         switch (properties.deviceType) {
@@ -131,19 +132,23 @@ struct PhysicalDeviceComparator {
 vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
     GAME_ASSERT(*vk.inst);
 
-    auto physical_devices = vk::raii::PhysicalDevices{vk.inst};
-    if (physical_devices.empty()) {
+    auto physicalDevices = vk::raii::PhysicalDevices{vk.inst};
+    if (physicalDevices.empty()) {
         throw std::runtime_error("No physical devices found");
     }
 
-    vk::raii::PhysicalDevice physical_device = std::move(*std::ranges::max_element(physical_devices, PhysicalDeviceComparator{}));
+    vk::raii::PhysicalDevice physicalDevice = std::move(*std::ranges::max_element(physicalDevices, PhysicalDeviceComparator{}));
 
-    vk::PhysicalDeviceProperties const& properties = physical_device.getProperties();
-    std::cout << std::format("[Vulkan] Chose physical device {}\n", properties.deviceName.data());
-    uint32_t api_version = properties.apiVersion;
-    std::cout << std::format("[Vulkan] {}.{}.{} device API version\n",
-                             VK_VERSION_MAJOR(api_version), VK_VERSION_MINOR(api_version), VK_VERSION_PATCH(api_version));
-    return physical_device;
+    vk::PhysicalDeviceProperties const& properties = physicalDevice.getProperties();
+    log("[Vulkan] Chose physical device {}", properties.deviceName.data());
+    uint32_t apiVersion = properties.apiVersion;
+    log("[Vulkan] {}.{}.{} device API version",
+        VK_VERSION_MAJOR(apiVersion), VK_VERSION_MINOR(apiVersion), VK_VERSION_PATCH(apiVersion));
+    log("[Vulkan] Available physical device extensions:");
+    for (auto const& extension: physicalDevice.enumerateDeviceExtensionProperties()) {
+        log("\t{}", std::string_view{extension.extensionName});
+    }
+    return physicalDevice;
 }
 
 std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
@@ -152,17 +157,19 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     using QueueIndex = uint32_t;
     using Queue = std::tuple<QueueIndex, vk::QueueFamilyProperties>;
 
-    auto queue_properties = vk.physical_device.getQueueFamilyProperties();
+    auto queue_properties = vk.physicalDevice.getQueueFamilyProperties();
     auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queue_properties);
 
     auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
-        return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
-    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+                               return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
+                           }) |
+                           std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
 
     auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
-        return vk.physical_device.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
-    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+                                   return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
+                               }) |
+                               std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
 
     std::vector<QueueIndex> combined;
@@ -172,14 +179,15 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     return {graphics_queues.front(), presentation_queues.front()};
 }
 
-vk::raii::Device make_device(VulkanContext const& vulkan) {
-    GAME_ASSERT(*vulkan.physical_device);
+vk::raii::Device make_logical_device(VulkanContext const& vk) {
+    GAME_ASSERT(*vk.physicalDevice);
 
     DeviceExtensions extensions = get_device_extensions();
-    float queue_priority = 0.0f;
-    vk::DeviceQueueCreateInfo queue_create_info({}, vulkan.graphics_family_index, 1, &queue_priority);
-    vk::DeviceCreateInfo create_info{{}, queue_create_info, {}, extensions};
-    return {vulkan.physical_device, create_info};
+    float queue_priority = 1.0f;
+    vk::DeviceQueueCreateInfo queueCreateInfo({}, vk.graphicsFamilyIndex, 1, &queue_priority);
+    vk::PhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures{true};
+    vk::DeviceCreateInfo createInfo{{}, queueCreateInfo, {}, extensions, {}, &dynamicRenderingFeatures};
+    return {vk.physicalDevice, createInfo};
 }
 
 vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& pool_sizes) {
@@ -194,7 +202,7 @@ vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, st
 MemAllocator::MemAllocator(VulkanContext& vk) {
     GAME_ASSERT(*vk.inst);
     GAME_ASSERT(*vk.device);
-    GAME_ASSERT(*vk.physical_device);
+    GAME_ASSERT(*vk.physicalDevice);
 
     VmaVulkanFunctions functions{
             .vkGetInstanceProcAddr = &vkGetInstanceProcAddr,
@@ -202,7 +210,7 @@ MemAllocator::MemAllocator(VulkanContext& vk) {
     };
 
     VmaAllocatorCreateInfo create_info{
-            .physicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
+            .physicalDevice = static_cast<VkPhysicalDevice>(*vk.physicalDevice),
             .device = static_cast<VkDevice>(*vk.device),
             .pVulkanFunctions = &functions,
             .instance = static_cast<VkInstance>(*vk.inst),
@@ -234,26 +242,28 @@ void setup_imgui(VulkanContext& vk) {
     ImGuiIO& io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForVulkan(vk.window.window_handle.get(), true);
+    ImGui_ImplGlfw_InitForVulkan(vk.window.windowHandle.get(), true);
     ImGui_ImplVulkan_InitInfo init_info{
             .Instance = static_cast<VkInstance>(*vk.inst),
-            .PhysicalDevice = static_cast<VkPhysicalDevice>(*vk.physical_device),
+            .PhysicalDevice = static_cast<VkPhysicalDevice>(*vk.physicalDevice),
             .Device = static_cast<VkDevice>(*vk.device),
-            .QueueFamily = vk.graphics_family_index,
-            .Queue = static_cast<VkQueue>(*vk.graphics_queue),
-            .PipelineCache = static_cast<VkPipelineCache>(*vk.pipeline_cache),
-            .DescriptorPool = static_cast<VkDescriptorPool>(*vk.descriptor_pool),
+            .QueueFamily = vk.graphicsFamilyIndex,
+            .Queue = static_cast<VkQueue>(*vk.graphicsQueue),
+            .PipelineCache = static_cast<VkPipelineCache>(*vk.pipelineCache),
+            .DescriptorPool = static_cast<VkDescriptorPool>(*vk.descriptorPool),
             .Subpass = 0,
             .MinImageCount = 2,
             .ImageCount = 2,
             .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+            .UseDynamicRendering = true,
+            .ColorAttachmentFormat = static_cast<VkFormat>(vk.swapchain.format.format),
             .Allocator = nullptr,
-            .CheckVkResultFn = nullptr
+            .CheckVkResultFn = nullptr,
     };
-    ImGui_ImplVulkan_Init(&init_info, static_cast<VkRenderPass>(*vk.render_pass));
+    ImGui_ImplVulkan_Init(&init_info, {});
     std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
-    one_time_submit(vk.command_buffers.front(), vk.graphics_queue, [](vk::raii::CommandBuffer const& commands) {
+    one_time_submit(vk.commandBuffers.front(), vk.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
     });
 
@@ -261,50 +271,55 @@ void setup_imgui(VulkanContext& vk) {
 }
 
 void init(VulkanContext& vk) {
+    glfwInit();
+    std::cout << std::format("[GLFW] {} initialized\n", glfwGetVersionString());
+    glfwSetErrorCallback([](int error, const char* msg) {
+        std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
+    });
+    if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
     fill_instance(vk);
 
-    vk.physical_device = make_physical_device(vk);
+    vk.physicalDevice = make_physical_device(vk);
 
     vk.window = {vk.inst, "Window"sv, vk::Extent2D{800, 600}};
 
-    std::tie(vk.graphics_family_index, vk.present_family_index) = find_queue_indices(vk);
+    std::tie(vk.graphicsFamilyIndex, vk.presentFamilyIndex) = find_queue_indices(vk);
 
-    vk.device = make_device(vk);
+    vk.device = make_logical_device(vk);
 
     vk.allocator = {vk};
 
-    vk.command_pool = {vk.device, {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphics_family_index}};
-    vk.command_buffers = {vk.device, {*vk.command_pool, vk::CommandBufferLevel::ePrimary, 2}};
+    vk.commandPool = {vk.device, {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, vk.graphicsFamilyIndex}};
+    vk.commandBuffers = {vk.device, {*vk.commandPool, vk::CommandBufferLevel::ePrimary, 2}};
 
-    vk.graphics_queue = {vk.device, vk.graphics_family_index, 0};
-    vk.present_queue = {vk.device, vk.present_family_index, 0};
+    vk.graphicsQueue = {vk.device, vk.graphicsFamilyIndex, 0};
+    vk.presentQueue = {vk.device, vk.presentFamilyIndex, 0};
 
-    vk.draw_fence = {vk.device, vk::FenceCreateInfo{}};
-    vk.image_acquire_semaphore = {vk.device, vk::SemaphoreCreateInfo{}};
+    vk.presentComplete = {vk.device, vk::SemaphoreCreateInfo{}};
+    vk.renderComplete = {vk.device, vk::SemaphoreCreateInfo{}};
 
-    vk.pipeline_cache = {vk.device, vk::PipelineCacheCreateInfo{}};
+    vk.pipelineCache = {vk.device, vk::PipelineCacheCreateInfo{}};
 
-    vk.descriptor_pool = make_descriptor_pool(
+    vk.descriptorPool = make_descriptor_pool(
             vk.device, {
-                    {vk::DescriptorType::eSampler,              64},
-                    {vk::DescriptorType::eCombinedImageSampler, 64},
-                    {vk::DescriptorType::eSampledImage,         64},
-                    {vk::DescriptorType::eStorageImage,         64},
-                    {vk::DescriptorType::eUniformTexelBuffer,   64},
-                    {vk::DescriptorType::eStorageTexelBuffer,   64},
-                    {vk::DescriptorType::eUniformBuffer,        64},
-                    {vk::DescriptorType::eStorageBuffer,        64},
-                    {vk::DescriptorType::eUniformBufferDynamic, 64},
-                    {vk::DescriptorType::eStorageBufferDynamic, 64},
-                    {vk::DescriptorType::eInputAttachment,      64},
-            }
-    );
+                               {vk::DescriptorType::eSampler, 64},
+                               {vk::DescriptorType::eCombinedImageSampler, 64},
+                               {vk::DescriptorType::eSampledImage, 64},
+                               {vk::DescriptorType::eStorageImage, 64},
+                               {vk::DescriptorType::eUniformTexelBuffer, 64},
+                               {vk::DescriptorType::eStorageTexelBuffer, 64},
+                               {vk::DescriptorType::eUniformBuffer, 64},
+                               {vk::DescriptorType::eStorageBuffer, 64},
+                               {vk::DescriptorType::eUniformBufferDynamic, 64},
+                               {vk::DescriptorType::eStorageBufferDynamic, 64},
+                               {vk::DescriptorType::eInputAttachment, 64},
+                       });
 
-    create_swapchain(vk);
+    createSwapchain(vk);
 
-//    createSwapChain(vk);
-//
     setup_imgui(vk);
-//
-//    glslang::InitializeProcess();
+    //
+    //    glslang::InitializeProcess();
 }

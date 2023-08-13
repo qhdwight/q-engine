@@ -1,11 +1,6 @@
 #include "render.hpp"
 
-#include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
-
 #include "app.hpp"
-//#include "shaders.hpp"
 #include "shader_math.hpp"
 
 constexpr uint64_t FENCE_TIMEOUT = 100000000;
@@ -23,86 +18,102 @@ void VulkanRenderPlugin::execute(App& app) {
     if (!*vk.inst) init(vk);
 
     GAME_ASSERT(*vk.device);
-    GAME_ASSERT(*vk.draw_fence);
-    GAME_ASSERT(*vk.render_pass);
     GAME_ASSERT(*vk.swapchain.swapchain);
-    GAME_ASSERT(*vk.image_acquire_semaphore);
-    GAME_ASSERT(!vk.command_buffers.empty());
-
-    // Acquire next image and signal the semaphore
-    auto [acquire_result, current_buffer_index] = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *vk.image_acquire_semaphore, nullptr);
-
-    if (acquire_result == vk::Result::eSuboptimalKHR) {
-        recreate_pipeline(vk);
-        return;
-    }
-    if (acquire_result != vk::Result::eSuccess) {
-        throw std::runtime_error("Invalid acquire next image KHR result");
-    }
-    if (vk.framebuffers.size() <= current_buffer_index) {
-        throw std::runtime_error("Invalid framebuffer size");
-    }
-//
-//    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
-//        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
-//
-//        // Create blank shader and fill it in
-//        createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
-//    }
-//
-    vk.command_buffers.front().begin({});
-    vk::ClearValue clear_color = vk::ClearColorValue(std::array<float, 4>{0.2f, 0.2f, 0.2f, 0.2f});
-    vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.0f, 0);
-    std::array<vk::ClearValue, 2> clear_values{clear_color, clear_depth};
-    vk::RenderPassBeginInfo render_pass_begin_info{
-            *vk.render_pass,
-            *vk.framebuffers[current_buffer_index],
-            vk::Rect2D{{}, vk.window.extent()},
-            clear_values
-    };
-    vk.command_buffers.front().beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
-    render_opaque(app);
-    render_imgui(app);
-    vk.command_buffers.front().endRenderPass();
-    vk.command_buffers.front().end();
-//
-    vk::PipelineStageFlags waitDestStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    // Fences need to be manually reset
-    vk.device.resetFences(*vk.draw_fence);
-    // Wait for the image to be acquired via the semaphore, signal the drawing fence when submitted
-    vk.graphics_queue.submit(vk::SubmitInfo{*vk.image_acquire_semaphore, waitDestStageMask, *vk.command_buffers.front()}, *vk.draw_fence);
-
-    // Wait for the draw fence to be signaled
-    while (vk::Result::eTimeout == vk.device.waitForFences(*vk.draw_fence, VK_TRUE, FENCE_TIMEOUT));
+    GAME_ASSERT(*vk.renderComplete);
+    GAME_ASSERT(*vk.presentComplete);
+    GAME_ASSERT(!vk.commandBuffers.empty());
 
     try {
-        // Present frame to display
-        vk::Result result = vk.present_queue.presentKHR({nullptr, *vk.swapchain.swapchain, current_buffer_index});
-        switch (result) {
-            case vk::Result::eSuccess:
-            case vk::Result::eSuboptimalKHR:
-                break;
-            default:
-                throw std::runtime_error("Bad present KHR result: " + vk::to_string(result));
+        auto [acquireResult, currentBufferIndex] = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *vk.presentComplete, nullptr);
+
+        //
+        //    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
+        //        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
+        //
+        //        // Create blank shader and fill it in
+        //        createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
+        //    }
+        //
+
+        vk::raii::CommandBuffer& cmdBuffer = vk.commandBuffers.front();
+        cmdBuffer.begin({});
+        {
+            vk::RenderingAttachmentInfo colorAttachmentInfo{
+                    *vk.swapchain.views[currentBufferIndex],
+                    vk::ImageLayout::eUndefined,
+                    vk::ResolveModeFlagBits::eNone,
+                    {},
+                    vk::ImageLayout::eAttachmentOptimalKHR,
+                    vk::AttachmentLoadOp::eClear,
+                    vk::AttachmentStoreOp::eStore,
+                    vk::ClearColorValue{0.2f, 0.2f, 0.2f, 0.2f},
+            };
+            //        vk::RenderingAttachmentInfo depthAttachmentInfo{
+            //                *vk.swapchain.views[currentBufferIndex],
+            //                vk::ImageLayout::eUndefined,
+            //                vk::ResolveModeFlagBits::eNone,
+            //                {},
+            //                vk::ImageLayout::eAttachmentOptimalKHR,
+            //                vk::AttachmentLoadOp::eClear,
+            //                vk::AttachmentStoreOp::eStore,
+            //                vk::ClearDepthStencilValue(1.0f, 0),
+            //        };
+            vk::RenderingInfoKHR renderingInfo{
+                    {},
+                    vk::Rect2D{{}, vk.window.extent()},
+                    1,
+                    {},
+                    colorAttachmentInfo,
+                    nullptr,
+            };
+
+            cmdBuffer.beginRenderingKHR(renderingInfo);
+            render_opaque(app);
+            render_imgui(app);
+            cmdBuffer.endRenderingKHR();
+
+            cmdBuffer.pipelineBarrier(
+                    vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                    vk::PipelineStageFlagBits::eBottomOfPipe,
+                    {},
+                    {},
+                    {},
+                    vk::ImageMemoryBarrier{
+                            vk::AccessFlagBits::eColorAttachmentWrite,
+                            {},
+                            vk::ImageLayout::eAttachmentOptimalKHR,
+                            vk::ImageLayout::ePresentSrcKHR,
+                            {},
+                            {},
+                            vk.swapchain.swapchain.getImages()[currentBufferIndex],
+                            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+                    });
         }
+        cmdBuffer.end();
+
+        vk::PipelineStageFlags waitDestStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        vk.graphicsQueue.submit(vk::SubmitInfo{*vk.presentComplete, waitDestStageMask, *cmdBuffer, *vk.renderComplete});
+
+        [[maybe_unused]] vk::Result result = vk.presentQueue.presentKHR(vk::PresentInfoKHR{*vk.renderComplete, *vk.swapchain.swapchain, currentBufferIndex});
+
+        glfwPollEvents();
+        bool& keepOpen = app.globalCtx.at<WindowContext>().keepOpen;
+        keepOpen = !glfwWindowShouldClose(vk.window.windowHandle.get());
+        if (!keepOpen) {
+            vk.device.waitIdle();
+        }
+
     } catch (vk::OutOfDateKHRError const&) {
         recreate_pipeline(vk);
-    }
-
-    glfwPollEvents();
-    bool& keep_open = app.globalCtx.at<WindowContext>().keepOpen;
-    keep_open = !glfwWindowShouldClose(vk.window.window_handle.get());
-    if (!keep_open) {
-        vk.device.waitIdle();
     }
 }
 
 void VulkanRenderPlugin::cleanup(App& app) {
     ImGui_ImplVulkan_Shutdown();
-//    glslang::FinalizeProcess();
-//    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
-//        for (auto& item: pipeline.shaders) {
-//            spvReflectDestroyShaderModule(&item.reflect);
-//        }
-//    }
+    //    glslang::FinalizeProcess();
+    //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
+    //        for (auto& item: pipeline.shaders) {
+    //            spvReflectDestroyShaderModule(&item.reflect);
+    //        }
+    //    }
 }
