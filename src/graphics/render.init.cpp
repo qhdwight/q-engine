@@ -69,8 +69,10 @@ constexpr uint32_t ENGINE_VERSION = 1u;
 auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const& layers, InstanceExtensions const& extensions) {
     vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &app_info, layers, extensions};
     if constexpr (IS_DEBUG) {
-        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-        using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+        using
+        enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        using
+        enum vk::DebugUtilsMessageTypeFlagBitsEXT;
         return vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT>{
                 createInfo,
                 {{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
@@ -161,14 +163,14 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queue_properties);
 
     auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
-                               return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
-                           }) |
+        return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
+    }) |
                            std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
 
     auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
-                                   return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
-                               }) |
+        return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
+    }) |
                                std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
 

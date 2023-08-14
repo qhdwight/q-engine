@@ -22,11 +22,18 @@ void VulkanRenderPlugin::execute(App& app) {
     GAME_ASSERT(!vk.commandBuffers.empty());
 
     try {
-        [[maybe_unused]] vk::Result waitResult = vk.device.waitForFences(*vk.waitFences[vk.currentFrame], VK_TRUE, FENCE_TIMEOUT);
+        vk::raii::Fence const& fence = vk.waitFences[vk.currentFrame];
+        vk::raii::Semaphore const& presentationComplete = vk.presentationCompleteSemaphores[vk.currentFrame];
+        vk::raii::Semaphore const& renderComplete = vk.renderCompleteSemaphores[vk.currentFrame];
+        vk::raii::CommandBuffer const& cmdBuffer = vk.commandBuffers[vk.currentFrame];
+
+        vk::Result waitResult = vk.device.waitForFences(*fence, VK_TRUE, FENCE_TIMEOUT);
+        GAME_ASSERT(waitResult == vk::Result::eSuccess);
 
         vk::Result acquireResult;
-        std::tie(acquireResult, vk.currentSwapchainImageIndex) = vk.swapchain.swapchain.acquireNextImage
-                (FENCE_TIMEOUT, *vk.presentationCompleteSemaphores[vk.currentFrame], nullptr);
+        std::tie(acquireResult, vk.currentSwapchainImageIndex)
+                = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
+        GAME_ASSERT(acquireResult == vk::Result::eSuccess);
 
         //
         //    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
@@ -37,9 +44,8 @@ void VulkanRenderPlugin::execute(App& app) {
         //    }
         //
 
-        vk.device.resetFences(*vk.waitFences[vk.currentFrame]);
+        vk.device.resetFences(*fence);
 
-        vk::raii::CommandBuffer& cmdBuffer = vk.commandBuffers[vk.currentFrame];
         cmdBuffer.reset();
         cmdBuffer.begin({});
 
@@ -83,7 +89,7 @@ void VulkanRenderPlugin::execute(App& app) {
             //        };
             vk::RenderingInfoKHR renderingInfo{
                     {},
-                    vk::Rect2D{{}, vk.window.extent()},
+                    vk::Rect2D{{}, vk.swapchain.extent},
                     1,
                     {},
                     colorAttachmentInfo,
@@ -115,11 +121,11 @@ void VulkanRenderPlugin::execute(App& app) {
         cmdBuffer.end();
 
         vk::PipelineStageFlags waitDestStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        vk.graphicsQueue.submit(vk::SubmitInfo{*vk.presentationCompleteSemaphores[vk.currentFrame], waitDestStageMask, *cmdBuffer,
-                                               *vk.renderCompleteSemaphores[vk.currentFrame]}, *vk.waitFences[vk.currentFrame]);
+        vk.graphicsQueue.submit(vk::SubmitInfo{*presentationComplete, waitDestStageMask, *cmdBuffer, *renderComplete}, *fence);
 
-        [[maybe_unused]] vk::Result presentResult = vk.presentQueue.presentKHR(
-                vk::PresentInfoKHR{*vk.renderCompleteSemaphores[vk.currentFrame], *vk.swapchain.swapchain, vk.currentSwapchainImageIndex});
+        vk::Result presentResult
+                = vk.presentQueue.presentKHR(vk::PresentInfoKHR{*renderComplete, *vk.swapchain.swapchain, vk.currentSwapchainImageIndex});
+        GAME_ASSERT(presentResult == vk::Result::eSuccess);
 
         glfwPollEvents();
         bool& keepOpen = app.globalCtx.at<WindowContext>().keepOpen;

@@ -138,6 +138,7 @@ struct Swapchain {
     Swapchain& operator=(Swapchain&&) = default;
 
     vk::raii::SwapchainKHR swapchain = nullptr;
+    vk::Extent2D extent;
     vk::SurfaceFormatKHR format;
     std::vector<vk::raii::ImageView> views;
 };

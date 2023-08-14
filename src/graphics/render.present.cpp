@@ -43,6 +43,7 @@ Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
     vk::SurfaceKHR const& surface = *vk.window.surface;
 
     format = pick_surface_format(vk.physicalDevice.getSurfaceFormatsKHR(surface));
+    extent = vk.window.extent();
     vk::SurfaceCapabilitiesKHR surfaceCapabilities = vk.physicalDevice.getSurfaceCapabilitiesKHR(surface);
     vk::PresentModeKHR presentMode = pick_present_mode(vk.physicalDevice.getSurfacePresentModesKHR(surface));
     vk::SwapchainCreateInfoKHR createInfo{
@@ -51,7 +52,7 @@ Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
             surfaceCapabilities.minImageCount,
             format.format,
             format.colorSpace,
-            vk.window.extent(),
+            extent,
             1,
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             vk::SharingMode::eExclusive,
