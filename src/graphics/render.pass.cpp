@@ -48,7 +48,7 @@
 //    bufData.deviceMemory->unmapMemory();
 //}
 
-void render_opaque(App& app) {
+void renderOpaque(App& app) {
 //    auto& vk = app.globalCtx.at<VulkanContext>();
 //    vk.cmdBufs->front().setViewport(0, vk::Viewport(0.0f, 0.0f,
 //                                                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
@@ -189,7 +189,7 @@ void renderImGuiOverlay(App& app) {
     ImGui::End();
 }
 
-void render_imgui(App& app) {
+void renderImgui(App& app) {
     auto& vk = app.globalCtx.at<VulkanContext>();
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

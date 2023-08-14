@@ -207,11 +207,11 @@ struct VulkanContext {
 
 void init(VulkanContext& vk);
 
-void render_opaque(App& app);
+void renderOpaque(App& app);
 
 void setup_imgui(App& app);
 
-void render_imgui(App& app);
+void renderImgui(App& app);
 
 void createSwapchain(VulkanContext& vk);
 

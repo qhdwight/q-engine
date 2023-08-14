@@ -9,9 +9,8 @@ constexpr uint32_t APP_VERSION = 1u;
 constexpr std::string_view ENGINE_NAME = "QEngine"sv;
 constexpr uint32_t ENGINE_VERSION = 1u;
 
-[[nodiscard]] InstanceExtensions get_instance_extensions(VulkanContext const& vulkan) {
+[[nodiscard]] InstanceExtensions getInstanceExtensions(VulkanContext const& vulkan) {
     InstanceExtensions desiredExtensions{VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
-
     {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
@@ -31,25 +30,25 @@ constexpr uint32_t ENGINE_VERSION = 1u;
 
     std::vector<vk::ExtensionProperties> availableExtensions = vulkan.ctx.enumerateInstanceExtensionProperties();
 
-    std::vector<std::string_view> sorted_desired_extensions(desiredExtensions.size());
+    std::vector<std::string_view> sortedDesiredExtensions(desiredExtensions.size());
     std::ranges::partial_sort_copy(desiredExtensions | std::views::transform([](const char* s) { return std::string_view{s}; }),
-                                   sorted_desired_extensions);
-    std::vector<std::string_view> sorted_available_extensions(availableExtensions.size());
+                                   sortedDesiredExtensions);
+    std::vector<std::string_view> sortedAvailableExtensions(availableExtensions.size());
     std::ranges::partial_sort_copy(availableExtensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }),
-                                   sorted_available_extensions);
+                                   sortedAvailableExtensions);
 
-    std::vector<std::string_view> missing_extensions;
-    std::ranges::set_difference(sorted_desired_extensions, sorted_available_extensions, std::back_inserter(missing_extensions));
+    std::vector<std::string_view> missingExtensions;
+    std::ranges::set_difference(sortedDesiredExtensions, sortedAvailableExtensions, std::back_inserter(missingExtensions));
 
     log("[Vulkan] Available instance extensions:");
-    for (std::string_view extension: sorted_available_extensions) {
+    for (std::string_view extension: sortedAvailableExtensions) {
         log("\t{}", extension);
     }
 
-    if (!missing_extensions.empty()) {
+    if (!missingExtensions.empty()) {
         std::ostringstream out;
         out << "[Vulkan] Missing extensions:\n";
-        for (std::string_view extension: missing_extensions) {
+        for (std::string_view extension: missingExtensions) {
             out << std::format("\t{}", extension);
         }
         throw std::runtime_error(out.str());
@@ -58,15 +57,16 @@ constexpr uint32_t ENGINE_VERSION = 1u;
     return desiredExtensions;
 }
 
-[[nodiscard]] DeviceExtensions get_device_extensions() {
+[[nodiscard]] DeviceExtensions getDeviceExtensions() {
     DeviceExtensions extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
     if constexpr (OS == OS::macOS) {
         extensions.push_back("VK_KHR_portability_subset");
     }
+    // TODO: check if physical device supports extensions
     return extensions;
 }
 
-auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const& layers, InstanceExtensions const& extensions) {
+auto makeInstanceCreateInfo(vk::ApplicationInfo const& app_info, Layers const& layers, InstanceExtensions const& extensions) {
     vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &app_info, layers, extensions};
     if constexpr (IS_DEBUG) {
         using
@@ -82,9 +82,9 @@ auto make_instance_create_info(vk::ApplicationInfo const& app_info, Layers const
     }
 }
 
-void fill_instance(VulkanContext& vk) {
+void fillInstance(VulkanContext& vk) {
     vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
-    InstanceExtensions extensions = get_instance_extensions(vk);
+    InstanceExtensions extensions = getInstanceExtensions(vk);
     Layers layers;
     if constexpr (IS_DEBUG) {
         layers.emplace_back("VK_LAYER_KHRONOS_validation");
@@ -95,7 +95,7 @@ void fill_instance(VulkanContext& vk) {
         log("\t{}", std::string_view{layer.layerName});
     }
 
-    auto createInfo = make_instance_create_info(appInfo, layers, extensions);
+    auto createInfo = makeInstanceCreateInfo(appInfo, layers, extensions);
     vk.inst = {vk.ctx, createInfo.get<vk::InstanceCreateInfo>()};
 
     if constexpr (IS_DEBUG) {
@@ -131,7 +131,7 @@ struct PhysicalDeviceComparator {
     }
 };
 
-vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
+vk::raii::PhysicalDevice makePhysicalDevice(VulkanContext const& vk) {
     GAME_ASSERT(*vk.inst);
 
     auto physicalDevices = vk::raii::PhysicalDevices{vk.inst};
@@ -153,7 +153,7 @@ vk::raii::PhysicalDevice make_physical_device(VulkanContext const& vk) {
     return physicalDevice;
 }
 
-std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
+std::pair<uint32_t, uint32_t> findQueueIndices(VulkanContext const& vk) {
     GAME_ASSERT(*vk.window.surface);
 
     using QueueIndex = uint32_t;
@@ -164,14 +164,12 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
 
     auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
         return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
-    }) |
-                           std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
 
     auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
         return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
-    }) |
-                               std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
     if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
 
     std::vector<QueueIndex> combined;
@@ -181,23 +179,23 @@ std::pair<uint32_t, uint32_t> find_queue_indices(VulkanContext const& vk) {
     return {graphics_queues.front(), presentation_queues.front()};
 }
 
-vk::raii::Device make_logical_device(VulkanContext const& vk) {
+vk::raii::Device makeLogicalDevice(VulkanContext const& vk) {
     GAME_ASSERT(*vk.physicalDevice);
 
-    DeviceExtensions extensions = get_device_extensions();
-    float queue_priority = 1.0f;
-    vk::DeviceQueueCreateInfo queueCreateInfo({}, vk.graphicsFamilyIndex, 1, &queue_priority);
+    DeviceExtensions extensions = getDeviceExtensions();
+    float queuePriority = 1.0f;
+    vk::DeviceQueueCreateInfo queueCreateInfo({}, vk.graphicsFamilyIndex, 1, &queuePriority);
     vk::PhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures{true};
     vk::DeviceCreateInfo createInfo{{}, queueCreateInfo, {}, extensions, {}, &dynamicRenderingFeatures};
     return {vk.physicalDevice, createInfo};
 }
 
-vk::raii::DescriptorPool make_descriptor_pool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& pool_sizes) {
-    GAME_ASSERT(!pool_sizes.empty());
-    uint32_t max_sets = std::accumulate(pool_sizes.begin(), pool_sizes.end(), 0,
-                                        [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
-    GAME_ASSERT(max_sets > 0);
-    vk::DescriptorPoolCreateInfo create_info{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, max_sets, pool_sizes};
+vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& poolSizes) {
+    GAME_ASSERT(!poolSizes.empty());
+    uint32_t maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
+                                       [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
+    GAME_ASSERT(maxSets > 0);
+    vk::DescriptorPoolCreateInfo create_info{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes};
     return {device, create_info};
 }
 
@@ -238,7 +236,7 @@ void one_time_submit(vk::raii::CommandBuffer const& command_buffer, vk::raii::Qu
     queue.waitIdle();
 }
 
-void setup_imgui(VulkanContext& vk) {
+void setupImgui(VulkanContext& vk) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -272,7 +270,7 @@ void setup_imgui(VulkanContext& vk) {
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void init(VulkanContext& vk) {
+void setupGlfw(VulkanContext& vk) {
     glfwInit();
     std::cout << std::format("[GLFW] {} initialized\n", glfwGetVersionString());
     glfwSetErrorCallback([](int error, const char* msg) {
@@ -280,16 +278,20 @@ void init(VulkanContext& vk) {
     });
     if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+}
 
-    fill_instance(vk);
+void init(VulkanContext& vk) {
+    setupGlfw(vk);
 
-    vk.physicalDevice = make_physical_device(vk);
+    fillInstance(vk);
+
+    vk.physicalDevice = makePhysicalDevice(vk);
 
     vk.window = {vk.inst, "Window"sv, vk::Extent2D{800, 600}};
 
-    std::tie(vk.graphicsFamilyIndex, vk.presentFamilyIndex) = find_queue_indices(vk);
+    std::tie(vk.graphicsFamilyIndex, vk.presentFamilyIndex) = findQueueIndices(vk);
 
-    vk.device = make_logical_device(vk);
+    vk.device = makeLogicalDevice(vk);
 
     vk.allocator = {vk};
 
@@ -307,7 +309,7 @@ void init(VulkanContext& vk) {
 
     vk.pipelineCache = {vk.device, vk::PipelineCacheCreateInfo{}};
 
-    vk.descriptorPool = make_descriptor_pool(
+    vk.descriptorPool = makeDescriptorPool(
             vk.device, {
                     {vk::DescriptorType::eSampler,              64},
                     {vk::DescriptorType::eCombinedImageSampler, 64},
@@ -324,7 +326,7 @@ void init(VulkanContext& vk) {
 
     createSwapchain(vk);
 
-    setup_imgui(vk);
-    //
+    setupImgui(vk);
+
     //    glslang::InitializeProcess();
 }

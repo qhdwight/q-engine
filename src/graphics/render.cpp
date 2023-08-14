@@ -26,6 +26,10 @@ void VulkanRenderPlugin::execute(App& app) {
         vk::raii::Semaphore const& presentationComplete = vk.presentationCompleteSemaphores[vk.currentFrame];
         vk::raii::Semaphore const& renderComplete = vk.renderCompleteSemaphores[vk.currentFrame];
         vk::raii::CommandBuffer const& cmdBuffer = vk.commandBuffers[vk.currentFrame];
+        GAME_ASSERT(*fence);
+        GAME_ASSERT(*presentationComplete);
+        GAME_ASSERT(*renderComplete);
+        GAME_ASSERT(*cmdBuffer);
 
         vk::Result waitResult = vk.device.waitForFences(*fence, VK_TRUE, FENCE_TIMEOUT);
         GAME_ASSERT(waitResult == vk::Result::eSuccess);
@@ -97,8 +101,8 @@ void VulkanRenderPlugin::execute(App& app) {
             };
 
             cmdBuffer.beginRenderingKHR(renderingInfo);
-            render_opaque(app);
-            render_imgui(app);
+            renderOpaque(app);
+            renderImgui(app);
             cmdBuffer.endRenderingKHR();
 
             cmdBuffer.pipelineBarrier(
