@@ -15,7 +15,7 @@
 #include <numbers>
 #include <numeric>
 #include <optional>
-#include <print>
+//#include <print>
 #include <ranges>
 #include <string>
 #include <unordered_map>
@@ -26,7 +26,8 @@
 
 template<typename... Args>
 void log(std::format_string<Args...> const& format, Args&&... args) {
-    std::println(std::cout, format, std::forward<Args>(args)...);
+//    std::println(std::cout, format, std::forward<Args>(args)...);
+    std::cout << std::format(format, std::forward<Args>(args)...) << std::endl;
 }
 
 #include <edyn/edyn.hpp>

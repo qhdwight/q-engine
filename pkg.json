@@ -1,7 +1,7 @@
 {
   "entt": {
     "uri": "https://github.com/skypjack/entt.git",
-    "reference": "refs/tags/v3.12.2",
+    "reference": "refs/tags/v3.10.3",
     "includes": [
       "src"
     ],
@@ -75,7 +75,7 @@
   },
   "edyn": {
     "uri": "https://github.com/xissburg/edyn",
-    "reference": "refs/heads/master",
+    "reference": "refs/tags/v1.2.1",
     "includes": [
       "include/edyn"
     ],

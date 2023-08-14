@@ -19,12 +19,14 @@ void VulkanRenderPlugin::execute(App& app) {
 
     GAME_ASSERT(*vk.device);
     GAME_ASSERT(*vk.swapchain.swapchain);
-    GAME_ASSERT(*vk.renderComplete);
-    GAME_ASSERT(*vk.presentComplete);
     GAME_ASSERT(!vk.commandBuffers.empty());
 
     try {
-        auto [acquireResult, currentBufferIndex] = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *vk.presentComplete, nullptr);
+        [[maybe_unused]] vk::Result waitResult = vk.device.waitForFences(*vk.waitFences[vk.currentFrame], VK_TRUE, FENCE_TIMEOUT);
+
+        vk::Result acquireResult;
+        std::tie(acquireResult, vk.currentSwapchainImageIndex) = vk.swapchain.swapchain.acquireNextImage
+                (FENCE_TIMEOUT, *vk.presentationCompleteSemaphores[vk.currentFrame], nullptr);
 
         //
         //    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
@@ -35,15 +37,36 @@ void VulkanRenderPlugin::execute(App& app) {
         //    }
         //
 
-        vk::raii::CommandBuffer& cmdBuffer = vk.commandBuffers.front();
+        vk.device.resetFences(*vk.waitFences[vk.currentFrame]);
+
+        vk::raii::CommandBuffer& cmdBuffer = vk.commandBuffers[vk.currentFrame];
+        cmdBuffer.reset();
         cmdBuffer.begin({});
+
+        cmdBuffer.pipelineBarrier(
+                vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits::eTopOfPipe,
+                {},
+                {},
+                {},
+                vk::ImageMemoryBarrier{
+                        vk::AccessFlagBits::eColorAttachmentWrite,
+                        {},
+                        vk::ImageLayout::eUndefined,
+                        vk::ImageLayout::eColorAttachmentOptimal,
+                        {},
+                        {},
+                        vk.swapchain.swapchain.getImages()[vk.currentSwapchainImageIndex],
+                        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+                });
+
         {
             vk::RenderingAttachmentInfo colorAttachmentInfo{
-                    *vk.swapchain.views[currentBufferIndex],
-                    vk::ImageLayout::eUndefined,
+                    *vk.swapchain.views[vk.currentSwapchainImageIndex],
+                    vk::ImageLayout::eAttachmentOptimalKHR,
                     vk::ResolveModeFlagBits::eNone,
                     {},
-                    vk::ImageLayout::eAttachmentOptimalKHR,
+                    {},
                     vk::AttachmentLoadOp::eClear,
                     vk::AttachmentStoreOp::eStore,
                     vk::ClearColorValue{0.2f, 0.2f, 0.2f, 0.2f},
@@ -81,20 +104,22 @@ void VulkanRenderPlugin::execute(App& app) {
                     vk::ImageMemoryBarrier{
                             vk::AccessFlagBits::eColorAttachmentWrite,
                             {},
-                            vk::ImageLayout::eAttachmentOptimalKHR,
+                            vk::ImageLayout::eColorAttachmentOptimal,
                             vk::ImageLayout::ePresentSrcKHR,
                             {},
                             {},
-                            vk.swapchain.swapchain.getImages()[currentBufferIndex],
+                            vk.swapchain.swapchain.getImages()[vk.currentSwapchainImageIndex],
                             vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
                     });
         }
         cmdBuffer.end();
 
         vk::PipelineStageFlags waitDestStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        vk.graphicsQueue.submit(vk::SubmitInfo{*vk.presentComplete, waitDestStageMask, *cmdBuffer, *vk.renderComplete});
+        vk.graphicsQueue.submit(vk::SubmitInfo{*vk.presentationCompleteSemaphores[vk.currentFrame], waitDestStageMask, *cmdBuffer,
+                                               *vk.renderCompleteSemaphores[vk.currentFrame]}, *vk.waitFences[vk.currentFrame]);
 
-        [[maybe_unused]] vk::Result result = vk.presentQueue.presentKHR(vk::PresentInfoKHR{*vk.renderComplete, *vk.swapchain.swapchain, currentBufferIndex});
+        [[maybe_unused]] vk::Result presentResult = vk.presentQueue.presentKHR(
+                vk::PresentInfoKHR{*vk.renderCompleteSemaphores[vk.currentFrame], *vk.swapchain.swapchain, vk.currentSwapchainImageIndex});
 
         glfwPollEvents();
         bool& keepOpen = app.globalCtx.at<WindowContext>().keepOpen;
@@ -102,6 +127,8 @@ void VulkanRenderPlugin::execute(App& app) {
         if (!keepOpen) {
             vk.device.waitIdle();
         }
+
+        vk.currentFrame = (vk.currentFrame + 1) % vk.commandBuffers.size();
 
     } catch (vk::OutOfDateKHRError const&) {
         recreate_pipeline(vk);

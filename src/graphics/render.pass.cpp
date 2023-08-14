@@ -200,5 +200,5 @@ void render_imgui(App& app) {
     renderImGuiInspector(app);
     renderImGuiOverlay(app);
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.commandBuffers.front()));
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.commandBuffers[vk.currentSwapchainImageIndex]));
 }

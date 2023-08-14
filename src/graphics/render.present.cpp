@@ -1,7 +1,7 @@
 #include "render.hpp"
 
 Window::Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
-    : window_name{window_name} {
+        : window_name{window_name} {
 
     GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(), nullptr, nullptr);
     windowHandle = {windowRaw, glfwDestroyWindow};
@@ -52,14 +52,14 @@ Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
             format.format,
             format.colorSpace,
             vk.window.extent(),
-            1,// image array layers
+            1,
             vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
             vk::SharingMode::eExclusive,
-            {},// queue family indices
+            {},
             surfaceCapabilities.currentTransform,
             vk::CompositeAlphaFlagBitsKHR::eOpaque,
             presentMode,
-            true,// clipped
+            true,
             *from.swapchain,
     };
     log("[Vulkan] Creating swapchain with format: {} {}",
@@ -78,9 +78,15 @@ Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
     // Create views
     std::vector<vk::Image> images = swapchain.getImages();
     views.reserve(images.size());
-    vk::ImageViewCreateInfo viewCreateInfo{{}, {}, vk::ImageViewType::e2D, format.format, {}, {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
     for (vk::Image const& image: images) {
-        viewCreateInfo.image = static_cast<vk::Image>(image);
+        vk::ImageViewCreateInfo viewCreateInfo{
+                {},
+                image,
+                vk::ImageViewType::e2D,
+                format.format,
+                {},
+                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
         views.emplace_back(vk.device, viewCreateInfo);
     }
 

@@ -5,7 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <spirv_reflect.h>
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "matrix4x4.hpp"
 #include "plugin.hpp"
@@ -191,14 +191,17 @@ struct VulkanContext {
     vk::raii::DescriptorPool descriptorPool = nullptr;
     vk::raii::PipelineCache pipelineCache = nullptr;
     //    std::unordered_map<asset_handle_t, Pipeline> modelPipelines;
-    vk::raii::Semaphore presentComplete = nullptr;
-    vk::raii::Semaphore renderComplete = nullptr;
+    std::vector<vk::raii::Semaphore> presentationCompleteSemaphores;
+    std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
+    std::vector<vk::raii::Fence> waitFences;
     //
     //    ImGui_ImplVulkanH_Window imGuiWindow;
     //    CameraUpload cameraUpload;
     //    SceneUpload sceneUpload;
-    uint32_t graphicsFamilyIndex;
-    uint32_t presentFamilyIndex;
+    uint32_t graphicsFamilyIndex{};
+    uint32_t presentFamilyIndex{};
+    uint32_t currentFrame{};
+    uint32_t currentSwapchainImageIndex{};
 };
 
 void init(VulkanContext& vk);

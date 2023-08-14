@@ -48,9 +48,9 @@ constexpr uint32_t ENGINE_VERSION = 1u;
 
     if (!missing_extensions.empty()) {
         std::ostringstream out;
-        std::println(out, "[Vulkan] Missing extensions:");
+        out << "[Vulkan] Missing extensions:\n";
         for (std::string_view extension: missing_extensions) {
-            std::println(out, "\t{}", extension);
+            out << std::format("\t{}", extension);
         }
         throw std::runtime_error(out.str());
     }
@@ -297,25 +297,28 @@ void init(VulkanContext& vk) {
     vk.graphicsQueue = {vk.device, vk.graphicsFamilyIndex, 0};
     vk.presentQueue = {vk.device, vk.presentFamilyIndex, 0};
 
-    vk.presentComplete = {vk.device, vk::SemaphoreCreateInfo{}};
-    vk.renderComplete = {vk.device, vk::SemaphoreCreateInfo{}};
+    for (uint32_t i = 0; i < vk.commandBuffers.size(); ++i) {
+        vk.presentationCompleteSemaphores.emplace_back(vk.device, vk::SemaphoreCreateInfo{});
+        vk.renderCompleteSemaphores.emplace_back(vk.device, vk::SemaphoreCreateInfo{});
+        vk.waitFences.emplace_back(vk.device, vk::FenceCreateInfo{vk::FenceCreateFlagBits::eSignaled});
+    }
 
     vk.pipelineCache = {vk.device, vk::PipelineCacheCreateInfo{}};
 
     vk.descriptorPool = make_descriptor_pool(
             vk.device, {
-                               {vk::DescriptorType::eSampler, 64},
-                               {vk::DescriptorType::eCombinedImageSampler, 64},
-                               {vk::DescriptorType::eSampledImage, 64},
-                               {vk::DescriptorType::eStorageImage, 64},
-                               {vk::DescriptorType::eUniformTexelBuffer, 64},
-                               {vk::DescriptorType::eStorageTexelBuffer, 64},
-                               {vk::DescriptorType::eUniformBuffer, 64},
-                               {vk::DescriptorType::eStorageBuffer, 64},
-                               {vk::DescriptorType::eUniformBufferDynamic, 64},
-                               {vk::DescriptorType::eStorageBufferDynamic, 64},
-                               {vk::DescriptorType::eInputAttachment, 64},
-                       });
+                    {vk::DescriptorType::eSampler,              64},
+                    {vk::DescriptorType::eCombinedImageSampler, 64},
+                    {vk::DescriptorType::eSampledImage,         64},
+                    {vk::DescriptorType::eStorageImage,         64},
+                    {vk::DescriptorType::eUniformTexelBuffer,   64},
+                    {vk::DescriptorType::eStorageTexelBuffer,   64},
+                    {vk::DescriptorType::eUniformBuffer,        64},
+                    {vk::DescriptorType::eStorageBuffer,        64},
+                    {vk::DescriptorType::eUniformBufferDynamic, 64},
+                    {vk::DescriptorType::eStorageBufferDynamic, 64},
+                    {vk::DescriptorType::eInputAttachment,      64},
+            });
 
     createSwapchain(vk);
 
