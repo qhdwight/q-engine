@@ -69,10 +69,8 @@ constexpr uint32_t ENGINE_VERSION = 1u;
 auto makeInstanceCreateInfo(vk::ApplicationInfo const& app_info, Layers const& layers, InstanceExtensions const& extensions) {
     vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &app_info, layers, extensions};
     if constexpr (IS_DEBUG) {
-        using
-        enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-        using
-        enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+        using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+        using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
         return vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT>{
                 createInfo,
                 {{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
@@ -86,7 +84,7 @@ void fillInstance(VulkanContext& vk) {
     vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
     InstanceExtensions extensions = getInstanceExtensions(vk);
     Layers layers;
-    if constexpr (IS_DEBUG) {
+    if constexpr (IS_DEBUG && OS == OS::Linux) {
         layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
@@ -228,7 +226,7 @@ MemAllocator::MemAllocator(VulkanContext& vk) {
 }
 
 template<typename Func>
-void one_time_submit(vk::raii::CommandBuffer const& command_buffer, vk::raii::Queue const& queue, Func const& func) {
+void oneTimeSubmit(vk::raii::CommandBuffer const& command_buffer, vk::raii::Queue const& queue, Func const& func) {
     command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     func(command_buffer);
     command_buffer.end();
@@ -263,7 +261,7 @@ void setupImgui(VulkanContext& vk) {
     ImGui_ImplVulkan_Init(&init_info, {});
     std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
-    one_time_submit(vk.commandBuffers.front(), vk.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
+    oneTimeSubmit(vk.commandBuffers.front(), vk.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
     });
 
@@ -311,18 +309,18 @@ void init(VulkanContext& vk) {
 
     vk.descriptorPool = makeDescriptorPool(
             vk.device, {
-                    {vk::DescriptorType::eSampler,              64},
-                    {vk::DescriptorType::eCombinedImageSampler, 64},
-                    {vk::DescriptorType::eSampledImage,         64},
-                    {vk::DescriptorType::eStorageImage,         64},
-                    {vk::DescriptorType::eUniformTexelBuffer,   64},
-                    {vk::DescriptorType::eStorageTexelBuffer,   64},
-                    {vk::DescriptorType::eUniformBuffer,        64},
-                    {vk::DescriptorType::eStorageBuffer,        64},
-                    {vk::DescriptorType::eUniformBufferDynamic, 64},
-                    {vk::DescriptorType::eStorageBufferDynamic, 64},
-                    {vk::DescriptorType::eInputAttachment,      64},
-            });
+                               {vk::DescriptorType::eSampler, 64},
+                               {vk::DescriptorType::eCombinedImageSampler, 64},
+                               {vk::DescriptorType::eSampledImage, 64},
+                               {vk::DescriptorType::eStorageImage, 64},
+                               {vk::DescriptorType::eUniformTexelBuffer, 64},
+                               {vk::DescriptorType::eStorageTexelBuffer, 64},
+                               {vk::DescriptorType::eUniformBuffer, 64},
+                               {vk::DescriptorType::eStorageBuffer, 64},
+                               {vk::DescriptorType::eUniformBufferDynamic, 64},
+                               {vk::DescriptorType::eStorageBufferDynamic, 64},
+                               {vk::DescriptorType::eInputAttachment, 64},
+                       });
 
     createSwapchain(vk);
 

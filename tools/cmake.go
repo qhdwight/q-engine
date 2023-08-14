@@ -90,7 +90,7 @@ find_package(Vulkan REQUIRED)
 
 	for pkgName := range packages {
 		if _, err := os.Stat(filepath.Join("pkg", pkgName, "CMakeLists.txt")); err == nil {
-			_, _ = cmakeFile.WriteString(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../build/%[1]s)\n", pkgName))
+			_, _ = cmakeFile.WriteString(fmt.Sprintf("add_subdirectory(../pkg/%[1]s ../build/%[1]s EXCLUDE_FROM_ALL SYSTEM)\n", pkgName))
 		}
 	}
 

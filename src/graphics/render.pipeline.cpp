@@ -248,7 +248,7 @@ void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline) {
     //    );
 }
 
-void recreate_pipeline(VulkanContext& vk) {
+void recreatePipeline(VulkanContext& vk) {
     vk.device.waitIdle();
     createSwapchain(vk);
 }

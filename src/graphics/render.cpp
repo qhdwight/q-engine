@@ -35,8 +35,7 @@ void VulkanRenderPlugin::execute(App& app) {
         GAME_ASSERT(waitResult == vk::Result::eSuccess);
 
         vk::Result acquireResult;
-        std::tie(acquireResult, vk.currentSwapchainImageIndex)
-                = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
+        std::tie(acquireResult, vk.currentSwapchainImageIndex) = vk.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
         GAME_ASSERT(acquireResult == vk::Result::eSuccess);
 
         //
@@ -69,6 +68,22 @@ void VulkanRenderPlugin::execute(App& app) {
                         vk.swapchain.swapchain.getImages()[vk.currentSwapchainImageIndex],
                         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
                 });
+        cmdBuffer.pipelineBarrier(
+                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+                {},
+                {},
+                {},
+                vk::ImageMemoryBarrier{
+                        vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+                        {},
+                        vk::ImageLayout::eUndefined,
+                        vk::ImageLayout::eStencilAttachmentOptimal,
+                        {},
+                        {},
+                        vk.swapchain.swapchain.getImages()[vk.currentSwapchainImageIndex],
+                        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eStencil | vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1},
+                });
 
         {
             vk::RenderingAttachmentInfo colorAttachmentInfo{
@@ -81,23 +96,23 @@ void VulkanRenderPlugin::execute(App& app) {
                     vk::AttachmentStoreOp::eStore,
                     vk::ClearColorValue{0.2f, 0.2f, 0.2f, 0.2f},
             };
-            //        vk::RenderingAttachmentInfo depthAttachmentInfo{
-            //                *vk.swapchain.views[currentBufferIndex],
-            //                vk::ImageLayout::eUndefined,
-            //                vk::ResolveModeFlagBits::eNone,
-            //                {},
-            //                vk::ImageLayout::eAttachmentOptimalKHR,
-            //                vk::AttachmentLoadOp::eClear,
-            //                vk::AttachmentStoreOp::eStore,
-            //                vk::ClearDepthStencilValue(1.0f, 0),
-            //        };
+            vk::RenderingAttachmentInfo depthAttachmentInfo{
+                    *vk.depthImage->view,
+                    vk::ImageLayout::eAttachmentOptimalKHR,
+                    vk::ResolveModeFlagBits::eNone,
+                    {},
+                    {},
+                    vk::AttachmentLoadOp::eClear,
+                    vk::AttachmentStoreOp::eStore,
+                    vk::ClearDepthStencilValue(1.0f, 0),
+            };
             vk::RenderingInfoKHR renderingInfo{
                     {},
                     vk::Rect2D{{}, vk.swapchain.extent},
                     1,
                     {},
                     colorAttachmentInfo,
-                    nullptr,
+                    &depthAttachmentInfo,
             };
 
             cmdBuffer.beginRenderingKHR(renderingInfo);
@@ -127,8 +142,7 @@ void VulkanRenderPlugin::execute(App& app) {
         vk::PipelineStageFlags waitDestStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
         vk.graphicsQueue.submit(vk::SubmitInfo{*presentationComplete, waitDestStageMask, *cmdBuffer, *renderComplete}, *fence);
 
-        vk::Result presentResult
-                = vk.presentQueue.presentKHR(vk::PresentInfoKHR{*renderComplete, *vk.swapchain.swapchain, vk.currentSwapchainImageIndex});
+        vk::Result presentResult = vk.presentQueue.presentKHR(vk::PresentInfoKHR{*renderComplete, *vk.swapchain.swapchain, vk.currentSwapchainImageIndex});
         GAME_ASSERT(presentResult == vk::Result::eSuccess);
 
         glfwPollEvents();
@@ -141,11 +155,12 @@ void VulkanRenderPlugin::execute(App& app) {
         vk.currentFrame = (vk.currentFrame + 1) % vk.commandBuffers.size();
 
     } catch (vk::OutOfDateKHRError const&) {
-        recreate_pipeline(vk);
+        recreatePipeline(vk);
     }
 }
 
 void VulkanRenderPlugin::cleanup(App& app) {
+    glfwTerminate();
     ImGui_ImplVulkan_Shutdown();
     //    glslang::FinalizeProcess();
     //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {

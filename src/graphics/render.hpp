@@ -5,7 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <spirv_reflect.h>
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 
 #include "matrix4x4.hpp"
 #include "plugin.hpp"
@@ -215,6 +215,6 @@ void renderImgui(App& app);
 
 void createSwapchain(VulkanContext& vk);
 
-void recreate_pipeline(VulkanContext& vk);
+void recreatePipeline(VulkanContext& vk);
 
 void createShaderPipeline(VulkanContext& vk, Pipeline& pipeline);

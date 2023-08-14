@@ -1,7 +1,7 @@
 #include "render.hpp"
 
 Window::Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
-        : window_name{window_name} {
+    : window_name{window_name} {
 
     GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(), nullptr, nullptr);
     windowHandle = {windowRaw, glfwDestroyWindow};
@@ -98,5 +98,5 @@ Swapchain::Swapchain(VulkanContext& vk, Swapchain&& from) {
 void createSwapchain(VulkanContext& vk) {
     Swapchain current = std::move(vk.swapchain);
     vk.swapchain = {vk, std::move(current)};
-    //    vk.depthImage.emplace(vk);
+    vk.depthImage.emplace(vk);
 }
