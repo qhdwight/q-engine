@@ -26,7 +26,7 @@ DepthImage::DepthImage(VulkanContext& vk) : Image(
             vk::ImageViewType::e2D,
             DEPTH_FORMAT,
             {},
-            {vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}
+            {vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, 0, 1, 0, 1}
     }};
 }
 

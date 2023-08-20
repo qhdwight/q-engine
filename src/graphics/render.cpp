@@ -82,7 +82,7 @@ void VulkanRenderPlugin::execute(App& app) {
                         {},
                         {},
                         vk.swapchain.swapchain.getImages()[vk.currentSwapchainImageIndex],
-                        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eStencil | vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1},
+                        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, 0, 1, 0, 1},
                 });
 
         {
@@ -160,7 +160,6 @@ void VulkanRenderPlugin::execute(App& app) {
 }
 
 void VulkanRenderPlugin::cleanup(App& app) {
-    glfwTerminate();
     ImGui_ImplVulkan_Shutdown();
     //    glslang::FinalizeProcess();
     //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {

@@ -1,6 +1,4 @@
-pkg/
 build/
-src/CMakeLists.txt
 assets/models
 assets/materials
 staging/

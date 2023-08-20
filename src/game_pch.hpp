@@ -34,16 +34,6 @@ void log(std::format_string<Args...> const& format, Args&&... args) {
 #include <edyn/math/vector2_3_util.hpp>
 #include <entt/entt.hpp>
 
-#define VULKAN_HPP_NO_STRUCT_SETTERS
-#define VULKAN_HPP_NO_SMART_HANDLE
-#define VULKAN_HPP_NO_SPACESHIP_OPERATOR
-#include <vulkan/vulkan_raii.hpp>
-
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
-#include <imgui.h>
-
 using scalar = edyn::scalar;
 using vec3 = edyn::vector3;
 using vec2 = edyn::vector2;

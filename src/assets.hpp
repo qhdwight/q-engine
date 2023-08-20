@@ -2,14 +2,14 @@
 
 #include "game_pch.hpp"
 
-#include <tiny_gltf.h>
+#include <rapidjson/document.h>
 
-using Model = tinygltf::Model;
+namespace tinygltf {
+    class Model;
+}
 
 struct ModelLoader {
-    using result_type = std::shared_ptr<Model>;
+    using result_type = std::shared_ptr<rapidjson::Document>;
 
     result_type operator()(std::string_view name);
 };
-
-using ModelAssets = entt::resource_cache<Model, ModelLoader>;

@@ -2,9 +2,19 @@
 
 #include "game_pch.hpp"
 
-#include <GLFW/glfw3.h>
+#define VULKAN_HPP_NO_STRUCT_SETTERS
+#define VULKAN_HPP_NO_SMART_HANDLE
+#define VULKAN_HPP_NO_SPACESHIP_OPERATOR
+#include <vulkan/vulkan_raii.hpp>
+
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
-#include <spirv_reflect.h>
+#include <imgui.h>
+
+#include <GLFW/glfw3.h>
+#include <SPIRV/GlslangToSpv.h>
+#include <backends/imgui_impl_vulkan.h>
 #include <vma/vk_mem_alloc.h>
 
 #include "matrix4x4.hpp"
@@ -154,11 +164,8 @@ struct Shader {
     vk::raii::ShaderModule module;
     std::unordered_map<uint32_t, VertexAttr> vertAttrs{};
     uint32_t vertAttrStride{};
-    SpvReflectShaderModule reflect{};
     uint32_t bindCount{};
-    SpvReflectDescriptorBinding** bindingsReflect = nullptr;
     uint32_t inputCount{};
-    SpvReflectInterfaceVariable** inputsReflect = nullptr;
 };
 
 struct Pipeline {
@@ -208,8 +215,6 @@ struct VulkanContext {
 void init(VulkanContext& vk);
 
 void renderOpaque(App& app);
-
-void setup_imgui(App& app);
 
 void renderImgui(App& app);
 

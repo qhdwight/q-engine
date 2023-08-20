@@ -1,7 +1,6 @@
 #define VMA_IMPLEMENTATION
 
 #include "render.hpp"
-
 #include "render.debug.hpp"
 
 constexpr std::string_view APP_NAME = "Game Engine"sv;
@@ -157,24 +156,24 @@ std::pair<uint32_t, uint32_t> findQueueIndices(VulkanContext const& vk) {
     using QueueIndex = uint32_t;
     using Queue = std::tuple<QueueIndex, vk::QueueFamilyProperties>;
 
-    auto queue_properties = vk.physicalDevice.getQueueFamilyProperties();
-    auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queue_properties);
+    auto queueProperties = vk.physicalDevice.getQueueFamilyProperties();
+    auto queues = std::views::zip(std::views::iota(QueueIndex{0}), queueProperties);
 
-    auto graphics_queues = queues | std::views::filter([](Queue const& queue) {
-        return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
-    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
-    if (graphics_queues.empty()) throw std::runtime_error("No graphics queues found");
+    auto graphicsQueues = queues | std::views::filter([](Queue const& queue) {
+                              return static_cast<bool>(std::get<vk::QueueFamilyProperties>(queue).queueFlags & vk::QueueFlagBits::eGraphics);
+                          }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+    if (graphicsQueues.empty()) throw std::runtime_error("No graphics queues found");
 
-    auto presentation_queues = queues | std::views::filter([&](Queue const& queue) {
-        return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
-    }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
-    if (presentation_queues.empty()) throw std::runtime_error("No presentation queues found");
+    auto presentationQueues = queues | std::views::filter([&](Queue const& queue) {
+                                  return vk.physicalDevice.getSurfaceSupportKHR(std::get<QueueIndex>(queue), *vk.window.surface);
+                              }) | std::views::transform([](Queue const& queue) { return std::get<QueueIndex>(queue); });
+    if (presentationQueues.empty()) throw std::runtime_error("No presentation queues found");
 
     std::vector<QueueIndex> combined;
-    std::ranges::set_intersection(graphics_queues, presentation_queues, std::back_inserter(combined));
+    std::ranges::set_intersection(graphicsQueues, presentationQueues, std::back_inserter(combined));
     if (!combined.empty()) return {combined.front(), combined.front()};
 
-    return {graphics_queues.front(), presentation_queues.front()};
+    return {graphicsQueues.front(), presentationQueues.front()};
 }
 
 vk::raii::Device makeLogicalDevice(VulkanContext const& vk) {
@@ -326,5 +325,5 @@ void init(VulkanContext& vk) {
 
     setupImgui(vk);
 
-    //    glslang::InitializeProcess();
+//    glslang::InitializeProcess();
 }

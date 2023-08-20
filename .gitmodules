@@ -1,0 +1,21 @@
+[submodule "pkg/edyn"]
+	path = pkg/edyn
+	url = https://github.com/xissburg/edyn.git
+[submodule "pkg/entt"]
+	path = pkg/entt
+	url = https://github.com/skypjack/entt.git
+[submodule "pkg/glfw"]
+	path = pkg/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "pkg/glslang"]
+	path = pkg/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+[submodule "pkg/imgui"]
+	path = pkg/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "pkg/rapidjson"]
+	path = pkg/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "pkg/vma"]
+	path = pkg/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

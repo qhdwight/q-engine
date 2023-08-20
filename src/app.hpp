@@ -18,7 +18,6 @@ struct App {
     World renderWorld;
     circular_buffer<World, BufferSize> cmdWorldHistory;
     Context globalCtx;
-    ModelAssets modelAssets;
     std::vector<std::shared_ptr<Plugin>> plugins;
 
     template<std::derived_from<Plugin> TPlugin, typename ...TParams>
