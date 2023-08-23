@@ -1,11 +1,8 @@
-module;
-
-#include <pch.hpp>
-
 export module render:debug;
 
 import std;
 import vulkan;
+import <vulkan/vulkan.h>;
 
 export VkBool32 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                             VkDebugUtilsMessageTypeFlagsEXT messageTypes,

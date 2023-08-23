@@ -12,13 +12,12 @@ import app;
 import game;
 import logging;
 
-import vulkan;
-
 import std;
+import vulkan;
 
 using namespace std::literals;
 
-constexpr uint64_t FENCE_TIMEOUT = 100'000'000;
+constexpr std::uint64_t FENCE_TIMEOUT = 100'000'000;
 
 export struct WindowContext {
     bool isReady;
@@ -55,8 +54,8 @@ struct VulkanContext {
     std::vector<vk::raii::Fence> waitFences;
     //    CameraUpload cameraUpload;
     //    SceneUpload sceneUpload;
-    uint32_t currentFrame = 0;
-    uint32_t currentSwapchainImageIndex = 0;
+    std::uint32_t currentFrame = 0;
+    std::uint32_t currentSwapchainImageIndex = 0;
 };
 
 void createSwapchain(VulkanContext& context) {
@@ -215,9 +214,8 @@ public:
             check(waitResult == vk::Result::eSuccess);
 
             vk::Result acquireResult;
-            std::tie(acquireResult, context.currentSwapchainImageIndex) = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT,
-                                                                                                                       *presentationComplete,
-                                                                                                                       nullptr);
+            std::tie(acquireResult, context.currentSwapchainImageIndex)
+                    = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
             check(acquireResult == vk::Result::eSuccess);
 
             //
@@ -260,10 +258,10 @@ public:
                             vk::AccessFlagBits::eDepthStencilAttachmentWrite,
                             {},
                             vk::ImageLayout::eUndefined,
-                            vk::ImageLayout::eStencilAttachmentOptimal,
+                            vk::ImageLayout::eDepthStencilAttachmentOptimal,
                             {},
                             {},
-                            context.swapchain.swapchain.getImages()[context.currentSwapchainImageIndex],
+                            context.depthImage->image,
                             vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, 0, 1, 0, 1},
                     });
 
@@ -294,7 +292,7 @@ public:
                         1,
                         {},
                         colorAttachmentInfo,
-                        &depthAttachmentInfo,
+//                        &depthAttachmentInfo,
                 };
 
                 cmdBuffer.beginRenderingKHR(renderingInfo);

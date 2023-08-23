@@ -1,7 +1,3 @@
-module;
-
-#include <pch.hpp>
-
 export module render:present;
 
 import :init;
@@ -9,8 +5,8 @@ import :init;
 import logging;
 
 import std;
-
 import vulkan;
+import <GLFW/glfw3.h>;
 
 export struct Window {
 

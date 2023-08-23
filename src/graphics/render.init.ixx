@@ -1,7 +1,3 @@
-module;
-
-#include <pch.hpp>
-
 export module render:init;
 
 import :debug;
@@ -9,35 +5,35 @@ import :debug;
 import game;
 import logging;
 
-import vulkan;
-
 import std;
+import vulkan;
+import <GLFW/glfw3.h>;
 
 constexpr std::string_view APP_NAME = "Game Engine";
-constexpr uint32_t APP_VERSION = 1;
+constexpr std::uint32_t APP_VERSION = 1;
 constexpr std::string_view ENGINE_NAME = "QEngine";
-constexpr uint32_t ENGINE_VERSION = 1;
+constexpr std::uint32_t ENGINE_VERSION = 1;
 
 using InstanceExtensions = std::vector<char const*>;
 using DeviceExtensions = std::vector<char const*>;
 using Layers = std::vector<char const*>;
 
 export struct QueueFamilyIndices {
-    uint32_t graphicsFamilyIndex{};
-    uint32_t presentFamilyIndex{};
+    std::uint32_t graphicsFamilyIndex{};
+    std::uint32_t presentFamilyIndex{};
 };
 
 [[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context) {
-    InstanceExtensions desiredExtensions{VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
+    InstanceExtensions desiredExtensions{"VK_KHR_portability_enumeration"};
     {
-        uint32_t glfwExtensionCount = 0;
+        std::uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (uint32_t i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
     if constexpr (IS_DEBUG) {
-        desiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        desiredExtensions.emplace_back("VK_EXT_debug_utils");
     }
     log("[Vulkan] Desired instance extensions:");
     for (std::string_view extension: desiredExtensions) {
@@ -71,7 +67,7 @@ export struct QueueFamilyIndices {
 }
 
 [[nodiscard]] DeviceExtensions getDeviceExtensions() {
-    DeviceExtensions extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
+    DeviceExtensions extensions{"VK_KHR_swapchain", "VK_KHR_dynamic_rendering"};
     if constexpr (OS == OS::macOS) {
         extensions.push_back("VK_KHR_portability_subset");
     }
@@ -80,12 +76,12 @@ export struct QueueFamilyIndices {
 }
 
 export vk::raii::Instance makeInstance(vk::raii::Context const& context) {
-    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
+    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(1, 3, 0, 0)};
 
     InstanceExtensions extensions = getInstanceExtensions(context);
     Layers layers;
     if constexpr (IS_DEBUG && OS == OS::Linux) {
-//        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+        layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
     log("[Vulkan] Available instance layers:");
@@ -157,7 +153,7 @@ vk::raii::PhysicalDevice makePhysicalDevice(vk::raii::Instance const& instance) 
     log("[Vulkan] Chose physical device {}", properties.deviceName.data());
     uint32_t apiVersion = properties.apiVersion;
     log("[Vulkan] {}.{}.{} device API version",
-        VK_VERSION_MAJOR(apiVersion), VK_VERSION_MINOR(apiVersion), VK_VERSION_PATCH(apiVersion));
+        vk::apiVersionMajor(apiVersion), vk::apiVersionMinor(apiVersion), vk::apiVersionPatch(apiVersion));
     log("[Vulkan] Available physical device extensions:");
     for (auto const& extension: physicalDevice.enumerateDeviceExtensionProperties()) {
         log("\t{}", std::string_view{extension.extensionName});

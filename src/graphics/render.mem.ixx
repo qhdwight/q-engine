@@ -1,12 +1,11 @@
-module;
-
-#include <pch.hpp>
-
 export module render:memory;
 
+import <vk_mem_alloc.h>;
+
+import std;
 import vulkan;
 
-constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32Sfloat;
+constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
 
 export struct MemAllocator : std::shared_ptr<VmaAllocator> {
 
@@ -80,7 +79,7 @@ export struct DepthImage : Image {
             vk::ImageCreateInfo{
                     {},
                     vk::ImageType::e2D,
-                    vk::Format::eD32Sfloat,
+                    DEPTH_FORMAT,
                     vk::Extent3D{extent, 1},
                     1,
                     1,

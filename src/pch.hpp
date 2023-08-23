@@ -1,4 +1,5 @@
-#include <entt/entity/registry.hpp>
+//#include <entt/entity/registry.hpp>
+#include <entt/entt.hpp>
 
 #include <rapidjson/document.h>
 #include <rapidjson/istreamwrapper.h>

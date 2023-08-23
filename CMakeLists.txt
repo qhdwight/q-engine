@@ -14,12 +14,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     add_compile_options(/experimental:module)
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_EXTENSIONS OFF)
-    #        add_compile_options(-fmodule-file=${CMAKE_CURRENT_LIST_DIR}/pch.pcm)
     add_compile_options(
             -Wno-read-modules-implicitly
-
-            #            -fmodule-map-file=${CMAKE_CURRENT_LIST_DIR}/module.modulemap
-            #            -fmodule-file=${CMAKE_CURRENT_LIST_DIR}/pch.pcm
+            -Wno-experimental-header-units
+            -fmodule-file=${CMAKE_BINARY_DIR}/glfw3.pcm
+            -fmodule-file=${CMAKE_BINARY_DIR}/vulkan.pcm
+            -fmodule-file=${CMAKE_BINARY_DIR}/vk_mem_alloc.pcm
     )
 endif ()
 set(CMAKE_CXX_STANDARD 23)
@@ -49,15 +49,6 @@ link_libraries(std c++)
 
 ### Dependencies ###
 add_subdirectory(pkg build/pkg EXCLUDE_FROM_ALL SYSTEM)
-
-#target_link_libraries(GameModules PUBLIC EnTT::EnTT VulkanMemoryAllocator Vulkan::Vulkan glfw RapidJSON IMGUI)
-
-#add_library(Dependencies)
-#target_sources(Dependencies PUBLIC
-#        FILE_SET cxx_modules TYPE CXX_MODULES FILES
-#        dependencies.ixx
-#)
-#target_link_libraries(Dependencies PUBLIC EnTT::EnTT VulkanMemoryAllocator Vulkan::Vulkan glfw RapidJSON IMGUI)
 
 ### Modules ###
 file(GLOB_RECURSE MODULE_SOURCE_FILES CONFIGURE_DEPENDS *.ixx)
