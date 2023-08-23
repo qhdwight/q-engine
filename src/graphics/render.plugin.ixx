@@ -157,10 +157,7 @@ public:
 
         setupGlfw();
         auto& context = app.globalContext.emplace<VulkanContext>();
-        std::memset(&context, 0, sizeof(VulkanContext)); // TODO: why is this needed?
-        context.context = {};
         context.instance = makeInstance(context.context);
-//        context.dispatchLoader = vk::DispatchLoaderDynamic{*context.instance, vkGetInstanceProcAddr};
         if constexpr (IS_DEBUG) {
             context.debugUtilMessenger = makeDebugUtilsMessenger(context.instance);
         }
