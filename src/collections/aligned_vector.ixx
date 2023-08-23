@@ -1,8 +1,6 @@
-#pragma once
+export module collections.aligned_vector;
 
-#include <cstdlib>
-
-template<typename T>
+export template<typename T>
 class aligned_vector {
 private:
     void* mPtr = nullptr;

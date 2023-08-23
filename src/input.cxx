@@ -1,17 +1,17 @@
-#include "input.hpp"
-
-#include <GLFW/glfw3.h>
-
-#include "state.hpp"
-#include "graphics/render.hpp"
-
-double getAxis(GLFWwindow* glfwWindow, int positiveKey, int negativeKey) {
-    return (glfwGetKey(glfwWindow, positiveKey) ? +1.0 : 0.0) +
-           (glfwGetKey(glfwWindow, negativeKey) ? -1.0 : 0.0);
-}
-
-
-void InputPlugin::execute(App& app) {
+//#include "input.hpp"
+//
+//#include <GLFW/glfw3.h>
+//
+//#include "graphics/render.hpp"
+//#include "state.cxx"
+//
+//double getAxis(GLFWwindow* glfwWindow, int positiveKey, int negativeKey) {
+//    return (glfwGetKey(glfwWindow, positiveKey) ? +1.0 : 0.0) +
+//           (glfwGetKey(glfwWindow, negativeKey) ? -1.0 : 0.0);
+//}
+//
+//
+//void InputPlugin::execute(App& app) {
 //    // TODO:arch restructure so it is graphics API agnostic
 //    auto vkPtr = app.globalCtx.find<VulkanContext>();
 //    if (!vkPtr) return;
@@ -58,4 +58,4 @@ void InputPlugin::execute(App& app) {
 //            ui.isVisible = !ui.isVisible;
 //        }
 //    }
-}
+//}

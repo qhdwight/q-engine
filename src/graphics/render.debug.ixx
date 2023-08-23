@@ -1,22 +1,24 @@
-#include "render.debug.hpp"
+export module render:debug;
 
-VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                           VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                                           VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                                           void* /*pUserData*/ ) {
-#if !defined( NDEBUG )
-    if (pCallbackData->messageIdNumber == 648835635) {
-        // UNASSIGNED-khronos-Validation-debug-build-warning-message
-        return VK_FALSE;
-    }
-    if (pCallbackData->messageIdNumber == 767975156) {
-        // UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension
-        return VK_FALSE;
-    }
-#endif
+import pch;
 
-    std::cerr << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>( messageSeverity )) << ": "
-              << vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>( messageTypes )) << ":\n";
+export VkBool32 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                            VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                            VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+                                            void* /*pUserData*/) {
+    //#if !defined(NDEBUG)
+    //    if (pCallbackData->messageIdNumber == 648835635) {
+    //        // UNASSIGNED-khronos-Validation-debug-build-warning-message
+    //        return false;
+    //    }
+    //    if (pCallbackData->messageIdNumber == 767975156) {
+    //        // UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension
+    //        return false;
+    //    }
+    //#endif
+
+    std::cerr << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity)) << ": "
+              << vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes)) << ":\n";
     std::cerr << "\t"
               << "messageIDName   = <" << pCallbackData->pMessageIdName << ">\n";
     std::cerr << "\t"
@@ -46,7 +48,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSe
             std::cerr << "\t\t"
                       << "Object " << i << "\n";
             std::cerr << "\t\t\t"
-                      << "objectType   = " << vk::to_string(static_cast<vk::ObjectType>( pCallbackData->pObjects[i].objectType )) << "\n";
+                      << "objectType   = " << vk::to_string(static_cast<vk::ObjectType>(pCallbackData->pObjects[i].objectType)) << "\n";
             std::cerr << "\t\t\t"
                       << "objectHandle = " << pCallbackData->pObjects[i].objectHandle << "\n";
             if (pCallbackData->pObjects[i].pObjectName) {
@@ -55,5 +57,5 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSe
             }
         }
     }
-    return VK_TRUE;
+    return true;
 }

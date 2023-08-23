@@ -1,11 +1,11 @@
-#include "render.hpp"
-
-#include "app.hpp"
-#include "inspector.hpp"
-#include "shader_math.hpp"
-
-#define PositionAttr "POSITION"
-
+//#include "render.hpp"
+//
+//#include "app.ixx"
+//#include "inspector.hpp"
+//#include "shader_math.hpp"
+//
+//#define PositionAttr "POSITION"
+//
 //template<std::integral T>
 //vk::raii::su::BufferData createIndexBufferData(VulkanContext const& vk, entt::resource<tinygltf::Model> const& model) {
 //    tinygltf::Primitive& primitive = model->meshes.front().primitives.front();
@@ -47,8 +47,8 @@
 //    }
 //    bufData.deviceMemory->unmapMemory();
 //}
-
-void renderOpaque(App& app) {
+//
+//void renderOpaque(App& app) {
 //    auto& vk = app.globalCtx.at<VulkanContext>();
 //    vk.cmdBufs->front().setViewport(0, vk::Viewport(0.0f, 0.0f,
 //                                                    static_cast<float>(vk.surfData->extent.width), static_cast<float>(vk.surfData->extent.height),
@@ -151,54 +151,54 @@ void renderOpaque(App& app) {
 //            drawIdx++;
 //        }
 //    }
-}
-
-void renderImGuiOverlay(App& app) {
-    auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
-                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
-    static bool open = true;
-    static int corner = 0;
-    if (corner != -1) {
-        const float PAD = 10.0f;
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
-        ImVec2 work_size = viewport->WorkSize;
-        ImVec2 window_pos, window_pos_pivot;
-        window_pos.x = (corner & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
-        window_pos.y = (corner & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
-        window_pos_pivot.x = (corner & 1) ? 1.0f : 0.0f;
-        window_pos_pivot.y = (corner & 2) ? 1.0f : 0.0f;
-        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-        windowFlags |= ImGuiWindowFlags_NoMove;
-    }
-    ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-    if (ImGui::Begin("Diagnostics", &open, windowFlags)) {
-        clock_delta_t avgFrameTime = diagnostics.getAvgFrameTime();
-        ImGui::Text("%.3f ms/frame (%.1f FPS)", ms_t(avgFrameTime).count(), 1.0 / sec_t(avgFrameTime).count());
-        if (ImGui::BeginPopupContextWindow()) {
-            if (ImGui::MenuItem("Custom", nullptr, corner == -1)) corner = -1;
-            if (ImGui::MenuItem("Top-left", nullptr, corner == 0)) corner = 0;
-            if (ImGui::MenuItem("Top-right", nullptr, corner == 1)) corner = 1;
-            if (ImGui::MenuItem("Bottom-left", nullptr, corner == 2)) corner = 2;
-            if (ImGui::MenuItem("Bottom-right", nullptr, corner == 3)) corner = 3;
-            if (open && ImGui::MenuItem("Close")) open = false;
-            ImGui::EndPopup();
-        }
-    }
-    ImGui::End();
-}
-
-void renderImgui(App& app) {
-    auto& vk = app.globalCtx.at<VulkanContext>();
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-//    ImGui::ShowDemoWindow();
-//    auto it = world->view<UI>().each();
-//    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
-    renderImGuiInspector(app);
-    renderImGuiOverlay(app);
-    ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.commandBuffers[vk.currentFrame]));
-}
+//}
+//
+//void renderImGuiOverlay(App& app) {
+//    auto& diagnostics = app.globalCtx.at<DiagnosticResource>();
+//    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+//                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+//    static bool open = true;
+//    static int corner = 0;
+//    if (corner != -1) {
+//        const float PAD = 10.0f;
+//        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+//        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+//        ImVec2 work_size = viewport->WorkSize;
+//        ImVec2 window_pos, window_pos_pivot;
+//        window_pos.x = (corner & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
+//        window_pos.y = (corner & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
+//        window_pos_pivot.x = (corner & 1) ? 1.0f : 0.0f;
+//        window_pos_pivot.y = (corner & 2) ? 1.0f : 0.0f;
+//        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+//        windowFlags |= ImGuiWindowFlags_NoMove;
+//    }
+//    ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+//    if (ImGui::Begin("Diagnostics", &open, windowFlags)) {
+//        clock_delta_t avgFrameTime = diagnostics.getAvgFrameTime();
+//        ImGui::Text("%.3f ms/frame (%.1f FPS)", ms_t(avgFrameTime).count(), 1.0 / sec_t(avgFrameTime).count());
+//        if (ImGui::BeginPopupContextWindow()) {
+//            if (ImGui::MenuItem("Custom", nullptr, corner == -1)) corner = -1;
+//            if (ImGui::MenuItem("Top-left", nullptr, corner == 0)) corner = 0;
+//            if (ImGui::MenuItem("Top-right", nullptr, corner == 1)) corner = 1;
+//            if (ImGui::MenuItem("Bottom-left", nullptr, corner == 2)) corner = 2;
+//            if (ImGui::MenuItem("Bottom-right", nullptr, corner == 3)) corner = 3;
+//            if (open && ImGui::MenuItem("Close")) open = false;
+//            ImGui::EndPopup();
+//        }
+//    }
+//    ImGui::End();
+//}
+//
+//void renderImgui(App& app) {
+//    auto& vk = app.globalCtx.at<VulkanContext>();
+//    ImGui_ImplVulkan_NewFrame();
+//    ImGui_ImplGlfw_NewFrame();
+//    ImGui::NewFrame();
+////    ImGui::ShowDemoWindow();
+////    auto it = world->view<UI>().each();
+////    bool uiVisible = std::any_of(it.begin(), it.end(), [](std::tuple<entt::entity, UI> const& t) { return std::get<1>(t).visible; });
+//    renderImGuiInspector(app);
+//    renderImGuiOverlay(app);
+//    ImGui::Render();
+//    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*vk.commandBuffers[vk.currentFrame]));
+//}

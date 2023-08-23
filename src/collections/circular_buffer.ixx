@@ -1,8 +1,10 @@
-#pragma once
+export module collections.circular_buffer;
 
-#include <array>
+import pch;
 
-template<typename T, size_t Size>
+import std;
+
+export template<typename T, size_t Size>
 class circular_buffer {
 private:
     std::array<T, Size> mArray{};
