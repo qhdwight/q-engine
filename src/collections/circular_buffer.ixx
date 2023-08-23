@@ -1,14 +1,12 @@
 export module collections.circular_buffer;
 
-import pch;
-
 import std;
 
-export template<typename T, size_t Size>
+export template<typename T, std::size_t Size>
 class circular_buffer {
 private:
     std::array<T, Size> mArray{};
-    size_t mHead = 0;
+    std::size_t mHead = 0;
 
 public:
     void advance() {
@@ -34,11 +32,11 @@ public:
         return mArray[mHead];
     }
 
-    T& peek(ptrdiff_t offset) {
+    T& peek(std::ptrdiff_t offset) {
         if (offset >= Size) {
             throw std::runtime_error("Query offset bigger than buffer size!");
         }
-        size_t queryHead = mHead;
+        std::size_t queryHead = mHead;
         if (offset >= mHead)
             queryHead += Size;
         return mArray[queryHead % Size];

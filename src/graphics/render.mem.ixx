@@ -1,6 +1,10 @@
+module;
+
+#include <pch.hpp>
+
 export module render:memory;
 
-import pch;
+import vulkan;
 
 constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32Sfloat;
 
@@ -19,7 +23,7 @@ export struct MemAllocator : std::shared_ptr<VmaAllocator> {
                 .device = static_cast<VkDevice>(*device),
                 .pVulkanFunctions = &functions,
                 .instance = static_cast<VkInstance>(*instance),
-                .vulkanApiVersion = eVK_API_VERSION_1_3,
+                .vulkanApiVersion = VK_API_VERSION_1_3,
         };
 
         auto* raw = new VmaAllocator{};
@@ -41,13 +45,15 @@ export struct Image {
     VmaAllocation allocation{};
 
     Image(const Image&) = delete;
+
     Image& operator=(Image&) = delete;
 
     Image(Image&&) = default;
+
     Image& operator=(Image&&) = default;
 
     Image(MemAllocator const& allocator, VmaAllocationCreateInfo const& allocInfo, vk::ImageCreateInfo const& imageInfo)
-        : allocator{allocator} {
+            : allocator{allocator} {
 
         auto createInfoRaw = static_cast<VkImageCreateInfo>(imageInfo);
         VkImage imageRaw;
@@ -65,26 +71,26 @@ export struct Image {
 export struct DepthImage : Image {
 
     explicit DepthImage(vk::raii::Device const& device, MemAllocator const& allocator, vk::Extent2D const& extent)
-        : Image{
-                  allocator,
-                  VmaAllocationCreateInfo{
-                          .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-                          .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                  },
-                  vk::ImageCreateInfo{
-                          {},
-                          vk::ImageType::e2D,
-                          vk::Format::eD32Sfloat,
-                          vk::Extent3D{extent, 1},
-                          1,
-                          1,
-                          vk::SampleCountFlagBits::e1,
-                          vk::ImageTiling::eOptimal,
-                          vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                          vk::SharingMode::eExclusive,
-                          {},
-                          vk::ImageLayout::eUndefined},
-          } {
+            : Image{
+            allocator,
+            VmaAllocationCreateInfo{
+                    .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+                    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            },
+            vk::ImageCreateInfo{
+                    {},
+                    vk::ImageType::e2D,
+                    vk::Format::eD32Sfloat,
+                    vk::Extent3D{extent, 1},
+                    1,
+                    1,
+                    vk::SampleCountFlagBits::e1,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                    vk::SharingMode::eExclusive,
+                    {},
+                    vk::ImageLayout::eUndefined},
+    } {
         view = {
                 device,
                 {
@@ -99,5 +105,6 @@ export struct DepthImage : Image {
     }
 
     DepthImage(DepthImage&&) = default;
+
     DepthImage& operator=(DepthImage&&) = default;
 };

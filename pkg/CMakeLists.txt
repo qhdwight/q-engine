@@ -20,6 +20,8 @@ set(RAPIDJSON_BUILD_CXX17 ON)
 set(RAPIDJSON_BUILD_TESTS OFF)
 set(RAPIDJSON_BUILD_EXAMPLES OFF)
 
+set(VULKAN_HPP_ENABLE_EXPERIMENTAL_CPP20_MODULES ON)
+
 include(FetchContent)
 FetchContent_Declare(
         entt
@@ -37,6 +39,11 @@ FetchContent_Declare(
         OVERRIDE_FIND_PACKAGE SYSTEM
 )
 FetchContent_Declare(
+        vulkan-hpp
+        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/vulkan-hpp
+        OVERRIDE_FIND_PACKAGE SYSTEM
+)
+FetchContent_Declare(
         vma
         SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/vma
         OVERRIDE_FIND_PACKAGE SYSTEM
@@ -46,9 +53,7 @@ FetchContent_Declare(
         SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/rapidjson
         OVERRIDE_FIND_PACKAGE SYSTEM
 )
-FetchContent_MakeAvailable(entt glfw vma rapidjson)
-
-target_include_directories(RapidJSON SYSTEM INTERFACE rapidjson/include)
+FetchContent_MakeAvailable(entt glfw vulkan-hpp vma rapidjson)
 
 add_library(IMGUI
         imgui/imgui.cpp
@@ -60,4 +65,4 @@ add_library(IMGUI
         imgui/backends/imgui_impl_glfw.cpp
 )
 target_include_directories(IMGUI PUBLIC imgui)
-target_link_libraries(IMGUI PUBLIC glfw Vulkan::Vulkan)
+target_link_libraries(IMGUI PUBLIC glfw VulkanHppModule)

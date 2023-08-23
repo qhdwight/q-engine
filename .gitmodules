@@ -19,3 +19,6 @@
 [submodule "pkg/vma"]
 	path = pkg/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "pkg/vulkan-hpp"]
+	path = pkg/vulkan-hpp
+	url = https://github.com/KhronosGroup/Vulkan-Hpp.git

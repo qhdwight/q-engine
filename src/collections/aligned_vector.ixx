@@ -1,10 +1,12 @@
 export module collections.aligned_vector;
 
+import std;
+
 export template<typename T>
 class aligned_vector {
 private:
     void* mPtr = nullptr;
-    size_t mAlignment{}, mSize{}, mBlockSize{};
+    std::size_t mAlignment{}, mSize{}, mBlockSize{};
 
     void cleanup() {
         if (!mPtr) return;
@@ -18,7 +20,7 @@ private:
 public:
     aligned_vector() = default;
 
-    void resize(size_t alignment, size_t size) {
+    void resize(std::size_t alignment, std::size_t size) {
         cleanup();
         mAlignment = alignment;
         mBlockSize = sizeof(T);
@@ -40,24 +42,24 @@ public:
         cleanup();
     }
 
-    size_t size() {
+    std::size_t size() {
         return mSize;
     }
 
-    size_t alignment() {
+    std::size_t alignment() {
         return mAlignment;
     }
 
-    size_t block_size() {
+    std::size_t block_size() {
         return mBlockSize;
     }
 
-    T& operator[](size_t i) {
+    T& operator[](std::size_t i) {
         auto bytePtr = reinterpret_cast<std::byte*>(mPtr);
         return *reinterpret_cast<T*>(bytePtr + i * mBlockSize);
     }
 
-    size_t mem_size() {
+    std::size_t mem_size() {
         return mBlockSize * mSize;
     }
 

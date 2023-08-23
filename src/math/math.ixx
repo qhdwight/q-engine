@@ -1,17 +1,15 @@
 export module math;
 
-import pch;
-
 import std;
 
 export template<typename T>
 concept Arithmetic = std::is_arithmetic_v<T>;
 
-export template<Arithmetic T, size_t Row, size_t Col>
+export template<Arithmetic T, std::size_t Row, std::size_t Col>
 struct matrix {
 };
 
-export template<Arithmetic T, size_t Dim>
+export template<Arithmetic T, std::size_t Dim>
 using vec = matrix<T, Dim, 1>;
 
 export using vec2d = vec<double, 2>;

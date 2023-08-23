@@ -1,3 +1,7 @@
+module;
+
+#include <pch.hpp>
+
 export module render:plugin;
 
 import :init;
@@ -8,7 +12,9 @@ import app;
 import game;
 import logging;
 
-import pch;
+import vulkan;
+
+import std;
 
 using namespace std::literals;
 
@@ -23,6 +29,7 @@ export struct WindowContext {
 struct VulkanContext {
     vk::raii::Context context;
     vk::raii::Instance instance = nullptr;
+    vk::DispatchLoaderDynamic dispatchLoader;
     vk::raii::DebugUtilsMessengerEXT debugUtilMessenger = nullptr;
     vk::raii::PhysicalDevice physicalDevice = nullptr;
     Window window;
@@ -64,7 +71,7 @@ void recreatePipeline(VulkanContext& context) {
 }
 
 void setupImgui(VulkanContext& context) {
-    ImGui_CheckVersion();
+    IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void) io;
@@ -88,7 +95,7 @@ void setupImgui(VulkanContext& context) {
             .CheckVkResultFn = nullptr,
     };
     ImGui_ImplVulkan_Init(&initInfo, {});
-    std::cout << "[IMGUI] " << eIMGUI_VERSION << " initialized" << std::endl;
+    std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
 
     oneTimeSubmit(context.commandBuffers.front(), context.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
@@ -150,7 +157,10 @@ public:
 
         setupGlfw();
         auto& context = app.globalContext.emplace<VulkanContext>();
+        std::memset(&context, 0, sizeof(VulkanContext)); // TODO: why is this needed?
+        context.context = {};
         context.instance = makeInstance(context.context);
+//        context.dispatchLoader = vk::DispatchLoaderDynamic{*context.instance, vkGetInstanceProcAddr};
         if constexpr (IS_DEBUG) {
             context.debugUtilMessenger = makeDebugUtilsMessenger(context.instance);
         }
@@ -171,18 +181,18 @@ public:
         context.pipelineCache = {context.device, vk::PipelineCacheCreateInfo{}};
         context.descriptorPool = makeDescriptorPool(
                 context.device, {
-                                        {vk::DescriptorType::eSampler, 64},
-                                        {vk::DescriptorType::eCombinedImageSampler, 64},
-                                        {vk::DescriptorType::eSampledImage, 64},
-                                        {vk::DescriptorType::eStorageImage, 64},
-                                        {vk::DescriptorType::eUniformTexelBuffer, 64},
-                                        {vk::DescriptorType::eStorageTexelBuffer, 64},
-                                        {vk::DescriptorType::eUniformBuffer, 64},
-                                        {vk::DescriptorType::eStorageBuffer, 64},
-                                        {vk::DescriptorType::eUniformBufferDynamic, 64},
-                                        {vk::DescriptorType::eStorageBufferDynamic, 64},
-                                        {vk::DescriptorType::eInputAttachment, 64},
-                                });
+                        {vk::DescriptorType::eSampler,              64},
+                        {vk::DescriptorType::eCombinedImageSampler, 64},
+                        {vk::DescriptorType::eSampledImage,         64},
+                        {vk::DescriptorType::eStorageImage,         64},
+                        {vk::DescriptorType::eUniformTexelBuffer,   64},
+                        {vk::DescriptorType::eStorageTexelBuffer,   64},
+                        {vk::DescriptorType::eUniformBuffer,        64},
+                        {vk::DescriptorType::eStorageBuffer,        64},
+                        {vk::DescriptorType::eUniformBufferDynamic, 64},
+                        {vk::DescriptorType::eStorageBufferDynamic, 64},
+                        {vk::DescriptorType::eInputAttachment,      64},
+                });
         createSwapchain(context);
         setupImgui(context);
     }
@@ -208,7 +218,9 @@ public:
             check(waitResult == vk::Result::eSuccess);
 
             vk::Result acquireResult;
-            std::tie(acquireResult, context.currentSwapchainImageIndex) = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
+            std::tie(acquireResult, context.currentSwapchainImageIndex) = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT,
+                                                                                                                       *presentationComplete,
+                                                                                                                       nullptr);
             check(acquireResult == vk::Result::eSuccess);
 
             //
@@ -315,7 +327,8 @@ public:
             vk::PipelineStageFlags waitDestStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
             context.graphicsQueue.submit(vk::SubmitInfo{*presentationComplete, waitDestStageMask, *cmdBuffer, *renderComplete}, *fence);
 
-            vk::Result presentResult = context.presentQueue.presentKHR(vk::PresentInfoKHR{*renderComplete, *context.swapchain.swapchain, context.currentSwapchainImageIndex});
+            vk::Result presentResult = context.presentQueue.presentKHR(
+                    vk::PresentInfoKHR{*renderComplete, *context.swapchain.swapchain, context.currentSwapchainImageIndex});
             check(presentResult == vk::Result::eSuccess);
 
             glfwPollEvents();

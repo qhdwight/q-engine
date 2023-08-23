@@ -1,4 +1,0 @@
-module pch {
-    header "pch.hpp"
-    export *
-}

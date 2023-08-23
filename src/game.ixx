@@ -1,7 +1,5 @@
 export module game;
 
-import pch;
-
 import std;
 
 using ns_t = std::chrono::nanoseconds;

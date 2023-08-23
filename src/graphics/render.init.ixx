@@ -1,3 +1,7 @@
+module;
+
+#include <pch.hpp>
+
 export module render:init;
 
 import :debug;
@@ -5,7 +9,9 @@ import :debug;
 import game;
 import logging;
 
-import pch;
+import vulkan;
+
+import std;
 
 constexpr std::string_view APP_NAME = "Game Engine";
 constexpr uint32_t APP_VERSION = 1;
@@ -22,7 +28,7 @@ export struct QueueFamilyIndices {
 };
 
 [[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context) {
-    InstanceExtensions desiredExtensions{eVK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME.data()};
+    InstanceExtensions desiredExtensions{VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
     {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
@@ -30,31 +36,27 @@ export struct QueueFamilyIndices {
         for (uint32_t i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
-
     if constexpr (IS_DEBUG) {
-        desiredExtensions.emplace_back(eVK_EXT_DEBUG_UTILS_EXTENSION_NAME.data());
+        desiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-
     log("[Vulkan] Desired instance extensions:");
     for (std::string_view extension: desiredExtensions) {
         log("\t{}", extension);
     }
 
     std::vector<vk::ExtensionProperties> availableExtensions = context.enumerateInstanceExtensionProperties();
-
     std::vector<std::string_view> sortedDesiredExtensions(desiredExtensions.size());
     std::ranges::partial_sort_copy(desiredExtensions, sortedDesiredExtensions);
     std::vector<std::string_view> sortedAvailableExtensions(availableExtensions.size());
     std::ranges::partial_sort_copy(availableExtensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }),
                                    sortedAvailableExtensions);
-
-    std::vector<std::string_view> missingExtensions;
-    std::ranges::set_difference(sortedDesiredExtensions, sortedAvailableExtensions, std::back_inserter(missingExtensions));
-
     log("[Vulkan] Available instance extensions:");
     for (std::string_view extension: sortedAvailableExtensions) {
         log("\t{}", extension);
     }
+
+    std::vector<std::string_view> missingExtensions;
+    std::ranges::set_difference(sortedDesiredExtensions, sortedAvailableExtensions, std::back_inserter(missingExtensions));
 
     if (!missingExtensions.empty()) {
         std::ostringstream out;
@@ -69,7 +71,7 @@ export struct QueueFamilyIndices {
 }
 
 [[nodiscard]] DeviceExtensions getDeviceExtensions() {
-    DeviceExtensions extensions{eVK_KHR_SWAPCHAIN_EXTENSION_NAME.data(), eVK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME.data()};
+    DeviceExtensions extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
     if constexpr (OS == OS::macOS) {
         extensions.push_back("VK_KHR_portability_subset");
     }
@@ -78,11 +80,12 @@ export struct QueueFamilyIndices {
 }
 
 export vk::raii::Instance makeInstance(vk::raii::Context const& context) {
-    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, eVK_API_VERSION_1_3};
+    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, VK_API_VERSION_1_3};
+
     InstanceExtensions extensions = getInstanceExtensions(context);
     Layers layers;
     if constexpr (IS_DEBUG && OS == OS::Linux) {
-        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+//        layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
     log("[Vulkan] Available instance layers:");
@@ -97,9 +100,19 @@ export vk::raii::Instance makeInstance(vk::raii::Context const& context) {
 export vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance const& instance) {
     check(*instance);
 
-    using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-    using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
-    return {instance, vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback}};
+    using
+    enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using
+    enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+//    return instance->createDebugUtilsMessengerEXTUnique(
+//            vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
+//            nullptr,
+//
+//            );
+    return {
+            instance,
+            vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
+    };
 }
 
 struct PhysicalDeviceComparator {
@@ -143,8 +156,8 @@ vk::raii::PhysicalDevice makePhysicalDevice(vk::raii::Instance const& instance) 
     vk::PhysicalDeviceProperties const& properties = physicalDevice.getProperties();
     log("[Vulkan] Chose physical device {}", properties.deviceName.data());
     uint32_t apiVersion = properties.apiVersion;
-    //    log("[Vulkan] {}.{}.{} device API version",
-    //        VK_VERSION_MAJOR(apiVersion), VK_VERSION_MINOR(apiVersion), VK_VERSION_PATCH(apiVersion));
+    log("[Vulkan] {}.{}.{} device API version",
+        VK_VERSION_MAJOR(apiVersion), VK_VERSION_MINOR(apiVersion), VK_VERSION_PATCH(apiVersion));
     log("[Vulkan] Available physical device extensions:");
     for (auto const& extension: physicalDevice.enumerateDeviceExtensionProperties()) {
         log("\t{}", std::string_view{extension.extensionName});
@@ -223,5 +236,5 @@ export void setupGlfw() {
         std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
     });
     if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
-    glfwWindowHint(eGLFW_CLIENT_API, eGLFW_NO_API);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 }

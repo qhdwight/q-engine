@@ -1,20 +1,26 @@
+module;
+
+#include <pch.hpp>
+
 export module render:present;
 
 import :init;
 
 import logging;
 
-import pch;
 import std;
+
+import vulkan;
 
 export struct Window {
 
     Window() = default;
 
     Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
-        : window_name{window_name} {
+            : window_name{window_name} {
 
-        GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(), nullptr, nullptr);
+        GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(),
+                                                 nullptr, nullptr);
         windowHandle = {windowRaw, glfwDestroyWindow};
 
         VkSurfaceKHR rawSurface;
@@ -25,9 +31,11 @@ export struct Window {
     }
 
     Window(const Window&) = delete;
+
     Window& operator=(Window&) = delete;
 
     Window(Window&&) = default;
+
     Window& operator=(Window&&) = default;
 
     [[nodiscard]] vk::Extent2D extent() const {
@@ -60,7 +68,8 @@ export struct Swapchain {
 
     Swapchain() = default;
 
-    Swapchain(vk::raii::Device const& device, vk::raii::PhysicalDevice const& physicalDevice, QueueFamilyIndices const& queueFamilyIndices, Window const& window, Swapchain&& from) {
+    Swapchain(vk::raii::Device const& device, vk::raii::PhysicalDevice const& physicalDevice, QueueFamilyIndices const& queueFamilyIndices,
+              Window const& window, Swapchain&& from) {
         vk::SurfaceKHR const& surface = *window.surface;
 
         format = pickSurfaceFormat(physicalDevice.getSurfaceFormatsKHR(surface));
@@ -117,9 +126,11 @@ export struct Swapchain {
     }
 
     Swapchain(const Swapchain&) = delete;
+
     Swapchain& operator=(Swapchain&) = delete;
 
     Swapchain(Swapchain&&) = default;
+
     Swapchain& operator=(Swapchain&&) = default;
 
     vk::raii::SwapchainKHR swapchain = nullptr;

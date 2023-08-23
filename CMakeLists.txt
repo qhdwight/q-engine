@@ -16,8 +16,10 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_EXTENSIONS OFF)
     #        add_compile_options(-fmodule-file=${CMAKE_CURRENT_LIST_DIR}/pch.pcm)
     add_compile_options(
-            -fmodule-map-file=${CMAKE_CURRENT_LIST_DIR}/module.modulemap
-#            -fmodule-file=${CMAKE_CURRENT_LIST_DIR}/pch.pcm
+            -Wno-read-modules-implicitly
+
+            #            -fmodule-map-file=${CMAKE_CURRENT_LIST_DIR}/module.modulemap
+            #            -fmodule-file=${CMAKE_CURRENT_LIST_DIR}/pch.pcm
     )
 endif ()
 set(CMAKE_CXX_STANDARD 23)
@@ -25,7 +27,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ### libc++ ###
-set(LIBCXX_BUILD D:/Programming/llvm/build_cxx)
+set(LIBCXX_BUILD /home/quintin/Programming/llvm/build_cxx)
 include(FetchContent)
 FetchContent_Declare(
         std
@@ -46,9 +48,7 @@ add_link_options(
 link_libraries(std c++)
 
 ### Dependencies ###
-set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.250.1")
-find_package(Vulkan REQUIRED)
-add_subdirectory(../pkg ../build/pkg EXCLUDE_FROM_ALL SYSTEM)
+add_subdirectory(pkg build/pkg EXCLUDE_FROM_ALL SYSTEM)
 
 #target_link_libraries(GameModules PUBLIC EnTT::EnTT VulkanMemoryAllocator Vulkan::Vulkan glfw RapidJSON IMGUI)
 
@@ -62,32 +62,18 @@ add_subdirectory(../pkg ../build/pkg EXCLUDE_FROM_ALL SYSTEM)
 ### Modules ###
 file(GLOB_RECURSE MODULE_SOURCE_FILES CONFIGURE_DEPENDS *.ixx)
 add_library(GameModules)
-target_sources(GameModules PUBLIC
-        FILE_SET cxx_modules TYPE CXX_MODULES FILES
+target_sources(GameModules
+        PUBLIC FILE_SET cxx_modules TYPE CXX_MODULES FILES
         ${MODULE_SOURCE_FILES}
 )
-target_include_directories(GameModules PRIVATE ${CMAKE_CURRENT_LIST_DIR})
-target_link_libraries(GameModules PUBLIC EnTT::EnTT VulkanMemoryAllocator Vulkan::Vulkan glfw RapidJSON IMGUI)
+target_include_directories(GameModules PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+target_link_libraries(GameModules PUBLIC EnTT::EnTT VulkanMemoryAllocator VulkanHppModule glfw RapidJSON IMGUI)
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cxx)
 add_executable(Game ${SOURCE_FILES})
-target_include_directories(Game PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(Game PUBLIC GameModules)
 
-target_compile_definitions(Game PUBLIC
-        VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=0
-        VULKAN_HPP_NO_SMART_HANDLE
-        VULKAN_HPP_NO_STRUCT_SETTERS
-        VULKAN_HPP_NO_SPACESHIP_OPERATOR
-)
-if (WIN32)
-    target_compile_definitions(Game PUBLIC NOMINMAX VK_USE_PLATFORM_WIN32_KHR)
-elseif (APPLE)
-    target_compile_definitions(Game PUBLIC VK_USE_PLATFORM_MACOS_MVK)
-elseif (UNIX)
-    target_compile_definitions(Game PUBLIC VK_USE_PLATFORM_XCB_KHR)
-endif ()
-
+add_compile_options(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=0)
 if (MSVC)
     target_compile_options(Game PRIVATE /W3 /WX)
 else ()

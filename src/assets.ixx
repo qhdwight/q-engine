@@ -1,6 +1,8 @@
-export module assets;
+module;
 
-import pch;
+#include <pch.hpp>
+
+export module assets;
 
 import std;
 

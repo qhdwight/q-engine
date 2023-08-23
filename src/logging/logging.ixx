@@ -1,7 +1,5 @@
 export module logging;
 
-import pch;
-
 import std;
 
 export template<typename... Args>
