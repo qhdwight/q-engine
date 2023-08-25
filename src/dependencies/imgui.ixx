@@ -7,10 +7,8 @@ export import <backends/imgui_impl_vulkan.h>;
 
 export namespace ImGui {
 
-    void checkVersion() {
+    void CheckVersion() {
         IMGUI_CHECKVERSION();
     }
-
-    constexpr std::string_view VERSION = IMGUI_VERSION;
 
 }// namespace ImGui

@@ -68,20 +68,20 @@ void recreatePipeline(VulkanContext& context) {
 }
 
 void setupImgui(VulkanContext& context) {
-    ImGui::checkVersion();
+    ImGui::CheckVersion();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForVulkan(context.window.windowHandle.get(), true);
     ImGui_ImplVulkan_InitInfo initInfo{
-            .Instance = static_cast<VkInstance>(*context.instance),
-            .PhysicalDevice = static_cast<VkPhysicalDevice>(*context.physicalDevice),
-            .Device = static_cast<VkDevice>(*context.device),
+            .Instance = *context.instance,
+            .PhysicalDevice = *context.physicalDevice,
+            .Device = *context.device,
             .QueueFamily = context.queueFamilyIndices.graphicsFamilyIndex,
-            .Queue = static_cast<VkQueue>(*context.graphicsQueue),
-            .PipelineCache = static_cast<VkPipelineCache>(*context.pipelineCache),
-            .DescriptorPool = static_cast<VkDescriptorPool>(*context.descriptorPool),
+            .Queue = *context.graphicsQueue,
+            .PipelineCache = *context.pipelineCache,
+            .DescriptorPool = *context.descriptorPool,
             .Subpass = 0,
             .MinImageCount = 2,
             .ImageCount = 2,
@@ -92,7 +92,7 @@ void setupImgui(VulkanContext& context) {
             .CheckVkResultFn = nullptr,
     };
     ImGui_ImplVulkan_Init(&initInfo, {});
-    std::cout << "[IMGUI] " << ImGui::VERSION << " initialized" << std::endl;
+    log("[IMGUI] {} initialized", ImGui::GetVersion());
 
     oneTimeSubmit(context.commandBuffers.front(), context.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
@@ -215,14 +215,12 @@ public:
             std::tie(acquireResult, context.currentSwapchainImageIndex) = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
             check(acquireResult == vk::Result::eSuccess);
 
-            //
             //    for (auto [ent, shaderHandle]: app.renderWorld.view<const ShaderHandle>().each()) {
             //        if (vk.modelPipelines.contains(shaderHandle.value)) continue;
             //
             //        // Create blank shader and fill it in
             //        createShaderPipeline(vk, vk.modelPipelines[shaderHandle.value]);
             //    }
-            //
 
             context.device.resetFences(*fence);
 

@@ -1,8 +1,7 @@
 export module render:memory;
 
-import <vk_mem_alloc.h>;
-
 import std;
+import vma;
 import vulkan;
 
 constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
@@ -18,11 +17,11 @@ struct MemAllocator : std::shared_ptr<VmaAllocator> {
         };
 
         VmaAllocatorCreateInfo create_info{
-                .physicalDevice = static_cast<VkPhysicalDevice>(*physicalDevice),
-                .device = static_cast<VkDevice>(*device),
+                .physicalDevice = *physicalDevice,
+                .device = *device,
                 .pVulkanFunctions = &functions,
-                .instance = static_cast<VkInstance>(*instance),
-                .vulkanApiVersion = VK_API_VERSION_1_3,
+                .instance = *instance,
+                .vulkanApiVersion = vk::makeApiVersion(0, 1, 3, 0),
         };
 
         auto* raw = new VmaAllocator{};

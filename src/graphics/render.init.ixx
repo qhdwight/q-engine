@@ -46,8 +46,7 @@ struct QueueFamilyIndices {
     std::vector<std::string_view> sortedDesiredExtensions(desiredExtensions.size());
     std::ranges::partial_sort_copy(desiredExtensions, sortedDesiredExtensions);
     std::vector<std::string_view> sortedAvailableExtensions(availableExtensions.size());
-    std::ranges::partial_sort_copy(availableExtensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }),
-                                   sortedAvailableExtensions);
+    std::ranges::partial_sort_copy(availableExtensions | std::views::transform([](const auto& e) { return std::string_view{e.extensionName}; }), sortedAvailableExtensions);
     log("[Vulkan] Available instance extensions:");
     for (std::string_view extension: sortedAvailableExtensions) {
         log("\t{}", extension);
@@ -190,7 +189,7 @@ void oneTimeSubmit(vk::raii::CommandBuffer const& commandBuffer, vk::raii::Queue
 }
 
 vk::raii::Instance makeInstance(vk::raii::Context const& context) {
-    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(1, 3, 0, 0)};
+    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(0, 1, 3, 0)};
 
     InstanceExtensions extensions = getInstanceExtensions(context);
     Layers layers;
@@ -220,7 +219,7 @@ vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance cons
 
 void setupGlfw() {
     glfwInit();
-    std::cout << std::format("[GLFW] {} initialized\n", glfwGetVersionString());
+    log("[GLFW] {} initialized", glfwGetVersionString());
     glfwSetErrorCallback([](int error, const char* msg) {
         std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
     });
