@@ -12,6 +12,7 @@ import std;
 import glfw;
 import imgui;
 import vulkan;
+import vulkanc;
 
 using namespace std::literals;
 
@@ -70,11 +71,11 @@ void recreatePipeline(VulkanContext& context) {
 void setupImgui(VulkanContext& context) {
     ImGui::CheckVersion();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
+    ImGui::ImGuiIO& io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForVulkan(context.window.windowHandle.get(), true);
-    ImGui_ImplVulkan_InitInfo initInfo{
+    ImGui::ImGui_ImplGlfw_InitForVulkan(context.window.windowHandle.get(), true);
+    ImGui::ImGui_ImplVulkan_InitInfo initInfo{
             .Instance = *context.instance,
             .PhysicalDevice = *context.physicalDevice,
             .Device = *context.device,
@@ -87,18 +88,18 @@ void setupImgui(VulkanContext& context) {
             .ImageCount = 2,
             .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
             .UseDynamicRendering = true,
-            .ColorAttachmentFormat = static_cast<VkFormat>(context.swapchain.format.format),
+            .ColorAttachmentFormat = static_cast<vkc::VkFormat>(context.swapchain.format.format),
             .Allocator = nullptr,
             .CheckVkResultFn = nullptr,
     };
-    ImGui_ImplVulkan_Init(&initInfo, {});
+    ImGui::ImGui_ImplVulkan_Init(&initInfo, {});
     log("[IMGUI] {} initialized", ImGui::GetVersion());
 
     oneTimeSubmit(context.commandBuffers.front(), context.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
-        ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
+        ImGui::ImGui_ImplVulkan_CreateFontsTexture(*commands);
     });
 
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
+    ImGui::ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 //void renderImGuiOverlay(App& app) {
@@ -139,12 +140,12 @@ void setupImgui(VulkanContext& context) {
 
 void renderImgui(App& app) {
     auto& context = app.globalContext.get<VulkanContext>();
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
+    ImGui::ImGui_ImplVulkan_NewFrame();
+    ImGui::ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), static_cast<VkCommandBuffer>(*context.commandBuffers[context.currentFrame]));
+    ImGui::ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *context.commandBuffers[context.currentFrame]);
 }
 
 export class VulkanRenderPlugin : public Plugin {
@@ -321,9 +322,9 @@ public:
                     vk::PresentInfoKHR{*renderComplete, *context.swapchain.swapchain, context.currentSwapchainImageIndex});
             check(presentResult == vk::Result::eSuccess);
 
-            glfwPollEvents();
+            glfw::glfwPollEvents();
             bool& keepOpen = app.globalContext.get<WindowContext>().keepOpen;
-            keepOpen = !glfwWindowShouldClose(context.window.windowHandle.get());
+            keepOpen = !glfw::glfwWindowShouldClose(context.window.windowHandle.get());
             if (!keepOpen) {
                 context.device.waitIdle();
             }
@@ -336,7 +337,7 @@ public:
     }
 
     void cleanup(App& app) override {
-        ImGui_ImplVulkan_Shutdown();
+        ImGui::ImGui_ImplVulkan_Shutdown();
         //    glslang::FinalizeProcess();
         //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
         //        for (auto& item: pipeline.shaders) {

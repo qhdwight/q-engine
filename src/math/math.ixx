@@ -5,8 +5,11 @@ import std;
 export template<typename T>
 concept Arithmetic = std::is_arithmetic_v<T>;
 
-export template<Arithmetic T, std::size_t Row, std::size_t Col>
-struct matrix {
+template<std::size_t... Dims>
+struct product;
+
+export template<Arithmetic T, std::size_t... Dims>
+struct matrix : public std::array<T, (Dims * ...)> {
 };
 
 export template<Arithmetic T, std::size_t Dim>

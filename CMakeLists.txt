@@ -60,20 +60,11 @@ target_sources(GameModules
 )
 target_include_directories(GameModules PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_link_libraries(GameModules PUBLIC
-    EnTT::EnTT
-    VulkanMemoryAllocator VulkanHppModule Vulkan::Vulkan
-    glfw
-    RapidJSON
-    IMGUI
-)
-target_compile_options(
-    GameModules PUBLIC
-    # -fmodule-file=${CMAKE_BINARY_DIR}/entt.pcm
-    -fmodule-file=${CMAKE_BINARY_DIR}/glfw3.pcm
-    -fmodule-file=${CMAKE_BINARY_DIR}/vulkan.pcm
-    -fmodule-file=${CMAKE_BINARY_DIR}/vk_mem_alloc.pcm
-    -fmodule-file=${CMAKE_BINARY_DIR}/imgui_impl_glfw.pcm
-    -fmodule-file=${CMAKE_BINARY_DIR}/imgui_impl_vulkan.pcm
+        EnTT::EnTT
+        VulkanMemoryAllocator VulkanHppModule Vulkan::Vulkan
+        glfw
+        RapidJSON
+        IMGUI
 )
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS src/*.cxx)

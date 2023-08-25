@@ -30,7 +30,7 @@ struct QueueFamilyIndices {
     {
         std::uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        glfwExtensions = glfw::glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (std::uint32_t i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
@@ -194,7 +194,7 @@ vk::raii::Instance makeInstance(vk::raii::Context const& context) {
     InstanceExtensions extensions = getInstanceExtensions(context);
     Layers layers;
     if constexpr (IS_DEBUG && OS == OS::Linux) {
-        //        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+        layers.emplace_back("VK_LAYER_KHRONOS_validation");
     }
 
     log("[Vulkan] Available instance layers:");
@@ -218,11 +218,11 @@ vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance cons
 }
 
 void setupGlfw() {
-    glfwInit();
-    log("[GLFW] {} initialized", glfwGetVersionString());
-    glfwSetErrorCallback([](int error, const char* msg) {
+    glfw::glfwInit();
+    log("[GLFW] {} initialized", glfw::glfwGetVersionString());
+    glfw::glfwSetErrorCallback([](int error, const char* msg) {
         std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
     });
-    if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
-    glfwWindowHint(glfw::CLIENT_API, glfw::NO_API);
+    if (!glfw::glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
+    glfw::glfwWindowHint(glfw::CLIENT_API, glfw::NO_API);
 }

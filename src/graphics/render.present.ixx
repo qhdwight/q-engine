@@ -7,6 +7,7 @@ import logging;
 import std;
 import glfw;
 import vulkan;
+import vulkanc;
 
 struct Window {
 
@@ -15,12 +16,12 @@ struct Window {
     Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
         : window_name{window_name} {
 
-        GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(),
-                                                 nullptr, nullptr);
-        windowHandle = {windowRaw, glfwDestroyWindow};
+        glfw::GLFWwindow* windowRaw = glfw::glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(),
+                                                             nullptr, nullptr);
+        windowHandle = {windowRaw, glfw::glfwDestroyWindow};
 
-        VkSurfaceKHR rawSurface;
-        if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), windowRaw, nullptr, &rawSurface) != VK_SUCCESS)
+        vkc::VkSurfaceKHR rawSurface;
+        if (!glfw::glfwCreateWindowSurface(*instance, windowRaw, nullptr, &rawSurface))
             throw std::runtime_error("[GLFW] Failed to create window surface");
 
         surface = {instance, rawSurface};
@@ -36,12 +37,12 @@ struct Window {
 
     [[nodiscard]] vk::Extent2D extent() const {
         int width, height;
-        glfwGetFramebufferSize(windowHandle.get(), &width, &height);
+        glfw::glfwGetFramebufferSize(windowHandle.get(), &width, &height);
         return {static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)};
     }
 
     std::string window_name;
-    std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> windowHandle;
+    std::unique_ptr<glfw::GLFWwindow, std::function<void(glfw::GLFWwindow*)>> windowHandle;
     vk::raii::SurfaceKHR surface = nullptr;
 };
 
