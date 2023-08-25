@@ -1,12 +1,9 @@
-module;
-
-#include <pch.hpp>
-
 export module app;
 
 import collections.circular_buffer;
 
 import std;
+import entt;
 
 export struct App;
 

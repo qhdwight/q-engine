@@ -1,7 +1,3 @@
-module;
-
-#include <pch.hpp>
-
 export module render:plugin;
 
 import :init;
@@ -14,6 +10,9 @@ import logging;
 
 import std;
 import vulkan;
+import <GLFW/glfw3.h>;
+import <backends/imgui_impl_glfw.h>;
+import <backends/imgui_impl_vulkan.h>;
 
 using namespace std::literals;
 
