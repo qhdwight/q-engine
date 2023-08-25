@@ -7,7 +7,7 @@ import vulkan;
 
 constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
 
-export struct MemAllocator : std::shared_ptr<VmaAllocator> {
+struct MemAllocator : std::shared_ptr<VmaAllocator> {
 
     MemAllocator() = default;
 
@@ -36,7 +36,7 @@ export struct MemAllocator : std::shared_ptr<VmaAllocator> {
     }
 };
 
-export struct Image {
+struct Image {
 
     MemAllocator allocator;
     vk::Image image;
@@ -52,7 +52,7 @@ export struct Image {
     Image& operator=(Image&&) = default;
 
     Image(MemAllocator const& allocator, VmaAllocationCreateInfo const& allocInfo, vk::ImageCreateInfo const& imageInfo)
-            : allocator{allocator} {
+        : allocator{allocator} {
 
         auto createInfoRaw = static_cast<VkImageCreateInfo>(imageInfo);
         VkImage imageRaw;
@@ -67,29 +67,29 @@ export struct Image {
     }
 };
 
-export struct DepthImage : Image {
+struct DepthImage : Image {
 
     explicit DepthImage(vk::raii::Device const& device, MemAllocator const& allocator, vk::Extent2D const& extent)
-            : Image{
-            allocator,
-            VmaAllocationCreateInfo{
-                    .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-                    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            },
-            vk::ImageCreateInfo{
-                    {},
-                    vk::ImageType::e2D,
-                    DEPTH_FORMAT,
-                    vk::Extent3D{extent, 1},
-                    1,
-                    1,
-                    vk::SampleCountFlagBits::e1,
-                    vk::ImageTiling::eOptimal,
-                    vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                    vk::SharingMode::eExclusive,
-                    {},
-                    vk::ImageLayout::eUndefined},
-    } {
+        : Image{
+                  allocator,
+                  VmaAllocationCreateInfo{
+                          .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+                          .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                  },
+                  vk::ImageCreateInfo{
+                          {},
+                          vk::ImageType::e2D,
+                          DEPTH_FORMAT,
+                          vk::Extent3D{extent, 1},
+                          1,
+                          1,
+                          vk::SampleCountFlagBits::e1,
+                          vk::ImageTiling::eOptimal,
+                          vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                          vk::SharingMode::eExclusive,
+                          {},
+                          vk::ImageLayout::eUndefined},
+          } {
         view = {
                 device,
                 {

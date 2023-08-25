@@ -4,10 +4,10 @@ import std;
 import vulkan;
 import <vulkan/vulkan.h>;
 
-export VkBool32 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                            VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                            VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                            void* /*pUserData*/) {
+VkBool32 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                     VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+                                     void* /*pUserData*/) {
     //#if !defined(NDEBUG)
     //    if (pCallbackData->messageIdNumber == 648835635) {
     //        // UNASSIGNED-khronos-Validation-debug-build-warning-message

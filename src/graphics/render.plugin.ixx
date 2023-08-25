@@ -9,10 +9,9 @@ import game;
 import logging;
 
 import std;
+import glfw;
+import imgui;
 import vulkan;
-import <GLFW/glfw3.h>;
-import <backends/imgui_impl_glfw.h>;
-import <backends/imgui_impl_vulkan.h>;
 
 using namespace std::literals;
 
@@ -69,7 +68,7 @@ void recreatePipeline(VulkanContext& context) {
 }
 
 void setupImgui(VulkanContext& context) {
-    IMGUI_CHECKVERSION();
+    ImGui::checkVersion();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void) io;
@@ -93,7 +92,7 @@ void setupImgui(VulkanContext& context) {
             .CheckVkResultFn = nullptr,
     };
     ImGui_ImplVulkan_Init(&initInfo, {});
-    std::cout << "[IMGUI] " << IMGUI_VERSION << " initialized" << std::endl;
+    std::cout << "[IMGUI] " << ImGui::VERSION << " initialized" << std::endl;
 
     oneTimeSubmit(context.commandBuffers.front(), context.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
         ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(*commands));
@@ -168,7 +167,7 @@ public:
         context.commandBuffers = {context.device, {*context.commandPool, vk::CommandBufferLevel::ePrimary, 2}};
         context.graphicsQueue = {context.device, context.queueFamilyIndices.graphicsFamilyIndex, 0};
         context.presentQueue = {context.device, context.queueFamilyIndices.presentFamilyIndex, 0};
-        for (uint32_t i = 0; i < context.commandBuffers.size(); ++i) {
+        for (std::uint32_t i = 0; i < context.commandBuffers.size(); ++i) {
             context.presentationCompleteSemaphores.emplace_back(context.device, vk::SemaphoreCreateInfo{});
             context.renderCompleteSemaphores.emplace_back(context.device, vk::SemaphoreCreateInfo{});
             context.waitFences.emplace_back(context.device, vk::FenceCreateInfo{vk::FenceCreateFlagBits::eSignaled});
@@ -176,18 +175,18 @@ public:
         context.pipelineCache = {context.device, vk::PipelineCacheCreateInfo{}};
         context.descriptorPool = makeDescriptorPool(
                 context.device, {
-                        {vk::DescriptorType::eSampler,              64},
-                        {vk::DescriptorType::eCombinedImageSampler, 64},
-                        {vk::DescriptorType::eSampledImage,         64},
-                        {vk::DescriptorType::eStorageImage,         64},
-                        {vk::DescriptorType::eUniformTexelBuffer,   64},
-                        {vk::DescriptorType::eStorageTexelBuffer,   64},
-                        {vk::DescriptorType::eUniformBuffer,        64},
-                        {vk::DescriptorType::eStorageBuffer,        64},
-                        {vk::DescriptorType::eUniformBufferDynamic, 64},
-                        {vk::DescriptorType::eStorageBufferDynamic, 64},
-                        {vk::DescriptorType::eInputAttachment,      64},
-                });
+                                        {vk::DescriptorType::eSampler, 64},
+                                        {vk::DescriptorType::eCombinedImageSampler, 64},
+                                        {vk::DescriptorType::eSampledImage, 64},
+                                        {vk::DescriptorType::eStorageImage, 64},
+                                        {vk::DescriptorType::eUniformTexelBuffer, 64},
+                                        {vk::DescriptorType::eStorageTexelBuffer, 64},
+                                        {vk::DescriptorType::eUniformBuffer, 64},
+                                        {vk::DescriptorType::eStorageBuffer, 64},
+                                        {vk::DescriptorType::eUniformBufferDynamic, 64},
+                                        {vk::DescriptorType::eStorageBufferDynamic, 64},
+                                        {vk::DescriptorType::eInputAttachment, 64},
+                                });
         createSwapchain(context);
         setupImgui(context);
     }
@@ -213,8 +212,7 @@ public:
             check(waitResult == vk::Result::eSuccess);
 
             vk::Result acquireResult;
-            std::tie(acquireResult, context.currentSwapchainImageIndex)
-                    = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
+            std::tie(acquireResult, context.currentSwapchainImageIndex) = context.swapchain.swapchain.acquireNextImage(FENCE_TIMEOUT, *presentationComplete, nullptr);
             check(acquireResult == vk::Result::eSuccess);
 
             //
@@ -291,7 +289,7 @@ public:
                         1,
                         {},
                         colorAttachmentInfo,
-//                        &depthAttachmentInfo,
+                        //                        &depthAttachmentInfo,
                 };
 
                 cmdBuffer.beginRenderingKHR(renderingInfo);

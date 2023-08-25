@@ -5,15 +5,15 @@ import :init;
 import logging;
 
 import std;
+import glfw;
 import vulkan;
-import <GLFW/glfw3.h>;
 
-export struct Window {
+struct Window {
 
     Window() = default;
 
     Window(vk::raii::Instance const& instance, std::string_view window_name, vk::Extent2D const& extent)
-            : window_name{window_name} {
+        : window_name{window_name} {
 
         GLFWwindow* windowRaw = glfwCreateWindow(static_cast<int>(extent.width), static_cast<int>(extent.height), window_name.data(),
                                                  nullptr, nullptr);
@@ -37,7 +37,7 @@ export struct Window {
     [[nodiscard]] vk::Extent2D extent() const {
         int width, height;
         glfwGetFramebufferSize(windowHandle.get(), &width, &height);
-        return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+        return {static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)};
     }
 
     std::string window_name;
@@ -60,7 +60,7 @@ vk::SurfaceFormatKHR pickSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& 
     return it == formats.end() ? formats.front() : *it;
 }
 
-export struct Swapchain {
+struct Swapchain {
 
     Swapchain() = default;
 
@@ -92,12 +92,12 @@ export struct Swapchain {
         log("[Vulkan] Creating swapchain with format: {} {}",
             vk::to_string(format.format), vk::to_string(format.colorSpace));
         if (queueFamilyIndices.graphicsFamilyIndex != queueFamilyIndices.presentFamilyIndex) {
-            std::array<uint32_t, 2> array{queueFamilyIndices.graphicsFamilyIndex, queueFamilyIndices.presentFamilyIndex};
+            std::array<std::uint32_t, 2> array{queueFamilyIndices.graphicsFamilyIndex, queueFamilyIndices.presentFamilyIndex};
             // If the graphics and present queues are from different queue families, we either have to explicitly
             // transfer ownership of images between the queues, or we have to create the swapchain with imageSharingMode
             // as vk::SharingMode::eConcurrent
             createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
-            createInfo.queueFamilyIndexCount = static_cast<uint32_t>(array.size());
+            createInfo.queueFamilyIndexCount = static_cast<std::uint32_t>(array.size());
             createInfo.pQueueFamilyIndices = array.data();
         }
         swapchain = {device, createInfo};

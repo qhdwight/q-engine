@@ -34,7 +34,7 @@ export struct App {
     std::vector<std::shared_ptr<Plugin>> plugins;
 
     template<std::derived_from<Plugin> TPlugin, typename... TParams>
-    std::shared_ptr<TPlugin> makePlugin(TParams&& ... params) {
+    std::shared_ptr<TPlugin> makePlugin(TParams&&... params) {
         auto plugin = std::make_shared<TPlugin>(std::forward<TParams>(params)...);
         plugin->build(*this);
         plugins.push_back(plugin);

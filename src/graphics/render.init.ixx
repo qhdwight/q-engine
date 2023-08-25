@@ -6,8 +6,8 @@ import game;
 import logging;
 
 import std;
+import glfw;
 import vulkan;
-import <GLFW/glfw3.h>;
 
 constexpr std::string_view APP_NAME = "Game Engine";
 constexpr std::uint32_t APP_VERSION = 1;
@@ -18,10 +18,12 @@ using InstanceExtensions = std::vector<char const*>;
 using DeviceExtensions = std::vector<char const*>;
 using Layers = std::vector<char const*>;
 
-export struct QueueFamilyIndices {
+struct QueueFamilyIndices {
     std::uint32_t graphicsFamilyIndex{};
     std::uint32_t presentFamilyIndex{};
 };
+
+[[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context);
 
 [[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context) {
     InstanceExtensions desiredExtensions{"VK_KHR_portability_enumeration"};
@@ -29,7 +31,7 @@ export struct QueueFamilyIndices {
         std::uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+        for (std::uint32_t i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
     if constexpr (IS_DEBUG) {
@@ -75,45 +77,9 @@ export struct QueueFamilyIndices {
     return extensions;
 }
 
-export vk::raii::Instance makeInstance(vk::raii::Context const& context) {
-    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(1, 3, 0, 0)};
-
-    InstanceExtensions extensions = getInstanceExtensions(context);
-    Layers layers;
-    if constexpr (IS_DEBUG && OS == OS::Linux) {
-        layers.emplace_back("VK_LAYER_KHRONOS_validation");
-    }
-
-    log("[Vulkan] Available instance layers:");
-    for (auto const& layer: vk::enumerateInstanceLayerProperties()) {
-        log("\t{}", std::string_view{layer.layerName});
-    }
-
-    vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, layers, extensions};
-    return {context, createInfo};
-}
-
-export vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance const& instance) {
-    check(*instance);
-
-    using
-    enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
-    using
-    enum vk::DebugUtilsMessageTypeFlagBitsEXT;
-//    return instance->createDebugUtilsMessengerEXTUnique(
-//            vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
-//            nullptr,
-//
-//            );
-    return {
-            instance,
-            vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
-    };
-}
-
 struct PhysicalDeviceComparator {
-    [[nodiscard]] static uint32_t score(vk::raii::PhysicalDevice const& device) {
-        uint32_t score = 0;
+    [[nodiscard]] static std::uint32_t score(vk::raii::PhysicalDevice const& device) {
+        std::uint32_t score = 0;
         auto properties = device.getProperties();
         switch (properties.deviceType) {
             case vk::PhysicalDeviceType::eDiscreteGpu:
@@ -151,7 +117,7 @@ vk::raii::PhysicalDevice makePhysicalDevice(vk::raii::Instance const& instance) 
 
     vk::PhysicalDeviceProperties const& properties = physicalDevice.getProperties();
     log("[Vulkan] Chose physical device {}", properties.deviceName.data());
-    uint32_t apiVersion = properties.apiVersion;
+    std::uint32_t apiVersion = properties.apiVersion;
     log("[Vulkan] {}.{}.{} device API version",
         vk::apiVersionMajor(apiVersion), vk::apiVersionMinor(apiVersion), vk::apiVersionPatch(apiVersion));
     log("[Vulkan] Available physical device extensions:");
@@ -165,36 +131,34 @@ QueueFamilyIndices findQueueFamilyIndices(vk::raii::PhysicalDevice const& physic
     check(*physicalDevice);
     check(*surface);
 
-    using QueueFamilyIndex = uint32_t;
+    using QueueFamilyIndex = std::uint32_t;
     using QueueFamily = std::tuple<QueueFamilyIndex, vk::QueueFamilyProperties>;
 
     auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+    auto queueFamilies = std::views::zip(std::views::iota(QueueFamilyIndex{0}), queueFamilyProperties);
 
-//    auto queueFamilies = std::views::zip(std::views::iota(QueueFamilyIndex{0}), queueFamilyProperties);
-//
-//    auto graphicsQueues = queueFamilies | std::views::filter([](QueueFamily const& queue) {
-//                              auto const& [index, properties] = queue;
-//                              return static_cast<bool>(properties.queueFlags & vk::QueueFlagBits::eGraphics);
-//                          }) |
-//                          std::views::keys | std::ranges::to<std::vector<QueueFamilyIndex>>();
-//    if (graphicsQueues.empty()) throw std::runtime_error("No graphics queues found");
-//
-//    auto presentationQueues = queueFamilies | std::views::filter([&](QueueFamily const& queue) {
-//                                  auto const& [index, properties] = queue;
-//                                  return physicalDevice.getSurfaceSupportKHR(index, *surface);
-//                              }) |
-//                              std::views::keys | std::ranges::to<std::vector<QueueFamilyIndex>>();
-//    if (presentationQueues.empty()) throw std::runtime_error("No presentation queues found");
-//
-//    std::vector<QueueFamilyIndex> combined;
-//    std::ranges::set_intersection(graphicsQueues, presentationQueues, std::back_inserter(combined));
-//    if (!combined.empty()) return {combined.front(), combined.front()};
-//
-//    return {graphicsQueues.front(), presentationQueues.front()};
-    return {};
+    auto graphicsQueues = queueFamilies | std::views::filter([](QueueFamily const& queue) {
+                              auto const& [index, properties] = queue;
+                              return static_cast<bool>(properties.queueFlags & vk::QueueFlagBits::eGraphics);
+                          }) |
+                          std::views::keys;
+    if (graphicsQueues.empty()) throw std::runtime_error("No graphics queues found");
+
+    auto presentationQueues = queueFamilies | std::views::filter([&](QueueFamily const& queue) {
+                                  auto const& [index, properties] = queue;
+                                  return physicalDevice.getSurfaceSupportKHR(index, *surface);
+                              }) |
+                              std::views::keys;
+    if (presentationQueues.empty()) throw std::runtime_error("No presentation queues found");
+
+    std::vector<QueueFamilyIndex> combined;
+    std::ranges::set_intersection(graphicsQueues, presentationQueues, std::back_inserter(combined));
+    if (!combined.empty()) return {combined.front(), combined.front()};
+
+    return {graphicsQueues.front(), presentationQueues.front()};
 }
 
-vk::raii::Device makeLogicalDevice(vk::raii::PhysicalDevice const& physicalDevice, uint32_t graphicsFamilyIndex) {
+vk::raii::Device makeLogicalDevice(vk::raii::PhysicalDevice const& physicalDevice, std::uint32_t graphicsFamilyIndex) {
     check(*physicalDevice);
 
     DeviceExtensions extensions = getDeviceExtensions();
@@ -209,8 +173,8 @@ vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std:
     check(*device);
     check(!poolSizes.empty());
 
-    uint32_t maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
-                                       [](uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
+    std::uint32_t maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
+                                            [](std::uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
     check(maxSets > 0);
     vk::DescriptorPoolCreateInfo createInfo{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes};
     return {device, createInfo};
@@ -225,12 +189,41 @@ void oneTimeSubmit(vk::raii::CommandBuffer const& commandBuffer, vk::raii::Queue
     queue.waitIdle();
 }
 
-export void setupGlfw() {
+vk::raii::Instance makeInstance(vk::raii::Context const& context) {
+    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(1, 3, 0, 0)};
+
+    InstanceExtensions extensions = getInstanceExtensions(context);
+    Layers layers;
+    if constexpr (IS_DEBUG && OS == OS::Linux) {
+        //        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+    }
+
+    log("[Vulkan] Available instance layers:");
+    for (auto const& layer: vk::enumerateInstanceLayerProperties()) {
+        log("\t{}", std::string_view{layer.layerName});
+    }
+
+    vk::InstanceCreateInfo createInfo{vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, layers, extensions};
+    return {context, createInfo};
+}
+
+vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance const& instance) {
+    check(*instance);
+
+    using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
+    return {
+            instance,
+            vk::DebugUtilsMessengerCreateInfoEXT{{}, eWarning | eError, eGeneral | ePerformance | eValidation, &debugUtilsMessengerCallback},
+    };
+}
+
+void setupGlfw() {
     glfwInit();
     std::cout << std::format("[GLFW] {} initialized\n", glfwGetVersionString());
     glfwSetErrorCallback([](int error, const char* msg) {
         std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
     });
     if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(glfw::CLIENT_API, glfw::NO_API);
 }

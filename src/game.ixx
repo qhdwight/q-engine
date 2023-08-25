@@ -2,12 +2,9 @@ export module game;
 
 import std;
 
-using ns_t = std::chrono::nanoseconds;
-using ms_t = std::chrono::duration<double, std::chrono::milliseconds::period>;
-using sec_t = std::chrono::duration<double, std::chrono::seconds::period>;
-using steady_clock_t = std::chrono::steady_clock;
-using clock_point_t = std::chrono::time_point<steady_clock_t>;
-using clock_delta_t = clock_point_t::duration;
+using SteadyClock = std::chrono::steady_clock;
+using ClockPoint = std::chrono::time_point<SteadyClock>;
+using ClockDelta = ClockPoint::duration;
 
 export enum struct OS {
     Windows,
