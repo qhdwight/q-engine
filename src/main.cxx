@@ -1,10 +1,9 @@
+#include "pch.hpp"
+
 import app;
 import render;
 
 import std;
-
-constexpr int EXIT_SUCCESS = 0;
-constexpr int EXIT_FAILURE = 1;
 
 int main() {
     try {

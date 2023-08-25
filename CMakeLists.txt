@@ -21,13 +21,15 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             -fmodule-file=${CMAKE_BINARY_DIR}/vulkan.pcm
             -fmodule-file=${CMAKE_BINARY_DIR}/vk_mem_alloc.pcm
     )
+    add_link_options(-fuse-ld=lld)
 endif ()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ### libc++ ###
-set(LIBCXX_BUILD /home/quintin/Programming/llvm/build_cxx)
+set(LIBCXX_BUILD /opt/libcxx)
+message(STATUS ${LIBCXX_BUILD})
 include(FetchContent)
 FetchContent_Declare(
         std
@@ -49,22 +51,30 @@ link_libraries(std c++)
 
 ### Dependencies ###
 add_subdirectory(pkg build/pkg EXCLUDE_FROM_ALL SYSTEM)
+include_directories(pkg/rapidjson/include)
+find_package(Vulkan REQUIRED)
 
 ### Modules ###
-file(GLOB_RECURSE MODULE_SOURCE_FILES CONFIGURE_DEPENDS *.ixx)
+file(GLOB_RECURSE MODULE_SOURCE_FILES CONFIGURE_DEPENDS src/*.ixx)
 add_library(GameModules)
 target_sources(GameModules
         PUBLIC FILE_SET cxx_modules TYPE CXX_MODULES FILES
         ${MODULE_SOURCE_FILES}
 )
 target_include_directories(GameModules PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
-target_link_libraries(GameModules PUBLIC EnTT::EnTT VulkanMemoryAllocator VulkanHppModule glfw RapidJSON IMGUI)
+target_link_libraries(GameModules PUBLIC
+    EnTT::EnTT
+    VulkanMemoryAllocator VulkanHppModule Vulkan::Vulkan
+    glfw
+    RapidJSON
+    IMGUI
+)
 
-file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS *.cxx)
+file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS src/*.cxx)
 add_executable(Game ${SOURCE_FILES})
 target_link_libraries(Game PUBLIC GameModules)
 
-add_compile_options(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=0)
+add_compile_definitions(GLFW_INCLUDE_VULKAN)
 if (MSVC)
     target_compile_options(Game PRIVATE /W3 /WX)
 else ()
