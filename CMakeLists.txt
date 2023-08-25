@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 project(game LANGUAGES CXX)
 
 ### CMake ###
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW) # Make options propagate when using add_subdirectory
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (CMAKE_VERSION VERSION_LESS "3.27.0")
     set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API "2182bf5c-ef0d-489a-91da-49dbc3090d2a")
 else ()
@@ -20,9 +23,6 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
     add_link_options(-fuse-ld=lld)
 endif ()
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ### libc++ ###
 set(LIBCXX_BUILD /opt/libcxx)
@@ -64,7 +64,7 @@ target_link_libraries(GameModules PUBLIC
         VulkanMemoryAllocator VulkanHppModule Vulkan::Vulkan
         glfw
         RapidJSON
-        IMGUI
+        ImGui
 )
 
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS src/*.cxx)

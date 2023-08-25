@@ -55,7 +55,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(entt glfw vulkan-hpp vma rapidjson)
 
-add_library(IMGUI
+add_library(ImGui
         imgui/imgui.cpp
         imgui/imgui_draw.cpp
         imgui/imgui_tables.cpp
@@ -64,5 +64,5 @@ add_library(IMGUI
         imgui/backends/imgui_impl_vulkan.cpp
         imgui/backends/imgui_impl_glfw.cpp
 )
-target_include_directories(IMGUI PUBLIC imgui)
-target_link_libraries(IMGUI PUBLIC glfw VulkanHppModule)
+target_include_directories(ImGui PUBLIC imgui)
+target_link_libraries(ImGui PUBLIC glfw VulkanHppModule)
