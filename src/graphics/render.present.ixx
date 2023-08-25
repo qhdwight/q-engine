@@ -46,14 +46,14 @@ struct Window {
     vk::raii::SurfaceKHR surface = nullptr;
 };
 
-vk::PresentModeKHR pickPresentMode(std::vector<vk::PresentModeKHR> const& presentModes) {
+vk::PresentModeKHR pickPresentMode(std::span<vk::PresentModeKHR> presentModes) {
     check(!presentModes.empty());
 
     auto it = std::ranges::find(presentModes, vk::PresentModeKHR::eMailbox);
     return it == presentModes.end() ? presentModes.front() : *it;
 }
 
-vk::SurfaceFormatKHR pickSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& formats) {
+vk::SurfaceFormatKHR pickSurfaceFormat(std::span<vk::SurfaceFormatKHR> formats) {
     check(!formats.empty());
 
     // request several formats, the first found will be used
@@ -68,11 +68,12 @@ struct Swapchain {
     Swapchain(vk::raii::Device const& device, vk::raii::PhysicalDevice const& physicalDevice, QueueFamilyIndices const& queueFamilyIndices,
               Window const& window, Swapchain&& from) {
         vk::SurfaceKHR const& surface = *window.surface;
-
-        format = pickSurfaceFormat(physicalDevice.getSurfaceFormatsKHR(surface));
+        std::vector<vk::SurfaceFormatKHR> formats = physicalDevice.getSurfaceFormatsKHR(surface);
+        format = pickSurfaceFormat(formats);
         extent = window.extent();
         vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-        vk::PresentModeKHR presentMode = pickPresentMode(physicalDevice.getSurfacePresentModesKHR(surface));
+        std::vector<vk::PresentModeKHR> presentModes = physicalDevice.getSurfacePresentModesKHR(surface);
+        vk::PresentModeKHR presentMode = pickPresentMode(presentModes);
         vk::SwapchainCreateInfoKHR createInfo{
                 {},
                 surface,

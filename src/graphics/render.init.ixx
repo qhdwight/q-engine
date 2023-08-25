@@ -168,7 +168,7 @@ vk::raii::Device makeLogicalDevice(vk::raii::PhysicalDevice const& physicalDevic
     return {physicalDevice, createInfo};
 }
 
-vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std::vector<vk::DescriptorPoolSize> const& poolSizes) {
+vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std::span<vk::DescriptorPoolSize> poolSizes) {
     check(*device);
     check(!poolSizes.empty());
 

@@ -174,20 +174,20 @@ public:
             context.waitFences.emplace_back(context.device, vk::FenceCreateInfo{vk::FenceCreateFlagBits::eSignaled});
         }
         context.pipelineCache = {context.device, vk::PipelineCacheCreateInfo{}};
-        context.descriptorPool = makeDescriptorPool(
-                context.device, {
-                                        {vk::DescriptorType::eSampler, 64},
-                                        {vk::DescriptorType::eCombinedImageSampler, 64},
-                                        {vk::DescriptorType::eSampledImage, 64},
-                                        {vk::DescriptorType::eStorageImage, 64},
-                                        {vk::DescriptorType::eUniformTexelBuffer, 64},
-                                        {vk::DescriptorType::eStorageTexelBuffer, 64},
-                                        {vk::DescriptorType::eUniformBuffer, 64},
-                                        {vk::DescriptorType::eStorageBuffer, 64},
-                                        {vk::DescriptorType::eUniformBufferDynamic, 64},
-                                        {vk::DescriptorType::eStorageBufferDynamic, 64},
-                                        {vk::DescriptorType::eInputAttachment, 64},
-                                });
+        std::vector<vk::DescriptorPoolSize> poolSizes{
+                {vk::DescriptorType::eSampler, 64},
+                {vk::DescriptorType::eCombinedImageSampler, 64},
+                {vk::DescriptorType::eSampledImage, 64},
+                {vk::DescriptorType::eStorageImage, 64},
+                {vk::DescriptorType::eUniformTexelBuffer, 64},
+                {vk::DescriptorType::eStorageTexelBuffer, 64},
+                {vk::DescriptorType::eUniformBuffer, 64},
+                {vk::DescriptorType::eStorageBuffer, 64},
+                {vk::DescriptorType::eUniformBufferDynamic, 64},
+                {vk::DescriptorType::eStorageBufferDynamic, 64},
+                {vk::DescriptorType::eInputAttachment, 64},
+        };
+        context.descriptorPool = makeDescriptorPool(context.device, poolSizes);
         createSwapchain(context);
         setupImgui(context);
     }
