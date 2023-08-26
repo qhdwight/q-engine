@@ -4,7 +4,7 @@ module;
 
 export module vma;
 
-export namespace vma {
+export {
 
     using ::VmaAllocation;
     using ::VmaAllocationCreateInfo;

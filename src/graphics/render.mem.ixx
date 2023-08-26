@@ -7,17 +7,17 @@ import vulkanc;
 
 constexpr vk::Format DEPTH_FORMAT = vk::Format::eD32SfloatS8Uint;
 
-struct MemAllocator : std::shared_ptr<vma::VmaAllocator> {
+struct MemAllocator : std::shared_ptr<VmaAllocator> {
 
     MemAllocator() = default;
 
     MemAllocator(vk::raii::Instance const& instance, vk::raii::Device const& device, vk::raii::PhysicalDevice const& physicalDevice) {
-        vma::VmaVulkanFunctions functions{
-                .vkGetInstanceProcAddr = &vkc::vkGetInstanceProcAddr,
-                .vkGetDeviceProcAddr = &vkc::vkGetDeviceProcAddr,
+        VmaVulkanFunctions functions{
+                .vkGetInstanceProcAddr = &vkGetInstanceProcAddr,
+                .vkGetDeviceProcAddr = &vkGetDeviceProcAddr,
         };
 
-        vma::VmaAllocatorCreateInfo create_info{
+        VmaAllocatorCreateInfo create_info{
                 .physicalDevice = *physicalDevice,
                 .device = *device,
                 .pVulkanFunctions = &functions,
@@ -25,12 +25,12 @@ struct MemAllocator : std::shared_ptr<vma::VmaAllocator> {
                 .vulkanApiVersion = vk::makeApiVersion(0, 1, 3, 0),
         };
 
-        auto* raw = new vma::VmaAllocator{};
-        if (vma::vmaCreateAllocator(&create_info, raw) != VK_SUCCESS) {
+        auto* raw = new VmaAllocator{};
+        if (vmaCreateAllocator(&create_info, raw) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create memory allocator");
         }
-        reset(raw, [](vma::VmaAllocator* p) {
-            vma::vmaDestroyAllocator(*p);
+        reset(raw, [](VmaAllocator* p) {
+            vmaDestroyAllocator(*p);
             delete p;
         });
     }
@@ -41,7 +41,7 @@ struct Image {
     MemAllocator allocator;
     vk::Image image;
     vk::raii::ImageView view = nullptr;
-    vma::VmaAllocation allocation{};
+    VmaAllocation allocation{};
 
     Image(const Image&) = delete;
 
@@ -51,19 +51,19 @@ struct Image {
 
     Image& operator=(Image&&) = default;
 
-    Image(MemAllocator const& allocator, vma::VmaAllocationCreateInfo const& allocInfo, vk::ImageCreateInfo const& imageInfo)
+    Image(MemAllocator const& allocator, VmaAllocationCreateInfo const& allocInfo, vk::ImageCreateInfo const& imageInfo)
         : allocator{allocator} {
 
-        auto createInfoRaw = static_cast<vkc::VkImageCreateInfo>(imageInfo);
-        vkc::VkImage imageRaw;
-        vma::vmaCreateImage(*allocator, &createInfoRaw, &allocInfo, &imageRaw, &allocation, nullptr);
+        auto createInfoRaw = static_cast<VkImageCreateInfo>(imageInfo);
+        VkImage imageRaw;
+        vmaCreateImage(*allocator, &createInfoRaw, &allocInfo, &imageRaw, &allocation, nullptr);
         image = imageRaw;
     }
 
     ~Image() {
         if (!allocator || !image) return;
 
-        vma::vmaDestroyImage(*allocator, image, allocation);
+        vmaDestroyImage(*allocator, image, allocation);
     }
 };
 
@@ -72,7 +72,7 @@ struct DepthImage : Image {
     explicit DepthImage(vk::raii::Device const& device, MemAllocator const& allocator, vk::Extent2D const& extent)
         : Image{
                   allocator,
-                  vma::VmaAllocationCreateInfo{
+                  VmaAllocationCreateInfo{
                           .usage = VMA_MEMORY_USAGE_GPU_ONLY,
                           .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                   },

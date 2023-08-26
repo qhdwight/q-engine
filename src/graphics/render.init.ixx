@@ -2,36 +2,34 @@ export module render:init;
 
 import :debug;
 
-import game;
+import common;
 import logging;
 
 import std;
 import glfw;
 import vulkan;
 
-constexpr std::string_view APP_NAME = "Game Engine";
-constexpr std::uint32_t APP_VERSION = 1;
-constexpr std::string_view ENGINE_NAME = "QEngine";
-constexpr std::uint32_t ENGINE_VERSION = 1;
+// Must be null-terminated
+constexpr const char* APP_NAME = "Game Engine";
+constexpr const char* ENGINE_NAME = "QEngine";
+constexpr u32 APP_VERSION = 1;
+constexpr u32 ENGINE_VERSION = 1;
 
 using InstanceExtensions = std::vector<char const*>;
 using DeviceExtensions = std::vector<char const*>;
 using Layers = std::vector<char const*>;
 
 struct QueueFamilyIndices {
-    std::uint32_t graphicsFamilyIndex{};
-    std::uint32_t presentFamilyIndex{};
+    u32 graphicsFamilyIndex{};
+    u32 presentFamilyIndex{};
 };
-
-[[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context);
 
 [[nodiscard]] InstanceExtensions getInstanceExtensions(vk::raii::Context const& context) {
     InstanceExtensions desiredExtensions{"VK_KHR_portability_enumeration"};
     {
-        std::uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfw::glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        for (std::uint32_t i = 0; i < glfwExtensionCount; ++i)
+        u32 glfwExtensionCount = 0;
+        const char** glfwExtensions = glfw::glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (u32 i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
     if constexpr (IS_DEBUG) {
@@ -77,8 +75,8 @@ struct QueueFamilyIndices {
 }
 
 struct PhysicalDeviceComparator {
-    [[nodiscard]] static std::uint32_t score(vk::raii::PhysicalDevice const& device) {
-        std::uint32_t score = 0;
+    [[nodiscard]] static u32 score(vk::raii::PhysicalDevice const& device) {
+        u32 score = 0;
         auto properties = device.getProperties();
         switch (properties.deviceType) {
             case vk::PhysicalDeviceType::eDiscreteGpu:
@@ -116,7 +114,7 @@ vk::raii::PhysicalDevice makePhysicalDevice(vk::raii::Instance const& instance) 
 
     vk::PhysicalDeviceProperties const& properties = physicalDevice.getProperties();
     log("[Vulkan] Chose physical device {}", properties.deviceName.data());
-    std::uint32_t apiVersion = properties.apiVersion;
+    u32 apiVersion = properties.apiVersion;
     log("[Vulkan] {}.{}.{} device API version",
         vk::apiVersionMajor(apiVersion), vk::apiVersionMinor(apiVersion), vk::apiVersionPatch(apiVersion));
     log("[Vulkan] Available physical device extensions:");
@@ -130,7 +128,7 @@ QueueFamilyIndices findQueueFamilyIndices(vk::raii::PhysicalDevice const& physic
     check(*physicalDevice);
     check(*surface);
 
-    using QueueFamilyIndex = std::uint32_t;
+    using QueueFamilyIndex = u32;
     using QueueFamily = std::tuple<QueueFamilyIndex, vk::QueueFamilyProperties>;
 
     auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
@@ -157,7 +155,7 @@ QueueFamilyIndices findQueueFamilyIndices(vk::raii::PhysicalDevice const& physic
     return {graphicsQueues.front(), presentationQueues.front()};
 }
 
-vk::raii::Device makeLogicalDevice(vk::raii::PhysicalDevice const& physicalDevice, std::uint32_t graphicsFamilyIndex) {
+vk::raii::Device makeLogicalDevice(vk::raii::PhysicalDevice const& physicalDevice, u32 graphicsFamilyIndex) {
     check(*physicalDevice);
 
     DeviceExtensions extensions = getDeviceExtensions();
@@ -172,8 +170,8 @@ vk::raii::DescriptorPool makeDescriptorPool(vk::raii::Device const& device, std:
     check(*device);
     check(!poolSizes.empty());
 
-    std::uint32_t maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
-                                            [](std::uint32_t sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
+    u32 maxSets = std::accumulate(poolSizes.begin(), poolSizes.end(), 0,
+                                            [](u32 sum, vk::DescriptorPoolSize const& dps) { return sum + dps.descriptorCount; });
     check(maxSets > 0);
     vk::DescriptorPoolCreateInfo createInfo{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets, poolSizes};
     return {device, createInfo};
@@ -189,12 +187,12 @@ void oneTimeSubmit(vk::raii::CommandBuffer const& commandBuffer, vk::raii::Queue
 }
 
 vk::raii::Instance makeInstance(vk::raii::Context const& context) {
-    vk::ApplicationInfo appInfo{APP_NAME.data(), APP_VERSION, ENGINE_NAME.data(), ENGINE_VERSION, vk::makeApiVersion(0, 1, 3, 0)};
+    vk::ApplicationInfo appInfo{APP_NAME, APP_VERSION, ENGINE_NAME, ENGINE_VERSION, vk::makeApiVersion(0, 1, 3, 0)};
 
     InstanceExtensions extensions = getInstanceExtensions(context);
     Layers layers;
     if constexpr (IS_DEBUG && OS == OS::Linux) {
-        layers.emplace_back("VK_LAYER_KHRONOS_validation");
+        layers.push_back("VK_LAYER_KHRONOS_validation");
     }
 
     log("[Vulkan] Available instance layers:");

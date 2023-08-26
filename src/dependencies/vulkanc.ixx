@@ -4,7 +4,7 @@ module;
 
 export module vulkanc;
 
-export namespace vkc {
+export {
 
     using ::VkBool32;
     using ::VkDebugUtilsMessageSeverityFlagBitsEXT;

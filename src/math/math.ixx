@@ -1,5 +1,7 @@
 export module math;
 
+import common;
+
 import std;
 
 export template<typename T>
@@ -15,15 +17,15 @@ struct matrix : public std::array<T, (Dims * ...)> {
 export template<Arithmetic T, std::size_t Dim>
 using vec = matrix<T, Dim, 1>;
 
-export using vec2d = vec<double, 2>;
-export using vec3d = vec<double, 3>;
-export using vec4d = vec<double, 4>;
+export using f64_2 = vec<f64, 2>;
+export using f64_3 = vec<f64, 3>;
+export using f64_4 = vec<f64, 4>;
 
-export using vec2f = vec<float, 2>;
-export using vec3f = vec<float, 3>;
-export using vec4f = vec<float, 4>;
+export using f32_2 = vec<f32, 2>;
+export using f32_3 = vec<f32, 3>;
+export using f32_4 = vec<f32, 4>;
 
-export using mat4f = matrix<float, 4, 4>;
+export using f32_4x4 = matrix<f32, 4, 4>;
 
 export template<std::integral T>
 T saturating_add(T a, T b) {

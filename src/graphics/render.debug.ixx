@@ -1,12 +1,14 @@
 export module render:debug;
 
+import common;
+
 import std;
 import vulkan;
 import vulkanc;
 
-vkc::VkBool32 debugUtilsMessengerCallback(vkc::VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                          vkc::VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                          vkc::VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+VkBool32 debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                          VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                          VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
                                           void* /*pUserData*/) {
     //#if !defined(NDEBUG)
     //    if (pCallbackData->messageIdNumber == 648835635) {
@@ -30,7 +32,7 @@ vkc::VkBool32 debugUtilsMessengerCallback(vkc::VkDebugUtilsMessageSeverityFlagBi
     if (0 < pCallbackData->queueLabelCount) {
         std::cerr << "\t"
                   << "Queue Labels:\n";
-        for (std::uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
+        for (u32 i = 0; i < pCallbackData->queueLabelCount; i++) {
             std::cerr << "\t\t"
                       << "labelName = <" << pCallbackData->pQueueLabels[i].pLabelName << ">\n";
         }
@@ -38,7 +40,7 @@ vkc::VkBool32 debugUtilsMessengerCallback(vkc::VkDebugUtilsMessageSeverityFlagBi
     if (0 < pCallbackData->cmdBufLabelCount) {
         std::cerr << "\t"
                   << "CommandBuffer Labels:\n";
-        for (std::uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
+        for (u32 i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
             std::cerr << "\t\t"
                       << "labelName = <" << pCallbackData->pCmdBufLabels[i].pLabelName << ">\n";
         }
@@ -46,7 +48,7 @@ vkc::VkBool32 debugUtilsMessengerCallback(vkc::VkDebugUtilsMessageSeverityFlagBi
     if (0 < pCallbackData->objectCount) {
         std::cerr << "\t"
                   << "Objects:\n";
-        for (std::uint32_t i = 0; i < pCallbackData->objectCount; i++) {
+        for (u32 i = 0; i < pCallbackData->objectCount; i++) {
             std::cerr << "\t\t"
                       << "Object " << i << "\n";
             std::cerr << "\t\t\t"

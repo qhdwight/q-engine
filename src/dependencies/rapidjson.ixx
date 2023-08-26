@@ -1,7 +1,7 @@
 module;
 
-#include <rapidjson/schema.h>
 #include <rapidjson/document.h>
+#include <rapidjson/schema.h>
 
 export module rapidjson;
 

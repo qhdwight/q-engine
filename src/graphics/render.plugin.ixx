@@ -5,7 +5,7 @@ import :memory;
 import :present;
 
 import app;
-import game;
+import common;
 import logging;
 
 import std;
@@ -16,7 +16,7 @@ import vulkanc;
 
 using namespace std::literals;
 
-constexpr std::uint64_t FENCE_TIMEOUT = 100'000'000;
+constexpr u64 FENCE_TIMEOUT = 100'000'000;
 
 export struct WindowContext {
     bool isReady;
@@ -53,8 +53,8 @@ struct VulkanContext {
     std::vector<vk::raii::Fence> waitFences;
     //    CameraUpload cameraUpload;
     //    SceneUpload sceneUpload;
-    std::uint32_t currentFrame = 0;
-    std::uint32_t currentSwapchainImageIndex = 0;
+    u32 currentFrame = 0;
+    u32 currentSwapchainImageIndex = 0;
 };
 
 void createSwapchain(VulkanContext& context) {
@@ -71,11 +71,11 @@ void recreatePipeline(VulkanContext& context) {
 void setupImgui(VulkanContext& context) {
     ImGui::CheckVersion();
     ImGui::CreateContext();
-    ImGui::ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
-    ImGui::ImGui_ImplGlfw_InitForVulkan(context.window.windowHandle.get(), true);
-    ImGui::ImGui_ImplVulkan_InitInfo initInfo{
+    ImGui_ImplGlfw_InitForVulkan(context.window.windowHandle.get(), true);
+    ImGui_ImplVulkan_InitInfo initInfo{
             .Instance = *context.instance,
             .PhysicalDevice = *context.physicalDevice,
             .Device = *context.device,
@@ -88,18 +88,18 @@ void setupImgui(VulkanContext& context) {
             .ImageCount = 2,
             .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
             .UseDynamicRendering = true,
-            .ColorAttachmentFormat = static_cast<vkc::VkFormat>(context.swapchain.format.format),
+            .ColorAttachmentFormat = static_cast<VkFormat>(context.swapchain.format.format),
             .Allocator = nullptr,
             .CheckVkResultFn = nullptr,
     };
-    ImGui::ImGui_ImplVulkan_Init(&initInfo, {});
+    ImGui_ImplVulkan_Init(&initInfo, {});
     log("[IMGUI] {} initialized", ImGui::GetVersion());
 
     oneTimeSubmit(context.commandBuffers.front(), context.graphicsQueue, [](vk::raii::CommandBuffer const& commands) {
-        ImGui::ImGui_ImplVulkan_CreateFontsTexture(*commands);
+        ImGui_ImplVulkan_CreateFontsTexture(*commands);
     });
 
-    ImGui::ImGui_ImplVulkan_DestroyFontUploadObjects();
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 //void renderImGuiOverlay(App& app) {
@@ -140,12 +140,12 @@ void setupImgui(VulkanContext& context) {
 
 void renderImgui(App& app) {
     auto& context = app.globalContext.get<VulkanContext>();
-    ImGui::ImGui_ImplVulkan_NewFrame();
-    ImGui::ImGui_ImplGlfw_NewFrame();
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     ImGui::Render();
-    ImGui::ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *context.commandBuffers[context.currentFrame]);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *context.commandBuffers[context.currentFrame]);
 }
 
 export class VulkanRenderPlugin : public Plugin {
@@ -168,7 +168,7 @@ public:
         context.commandBuffers = {context.device, {*context.commandPool, vk::CommandBufferLevel::ePrimary, 2}};
         context.graphicsQueue = {context.device, context.queueFamilyIndices.graphicsFamilyIndex, 0};
         context.presentQueue = {context.device, context.queueFamilyIndices.presentFamilyIndex, 0};
-        for (std::uint32_t i = 0; i < context.commandBuffers.size(); ++i) {
+        for (u32 i = 0; i < context.commandBuffers.size(); ++i) {
             context.presentationCompleteSemaphores.emplace_back(context.device, vk::SemaphoreCreateInfo{});
             context.renderCompleteSemaphores.emplace_back(context.device, vk::SemaphoreCreateInfo{});
             context.waitFences.emplace_back(context.device, vk::FenceCreateInfo{vk::FenceCreateFlagBits::eSignaled});
@@ -337,7 +337,7 @@ public:
     }
 
     void cleanup(App& app) override {
-        ImGui::ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplVulkan_Shutdown();
         //    glslang::FinalizeProcess();
         //    for (auto& [_, pipeline]: app.globalCtx.at<VulkanContext>().modelPipelines) {
         //        for (auto& item: pipeline.shaders) {

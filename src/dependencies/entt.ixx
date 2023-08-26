@@ -10,7 +10,7 @@ export namespace entt {
     using entt::resource_cache;
 
     namespace literals {
-        using entt::literals::operator ""_hs;
+        using entt::literals::operator""_hs;
     }
 
 }// namespace entt

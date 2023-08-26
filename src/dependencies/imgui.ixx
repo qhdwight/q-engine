@@ -5,12 +5,7 @@ module;
 
 export module imgui;
 
-export namespace ImGui {
-
-    void CheckVersion() {
-        IMGUI_CHECKVERSION();
-    }
-
+export {
     using ::ImGui_ImplGlfw_InitForVulkan;
     using ::ImGui_ImplGlfw_NewFrame;
     using ::ImGui_ImplVulkan_CreateFontsTexture;
@@ -21,6 +16,12 @@ export namespace ImGui {
     using ::ImGui_ImplVulkan_RenderDrawData;
     using ::ImGui_ImplVulkan_Shutdown;
     using ::ImGuiIO;
+}
+
+export namespace ImGui {
+    void CheckVersion() {
+        IMGUI_CHECKVERSION();
+    }
     using ImGui::CreateContext;
     using ImGui::GetDrawData;
     using ImGui::GetIO;
@@ -29,5 +30,4 @@ export namespace ImGui {
     using ImGui::Render;
     using ImGui::ShowDemoWindow;
     using ImGui::StyleColorsDark;
-
 }// namespace ImGui
