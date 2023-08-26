@@ -7,10 +7,11 @@ export module entt;
 export namespace entt {
 
     using entt::registry;
+    using entt::resource;
     using entt::resource_cache;
 
     namespace literals {
-        using entt::literals::operator""_hs;
+        using entt::literals::operator ""_hs;
     }
 
 }// namespace entt

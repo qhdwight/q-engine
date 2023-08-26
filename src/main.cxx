@@ -12,7 +12,7 @@ constexpr int EXIT_FAILURE = 0;
 
 int main() {
     try {
-        entt::resource_cache<gltf::Model, gltf::ModelLoader> models;
+        entt::resource_cache<gltf::ModelAsset, gltf::ModelLoader> models;
         std::ifstream stream("assets/models/Cube.glb", std::ios::binary);
         models.load("cube"_hs, stream);
 
