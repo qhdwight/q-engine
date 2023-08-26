@@ -25,7 +25,6 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif ()
 
 ### libc++ ###
-set(LIBCXX_BUILD /opt/libcxx)
 message(STATUS ${LIBCXX_BUILD})
 include(FetchContent)
 FetchContent_Declare(
