@@ -4,11 +4,7 @@ module;
 
 export module glfw;
 
-export namespace glfw {
-
-    constexpr int CLIENT_API = GLFW_CLIENT_API;
-    constexpr int NO_API = GLFW_NO_API;
-
+export {
     using ::glfwCreateWindow;
     using ::glfwCreateWindowSurface;
     using ::glfwDestroyWindow;
@@ -22,5 +18,12 @@ export namespace glfw {
     using ::GLFWwindow;
     using ::glfwWindowHint;
     using ::glfwWindowShouldClose;
+}
+
+export namespace glfw {
+
+    constexpr int CLIENT_API = GLFW_CLIENT_API;
+    constexpr int NO_API = GLFW_NO_API;
 
 }// namespace glfw
+

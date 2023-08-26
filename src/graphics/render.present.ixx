@@ -17,14 +17,14 @@ struct Window {
     Window(vk::raii::Instance const& instance, const char* windowName, vk::Extent2D const& extent)
         : windowName{windowName} {
 
-        glfw::GLFWwindow* windowRaw = glfw::glfwCreateWindow(
+        GLFWwindow* windowRaw = glfwCreateWindow(
                 static_cast<int>(extent.width), static_cast<int>(extent.height),
                 windowName,// Enforce null-termination
                 nullptr, nullptr);
-        windowHandle = {windowRaw, glfw::glfwDestroyWindow};
+        windowHandle = {windowRaw, glfwDestroyWindow};
 
         VkSurfaceKHR rawSurface;
-        if (auto result = static_cast<vk::Result>(glfw::glfwCreateWindowSurface(*instance, windowRaw, nullptr, &rawSurface)); result != vk::Result::eSuccess)
+        if (auto result = static_cast<vk::Result>(glfwCreateWindowSurface(*instance, windowRaw, nullptr, &rawSurface)); result != vk::Result::eSuccess)
             throw std::runtime_error("[GLFW] Failed to create window surface: " + vk::to_string(result));
 
         surface = {instance, rawSurface};
@@ -40,12 +40,12 @@ struct Window {
 
     [[nodiscard]] vk::Extent2D extent() const {
         int width, height;
-        glfw::glfwGetFramebufferSize(windowHandle.get(), &width, &height);
+        glfwGetFramebufferSize(windowHandle.get(), &width, &height);
         return {static_cast<u32>(width), static_cast<u32>(height)};
     }
 
     std::string windowName;
-    std::unique_ptr<glfw::GLFWwindow, std::function<void(glfw::GLFWwindow*)>> windowHandle;
+    std::unique_ptr<GLFWwindow, std::function<void(GLFWwindow*)>> windowHandle;
     vk::raii::SurfaceKHR surface = nullptr;
 };
 

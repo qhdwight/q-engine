@@ -28,7 +28,7 @@ struct QueueFamilyIndices {
     InstanceExtensions desiredExtensions{"VK_KHR_portability_enumeration"};
     {
         u32 glfwExtensionCount = 0;
-        const char** glfwExtensions = glfw::glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (u32 i = 0; i < glfwExtensionCount; ++i)
             desiredExtensions.emplace_back(glfwExtensions[i]);
     }
@@ -216,11 +216,11 @@ vk::raii::DebugUtilsMessengerEXT makeDebugUtilsMessenger(vk::raii::Instance cons
 }
 
 void setupGlfw() {
-    glfw::glfwInit();
-    log("[GLFW] {} initialized", glfw::glfwGetVersionString());
-    glfw::glfwSetErrorCallback([](int error, const char* msg) {
+    glfwInit();
+    log("[GLFW] {} initialized", glfwGetVersionString());
+    glfwSetErrorCallback([](int error, const char* msg) {
         std::cerr << std::format("[GLFW] Error {}: {}\n", error, msg);
     });
-    if (!glfw::glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
-    glfw::glfwWindowHint(glfw::CLIENT_API, glfw::NO_API);
+    if (!glfwVulkanSupported()) throw std::runtime_error("[GLFW] Vulkan is not supported");
+    glfwWindowHint(glfw::CLIENT_API, glfw::NO_API);
 }

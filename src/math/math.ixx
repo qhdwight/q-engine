@@ -5,16 +5,16 @@ import common;
 import std;
 
 export template<typename T>
-concept Arithmetic = std::is_arithmetic_v<T>;
+concept Arithmetical = std::is_arithmetic_v<T>;
 
 template<std::size_t... Dims>
 struct product;
 
-export template<Arithmetic T, std::size_t... Dims>
+export template<Arithmetical T, std::size_t... Dims>
 struct matrix : public std::array<T, (Dims * ...)> {
 };
 
-export template<Arithmetic T, std::size_t Dim>
+export template<Arithmetical T, std::size_t Dim>
 using vec = matrix<T, Dim, 1>;
 
 export using f64_2 = vec<f64, 2>;

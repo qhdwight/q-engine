@@ -322,9 +322,9 @@ public:
                     vk::PresentInfoKHR{*renderComplete, *context.swapchain.swapchain, context.currentSwapchainImageIndex});
             check(presentResult == vk::Result::eSuccess);
 
-            glfw::glfwPollEvents();
+            glfwPollEvents();
             bool& keepOpen = app.globalContext.get<WindowContext>().keepOpen;
-            keepOpen = !glfw::glfwWindowShouldClose(context.window.windowHandle.get());
+            keepOpen = !glfwWindowShouldClose(context.window.windowHandle.get());
             if (!keepOpen) {
                 context.device.waitIdle();
             }
