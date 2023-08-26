@@ -24,9 +24,6 @@ namespace gltf {
             u32 length{};
         } header;
 
-        struct JsonChunk {
-        };
-
         struct Chunk {
             ChunkType type{};
             std::vector<std::byte> data;
@@ -47,8 +44,8 @@ namespace gltf {
         header.version = parse<u32>(stream);
         header.length = parse<u32>(stream);
 
-        check_equal(header.magic, MAGIC);
-        check_equal(header.version, VERSION);
+        checkEqual(header.magic, MAGIC);
+        checkEqual(header.version, VERSION);
         return header;
     }
 
@@ -60,7 +57,7 @@ namespace gltf {
         chunk.type = parse<ChunkType>(stream);
         stream.read(reinterpret_cast<char*>(chunk.data.data()), length);
 
-        check_in(chunk.type, {ChunkType::JSON, ChunkType::BINARY});
+        checkIn(chunk.type, {ChunkType::JSON, ChunkType::BINARY});
         return chunk;
     }
 
@@ -75,8 +72,8 @@ namespace gltf {
         rapidjson::Document document;
         document.Parse(jsonString.data(), jsonString.size());
 
-        check_equal(model.jsonChunk.type, ChunkType::JSON);
-        check_equal(model.binaryChunk.type, ChunkType::BINARY);
+        checkEqual(model.jsonChunk.type, ChunkType::JSON);
+        checkEqual(model.binaryChunk.type, ChunkType::BINARY);
         check(document.IsObject());
         return model;
     }

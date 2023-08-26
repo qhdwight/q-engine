@@ -18,7 +18,7 @@ export void check(bool condition,
 }
 
 export template<typename T>
-void check_equal(T const &lhs, T const &rhs,
+void checkEqual(T const &lhs, T const &rhs,
                  std::source_location location = std::source_location::current()) {
     if (lhs == rhs) return;
 
@@ -31,7 +31,7 @@ void check_equal(T const &lhs, T const &rhs,
 }
 
 export template<typename T>
-void check_in(T const &lhs, std::unordered_set <T> const &rhs,
+void checkIn(T const &lhs, std::unordered_set <T> const &rhs,
               std::source_location location = std::source_location::current()) {
     if (rhs.contains(lhs)) return;
 
